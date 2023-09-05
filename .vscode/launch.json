@@ -10,7 +10,8 @@
             "name": "Debug",
             "program": "${workspaceFolder}/${defaultBuildTask}/bin/observer",
             "args": ["-f", "${workspaceFolder}/etc/observer.ini", "-P", "cli"],
-            "cwd": "${workspaceFolder}/${defaultBuildTask}/"
+            "cwd": "${workspaceFolder}/${defaultBuildTask}/",
+            "preLaunchTask": "build_debug"
         }
     ]
 }

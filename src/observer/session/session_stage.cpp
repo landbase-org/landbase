@@ -87,6 +87,7 @@ void SessionStage::handle_event(StageEvent *event)
 
 void SessionStage::handle_request(StageEvent *event)
 {
+  // dynamic_cast 用于类继承层次间的指针或引用转换。主要还是用于执行“安全的向下转型（safe downcasting）”，也即是基类对象的指针或引用转换为同一继承层次的其他指针或引用。
   SessionEvent *sev = dynamic_cast<SessionEvent *>(event);
   if (nullptr == sev) {
     LOG_ERROR("Cannot cat event to sessionEvent");
@@ -126,6 +127,8 @@ void SessionStage::handle_request(StageEvent *event)
  */
 RC SessionStage::handle_sql(SQLStageEvent *sql_event)
 {
+  // TODO: 添加查询缓存阶段
+  // 当前什么也没做
   RC rc = query_cache_stage_.handle_request(sql_event);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do query cache. rc=%s", strrc(rc));

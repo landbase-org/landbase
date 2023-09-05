@@ -327,6 +327,7 @@ int Server::start_stdin_server()
       return -1;
     }
 
+    // event 为 null 代表输入了 exit 命令
     if (event == nullptr) {
       break;
     }

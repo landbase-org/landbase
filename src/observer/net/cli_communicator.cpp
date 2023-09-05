@@ -93,6 +93,7 @@ char *read_command()
   for (input_command = my_readline(prompt_str); 
         common::is_blank(input_command); 
         input_command = my_readline(prompt_str)) {
+    // 如果只输入了回车: input_command = "\0", 所以要free
     free(input_command);
     input_command = nullptr;
   }
