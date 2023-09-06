@@ -121,7 +121,7 @@ void SessionStage::handle_request(StageEvent *event)
 RC SessionStage::handle_sql(SQLStageEvent *sql_event)
 {
   // TODO: 添加查询缓存阶段
-  // 当前什么也没做
+    // 主要的五个阶段处理
   RC rc = query_cache_stage_.handle_request(sql_event);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do query cache. rc=%s", strrc(rc));
