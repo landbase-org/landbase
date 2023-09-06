@@ -12,6 +12,7 @@ See the Mulan PSL v2 for more details. */
 // Created by Meiyi & Wangyunlai on 2021/5/13.
 //
 
+#include <cstdio>
 #include <limits.h>
 #include <string.h>
 #include <algorithm>
@@ -120,6 +121,41 @@ RC Table::create(int32_t table_id,
   base_dir_ = base_dir;
   LOG_INFO("Successfully create table %s:%s", base_dir, name);
   return rc;
+}
+
+RC Table::drop(const char * base_dir){
+    // 删除表, 获取索引, 删除索引
+    auto path = table_data_file(base_dir, name());
+    int fail = remove(path.c_str());
+    if (fail){
+        LOG_ERROR("Failed to drop table data file: %s", name());
+        return RC::FAIL_TO_DELETE_FILE;
+    }
+
+    BufferPoolManager &bpm = BufferPoolManager::instance();
+    RC rc = bpm.close_file(path.c_str());
+    if(rc!=RC::SUCCESS){
+        LOG_ERROR("Failed to close BufferPool: %s", name());
+        return RC::FAILURE;
+    }
+
+    path = table_meta_file(base_dir, name());
+    fail = remove(path.c_str());
+    if (fail){
+        LOG_ERROR("Failed to drop table meta file: %s", name());
+        return RC::FAIL_TO_DELETE_FILE;
+    }
+
+    for (auto index : indexes_){
+        path = table_index_file(base_dir, name(), index->index_meta().name());
+        fail = remove(path.c_str());
+        if (fail){
+            LOG_ERROR("Failed to drop index %s on table %s", index->index_meta().name(), name());
+            return RC::FAIL_TO_DELETE_FILE;
+        }
+    }
+
+    return RC::SUCCESS;
 }
 
 RC Table::open(const char *meta_file, const char *base_dir)

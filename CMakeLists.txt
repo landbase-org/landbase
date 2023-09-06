@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 set(CMAKE_CXX_STANDARD 20)
 
 project(minidb)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 MESSAGE(STATUS "This is Project source dir " ${PROJECT_SOURCE_DIR})
 MESSAGE(STATUS "This is PROJECT_BINARY_DIR dir " ${PROJECT_BINARY_DIR})

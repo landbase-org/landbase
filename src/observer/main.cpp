@@ -168,9 +168,8 @@ void quit_signal_handle(int signum)
 int main(int argc, char **argv)
 {
   int rc = STATUS_SUCCESS;
-
   setSignalHandler(quit_signal_handle);
-
+  // 解析参数
   parse_parameter(argc, argv);
 
   rc = init(the_process_param());

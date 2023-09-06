@@ -197,9 +197,10 @@ int Log::rotate_by_day(const int year, const int month, const int day)
     return 0;
   }
 
+  // 将日志名改为 observer-2001-02-03.log 的样式
   char date[16] = {0};
-  snprintf(date, sizeof(date), "%04d%02d%02d", year, month, day);
-  std::string log_file_name = log_name_ + "." + date;
+  snprintf(date, sizeof(date), "-%04d-%02d-%02d", year, month, day);
+  std::string log_file_name = log_name_.insert(log_name_.length() - 4, date);
 
   if (ofs_.is_open()) {
     ofs_.close();
