@@ -96,6 +96,7 @@ void SessionStage::handle_request(StageEvent *event)
   sev->session()->set_current_request(sev);
   SQLStageEvent *sql_event = new SQLStageEvent(sev, sql);
   (void)handle_sql(sql_event);
+  delete sql_event;
 
   Communicator *communicator    = sev->get_communicator();
   bool          need_disconnect = false;
@@ -121,7 +122,7 @@ void SessionStage::handle_request(StageEvent *event)
 RC SessionStage::handle_sql(SQLStageEvent *sql_event)
 {
   // TODO: 添加查询缓存阶段
-    // 主要的五个阶段处理
+  // 主要的五个阶段处理
   RC rc = query_cache_stage_.handle_request(sql_event);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do query cache. rc=%s", strrc(rc));
