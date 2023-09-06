@@ -11,6 +11,7 @@ See the Mulan PSL v2 for more details. */
 //
 // Created by Wangyunlai on 2022/6/23.
 //
+#include <cstdint>
 
 #pragma once
 
