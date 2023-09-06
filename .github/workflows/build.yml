@@ -2,9 +2,9 @@ name: build
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "master" ]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -39,16 +39,3 @@ jobs:
         cd build_debug
         make test
 
-  build-on-mac:
-    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
-    # You can convert this to a matrix build if you need cross-platform coverage.
-    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-    runs-on: macos-latest
-
-    steps:
-    - name: Checkout repository and submodules
-      uses: actions/checkout@v2
-        
-    - name: Build
-      shell: bash
-      run: sudo bash build.sh init && bash build.sh release --make -j4
