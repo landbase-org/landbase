@@ -11,14 +11,14 @@ See the Mulan PSL v2 for more details. */
 //
 // Created by Wangyunlai on 2023/03/14
 //
+#include <benchmark/benchmark.h>
 #include <inttypes.h>
 #include <stdexcept>
-#include <benchmark/benchmark.h>
 
-#include "storage/index/bplus_tree.h"
-#include "storage/buffer/disk_buffer_pool.h"
 #include "common/log/log.h"
 #include "integer_generator.h"
+#include "storage/buffer/disk_buffer_pool.h"
+#include "storage/index/bplus_tree.h"
 
 using namespace std;
 using namespace common;
@@ -76,7 +76,8 @@ public:
       throw runtime_error("failed to create btree handler");
     }
     LOG_INFO(
-        "test %s setup done. threads=%d, thread index=%d", this->Name().c_str(), state.threads(), state.thread_index());
+        "test %s setup done. threads=%d, thread index=%d", this->Name().c_str(), state.threads(), state.thread_index()
+    );
   }
 
   virtual void TearDown(const State &state)
@@ -86,10 +87,12 @@ public:
     }
 
     handler_.close();
-    LOG_INFO("test %s teardown done. threads=%d, thread index=%d",
+    LOG_INFO(
+        "test %s teardown done. threads=%d, thread index=%d",
         this->Name().c_str(),
         state.threads(),
-        state.thread_index());
+        state.thread_index()
+    );
   }
 
   void FillUp(uint32_t min, uint32_t max)
@@ -330,16 +333,18 @@ BENCHMARK_DEFINE_F(MixtureBenchmark, Mixture)(State &state)
     }
   }
 
-  state.counters.insert({{"insert_success", Counter(stat.insert_success_count, Counter::kIsRate)},
-      {"insert_other", Counter(stat.insert_other_count, Counter::kIsRate)},
-      {"insert_duplicate", Counter(stat.duplicate_count, Counter::kIsRate)},
-      {"delete_success", Counter(stat.delete_success_count, Counter::kIsRate)},
-      {"delete_other", Counter(stat.delete_other_count, Counter::kIsRate)},
-      {"delete_not_exist", Counter(stat.not_exist_count, Counter::kIsRate)},
-      {"scan_success", Counter(stat.scan_success_count, Counter::kIsRate)},
-      {"scan_other", Counter(stat.scan_other_count, Counter::kIsRate)},
-      {"scan_mismatch", Counter(stat.mismatch_count, Counter::kIsRate)},
-      {"scan_open_failed", Counter(stat.scan_open_failed_count, Counter::kIsRate)}});
+  state.counters.insert(
+      {{"insert_success", Counter(stat.insert_success_count, Counter::kIsRate)},
+       {"insert_other", Counter(stat.insert_other_count, Counter::kIsRate)},
+       {"insert_duplicate", Counter(stat.duplicate_count, Counter::kIsRate)},
+       {"delete_success", Counter(stat.delete_success_count, Counter::kIsRate)},
+       {"delete_other", Counter(stat.delete_other_count, Counter::kIsRate)},
+       {"delete_not_exist", Counter(stat.not_exist_count, Counter::kIsRate)},
+       {"scan_success", Counter(stat.scan_success_count, Counter::kIsRate)},
+       {"scan_other", Counter(stat.scan_other_count, Counter::kIsRate)},
+       {"scan_mismatch", Counter(stat.mismatch_count, Counter::kIsRate)},
+       {"scan_open_failed", Counter(stat.scan_open_failed_count, Counter::kIsRate)}}
+  );
 }
 
 BENCHMARK_REGISTER_F(MixtureBenchmark, Mixture)->Threads(10)->Arg(4 * 10000);

@@ -25,12 +25,13 @@ See the Mulan PSL v2 for more details. */
 namespace common {
 
 //********************************************************************
-//#means comments
+// #means comments
 // Ini configuration format
 //[section]
 // VARNAME=VALUE
 
-class Ini {
+class Ini
+{
 public:
   /**
    * To simplify the logic, no lock's when loading configuration
@@ -58,7 +59,8 @@ public:
    * use the input default_value
    */
   std::string get(
-      const std::string &key, const std::string &default_value, const std::string &section = DEFAULT_SECTION);
+      const std::string &key, const std::string &default_value, const std::string &section = DEFAULT_SECTION
+  );
 
   /**
    * put the key-value pair to the section
@@ -88,7 +90,7 @@ public:
 
   // session name tag
   static const char CFG_SESSION_START_TAG = '[';
-  static const char CFG_SESSION_END_TAG = ']';
+  static const char CFG_SESSION_END_TAG   = ']';
 
 protected:
   /**
@@ -115,7 +117,7 @@ private:
   static const std::map<std::string, std::string> empty_map_;
 
   std::set<std::string> file_names_;
-  SessionsMap sections_;
+  SessionsMap           sections_;
 };
 
 /**

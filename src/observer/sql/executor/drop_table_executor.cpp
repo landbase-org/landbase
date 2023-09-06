@@ -1,12 +1,12 @@
 #include "drop_table_executor.h"
-#include "sql/stmt/drop_table_stmt.h"
-#include "sql/stmt/stmt.h"
+#include "common/log/log.h"
+#include "event/session_event.h"
 #include "event/sql_event.h"
 #include "session/session.h"
-#include "common/log/log.h"
-#include "storage/table/table.h"
-#include "event/session_event.h"
+#include "sql/stmt/drop_table_stmt.h"
+#include "sql/stmt/stmt.h"
 #include "storage/db/db.h"
+#include "storage/table/table.h"
 
 RC DropTableExecutor::execute(SQLStageEvent *sql_event)
 {

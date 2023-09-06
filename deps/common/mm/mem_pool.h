@@ -14,13 +14,13 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
-#include <queue>
-#include <list>
-#include <set>
-#include <string>
-#include <sstream>
 #include <functional>
+#include <list>
 #include <memory>
+#include <queue>
+#include <set>
+#include <sstream>
+#include <string>
 
 #include "common/lang/mutex.h"
 #include "common/log/log.h"
@@ -48,10 +48,7 @@ public:
     MUTEX_INIT(&mutex, &mutexatr);
   }
 
-  virtual ~MemPool()
-  {
-    MUTEX_DESTROY(&mutex);
-  }
+  virtual ~MemPool() { MUTEX_DESTROY(&mutex); }
 
   /**
    * init memory pool, the major job is to alloc memory for memory pool
@@ -60,7 +57,8 @@ public:
    * @return
    */
   virtual int init(
-      bool dynamic = true, int pool_num = DEFAULT_POOL_NUM, int item_num_per_pool = DEFAULT_ITEM_NUM_PER_POOL) = 0;
+      bool dynamic = true, int pool_num = DEFAULT_POOL_NUM, int item_num_per_pool = DEFAULT_ITEM_NUM_PER_POOL
+  ) = 0;
 
   /**
    * Do cleanup job for memory pool
@@ -90,24 +88,15 @@ public:
    */
   virtual std::string to_string() = 0;
 
-  const std::string get_name() const
-  {
-    return name;
-  }
-  bool is_dynamic() const
-  {
-    return dynamic;
-  }
-  int get_size() const
-  {
-    return size;
-  }
+  const std::string get_name() const { return name; }
+  bool              is_dynamic() const { return dynamic; }
+  int               get_size() const { return size; }
 
 protected:
   pthread_mutex_t mutex;
-  int size;
-  bool dynamic;
-  std::string name;
+  int             size;
+  bool            dynamic;
+  std::string     name;
 };
 
 /**
@@ -119,13 +108,9 @@ template <class T>
 class MemPoolSimple : public MemPool<T>
 {
 public:
-  MemPoolSimple(const char *tag) : MemPool<T>(tag)
-  {}
+  MemPoolSimple(const char *tag) : MemPool<T>(tag) {}
 
-  virtual ~MemPoolSimple()
-  {
-    cleanup();
-  }
+  virtual ~MemPoolSimple() { cleanup(); }
 
   /**
    * init memory pool, the major job is to alloc memory for memory pool
@@ -163,10 +148,7 @@ public:
    */
   std::string to_string();
 
-  int get_item_num_per_pool() const
-  {
-    return item_num_per_pool;
-  }
+  int get_item_num_per_pool() const { return item_num_per_pool; }
 
   int get_used_num()
   {
@@ -178,9 +160,9 @@ public:
 
 protected:
   std::list<T *> pools;
-  std::set<T *> used;
+  std::set<T *>  used;
   std::list<T *> frees;
-  int item_num_per_pool;
+  int            item_num_per_pool;
 };
 
 template <class T>
@@ -192,8 +174,12 @@ int MemPoolSimple<T>::init(bool dynamic, int pool_num, int item_num_per_pool)
   }
 
   if (pool_num <= 0 || item_num_per_pool <= 0) {
-    LOG_ERROR("Invalid arguments,  pool_num:%d, item_num_per_pool:%d, this->name:%s.",
-              pool_num, item_num_per_pool, this->name.c_str());
+    LOG_ERROR(
+        "Invalid arguments,  pool_num:%d, item_num_per_pool:%d, this->name:%s.",
+        pool_num,
+        item_num_per_pool,
+        this->name.c_str()
+    );
     return -1;
   }
 
@@ -208,8 +194,12 @@ int MemPoolSimple<T>::init(bool dynamic, int pool_num, int item_num_per_pool)
   }
   this->dynamic = dynamic;
 
-  LOG_INFO("Extend one pool, this->size:%d, item_num_per_pool:%d, this->name:%s.",
-           this->size, item_num_per_pool, this->name.c_str());
+  LOG_INFO(
+      "Extend one pool, this->size:%d, item_num_per_pool:%d, this->name:%s.",
+      this->size,
+      item_num_per_pool,
+      this->name.c_str()
+  );
   return 0;
 }
 
@@ -249,8 +239,12 @@ int MemPoolSimple<T>::extend()
   T *pool = new T[item_num_per_pool];
   if (pool == nullptr) {
     MUTEX_UNLOCK(&this->mutex);
-    LOG_ERROR("Failed to extend memory pool, this->size:%d, item_num_per_pool:%d, this->name:%s.",
-              this->size, item_num_per_pool, this->name.c_str());
+    LOG_ERROR(
+        "Failed to extend memory pool, this->size:%d, item_num_per_pool:%d, this->name:%s.",
+        this->size,
+        item_num_per_pool,
+        this->name.c_str()
+    );
     return -1;
   }
 
@@ -261,8 +255,12 @@ int MemPoolSimple<T>::extend()
   }
   MUTEX_UNLOCK(&this->mutex);
 
-  LOG_INFO("Extend one pool, this->size:%d, item_num_per_pool:%d, this->name:%s.",
-           this->size, item_num_per_pool, this->name.c_str());
+  LOG_INFO(
+      "Extend one pool, this->size:%d, item_num_per_pool:%d, this->name:%s.",
+      this->size,
+      item_num_per_pool,
+      this->name.c_str()
+  );
   return 0;
 }
 
@@ -295,7 +293,7 @@ template <class T>
 void MemPoolSimple<T>::free(T *buf)
 {
   buf->reset();
-  
+
   MUTEX_LOCK(&this->mutex);
 
   size_t num = used.erase(buf);
@@ -329,7 +327,7 @@ std::string MemPoolSimple<T>::to_string()
 class MemPoolItem
 {
 public:
-  using unique_ptr = std::unique_ptr<void, std::function<void(void * const)>>;
+  using unique_ptr = std::unique_ptr<void, std::function<void(void *const)>>;
 
 public:
   MemPoolItem(const char *tag) : name(tag)
@@ -355,8 +353,10 @@ public:
    * @param item_num_per_pool, how many items per pool.
    * @return
    */
-  int init(int item_size, bool dynamic = true, int pool_num = DEFAULT_POOL_NUM,
-      int item_num_per_pool = DEFAULT_ITEM_NUM_PER_POOL);
+  int init(
+      int item_size, bool dynamic = true, int pool_num = DEFAULT_POOL_NUM,
+      int item_num_per_pool = DEFAULT_ITEM_NUM_PER_POOL
+  );
 
   /**
    * Do cleanup job for memory pool
@@ -372,7 +372,7 @@ public:
    * Alloc one frame from memory Pool
    * @return
    */
-  void *alloc();
+  void      *alloc();
   unique_ptr alloc_unique_ptr();
 
   /**
@@ -408,26 +408,11 @@ public:
     return ss.str();
   }
 
-  const std::string get_name() const
-  {
-    return name;
-  }
-  bool is_dynamic() const
-  {
-    return dynamic;
-  }
-  int get_size() const
-  {
-    return size;
-  }
-  int get_item_size() const
-  {
-    return item_size;
-  }
-  int get_item_num_per_pool() const
-  {
-    return item_num_per_pool;
-  }
+  const std::string get_name() const { return name; }
+  bool              is_dynamic() const { return dynamic; }
+  int               get_size() const { return size; }
+  int               get_item_size() const { return item_size; }
+  int               get_item_num_per_pool() const { return item_num_per_pool; }
 
   int get_used_num()
   {
@@ -439,14 +424,14 @@ public:
 
 protected:
   pthread_mutex_t mutex;
-  std::string name;
-  bool dynamic;
-  int size;
-  int item_size;
-  int item_num_per_pool;
+  std::string     name;
+  bool            dynamic;
+  int             size;
+  int             item_size;
+  int             item_num_per_pool;
 
   std::list<void *> pools;
-  std::set<void *> used;
+  std::set<void *>  used;
   std::list<void *> frees;
 };
 

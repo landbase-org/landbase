@@ -33,7 +33,10 @@ extern bool &get_event_history_flag();
 
 // Constructor
 CompletionCallback::CompletionCallback(Stage *trgt, CallbackContext *ctx)
-    : target_stage_(trgt), context_(ctx), next_cb_(NULL), ev_hist_flag_(get_event_history_flag())
+    : target_stage_(trgt),
+      context_(ctx),
+      next_cb_(NULL),
+      ev_hist_flag_(get_event_history_flag())
 {}
 
 // Destructor
@@ -75,10 +78,7 @@ void CompletionCallback::event_done(StageEvent *ev)
 }
 
 // Reschedule callback on target stage thread
-void CompletionCallback::event_reschedule(StageEvent *ev)
-{
-  target_stage_->add_event(ev);
-}
+void CompletionCallback::event_reschedule(StageEvent *ev) { target_stage_->add_event(ev); }
 
 void CompletionCallback::event_timeout(StageEvent *ev)
 {

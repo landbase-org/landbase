@@ -22,15 +22,17 @@ int MemPoolItem::init(int item_size, bool dynamic, int pool_num, int item_num_pe
   }
 
   if (item_size <= 0 || pool_num <= 0 || item_num_per_pool <= 0) {
-    LOG_ERROR("Invalid arguments, item_size:%d, pool_num:%d, item_num_per_pool:%d, this->name:%s.",
+    LOG_ERROR(
+        "Invalid arguments, item_size:%d, pool_num:%d, item_num_per_pool:%d, this->name:%s.",
         item_size,
         pool_num,
         item_num_per_pool,
-        this->name.c_str());
+        this->name.c_str()
+    );
     return -1;
   }
 
-  this->item_size = item_size;
+  this->item_size         = item_size;
   this->item_num_per_pool = item_num_per_pool;
   // in order to init memory pool, enable dynamic here
   this->dynamic = true;
@@ -42,11 +44,13 @@ int MemPoolItem::init(int item_size, bool dynamic, int pool_num, int item_num_pe
   }
   this->dynamic = dynamic;
 
-  LOG_INFO("Extend one pool, this->size:%d, item_size:%d, item_num_per_pool:%d, this->name:%s.",
+  LOG_INFO(
+      "Extend one pool, this->size:%d, item_size:%d, item_num_per_pool:%d, this->name:%s.",
       this->size,
       item_size,
       item_num_per_pool,
-      this->name.c_str());
+      this->name.c_str()
+  );
   return 0;
 }
 
@@ -84,10 +88,12 @@ int MemPoolItem::extend()
   void *pool = malloc(item_num_per_pool * item_size);
   if (pool == nullptr) {
     MUTEX_UNLOCK(&this->mutex);
-    LOG_ERROR("Failed to extend memory pool, this->size:%d, item_num_per_pool:%d, this->name:%s.",
+    LOG_ERROR(
+        "Failed to extend memory pool, this->size:%d, item_num_per_pool:%d, this->name:%s.",
         this->size,
         item_num_per_pool,
-        this->name.c_str());
+        this->name.c_str()
+    );
     return -1;
   }
 
@@ -99,11 +105,13 @@ int MemPoolItem::extend()
   }
   MUTEX_UNLOCK(&this->mutex);
 
-  LOG_INFO("Extend one pool, this->size:%d, item_size:%d, item_num_per_pool:%d, this->name:%s.",
+  LOG_INFO(
+      "Extend one pool, this->size:%d, item_size:%d, item_num_per_pool:%d, this->name:%s.",
       this->size,
       item_size,
       item_num_per_pool,
-      this->name.c_str());
+      this->name.c_str()
+  );
   return 0;
 }
 
@@ -134,8 +142,8 @@ void *MemPoolItem::alloc()
 
 MemPoolItem::unique_ptr MemPoolItem::alloc_unique_ptr()
 {
-  void *item = this->alloc();
-  auto deleter = [this](void *p) { this->free(p); };
+  void *item    = this->alloc();
+  auto  deleter = [this](void *p) { this->free(p); };
   return MemPoolItem::unique_ptr(item, deleter);
 }
 

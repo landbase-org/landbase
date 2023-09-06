@@ -46,7 +46,8 @@ int getFileLines(const std::string &fileName, uint64_t &lineNum);
  * @return  0   if success, error code otherwise
  */
 int getFileList(
-    std::vector<std::string> &fileList, const std::string &path, const std::string &pattern, bool recursive);
+    std::vector<std::string> &fileList, const std::string &path, const std::string &pattern, bool recursive
+);
 int getFileNum(uint64_t &fileNum, const std::string &path, const std::string &pattern, bool recursive);
 int getDirList(std::vector<std::string> &dirList, const std::string &path, const std::string &pattern);
 
@@ -59,7 +60,7 @@ int getFileSize(const char *filePath, uint64_t &fileLen);
 
 /**
  * @brief 一次性写入所有指定数据
- * 
+ *
  * @param fd  写入的描述符
  * @param buf 写入的数据
  * @param size 写入多少数据
@@ -69,7 +70,7 @@ int writen(int fd, const void *buf, int size);
 
 /**
  * @brief 一次性读取指定长度的数据
- * 
+ *
  * @param fd  读取的描述符
  * @param buf 读取到这里
  * @param size 读取的数据长度

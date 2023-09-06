@@ -43,7 +43,8 @@ public:
 private:
   /**
    * @brief 根据SQL生成逻辑计划
-   * @details 由于SQL语句种类比较多，并且SQL语句可能会有嵌套的情况，比如带有SQL子查询的语句，那就需要递归的创建逻辑计划。
+   * @details
+   * 由于SQL语句种类比较多，并且SQL语句可能会有嵌套的情况，比如带有SQL子查询的语句，那就需要递归的创建逻辑计划。
    * @param sql_event   包含SQL信息的事件
    * @param logical_operator  生成的逻辑计划
    */
@@ -72,10 +73,11 @@ private:
    * @param physical_operator 生成的物理计划。通常是一个多叉树的形状，这里就拿着根节点就可以了。
    */
   RC generate_physical_plan(
-      std::unique_ptr<LogicalOperator> &logical_operator, std::unique_ptr<PhysicalOperator> &physical_operator);
+      std::unique_ptr<LogicalOperator> &logical_operator, std::unique_ptr<PhysicalOperator> &physical_operator
+  );
 
 private:
-  LogicalPlanGenerator  logical_plan_generator_;  ///< 根据SQL生成逻辑计划
-  PhysicalPlanGenerator physical_plan_generator_; ///< 根据逻辑计划生成物理计划
-  Rewriter              rewriter_;                ///< 逻辑计划改写
+  LogicalPlanGenerator  logical_plan_generator_;   ///< 根据SQL生成逻辑计划
+  PhysicalPlanGenerator physical_plan_generator_;  ///< 根据逻辑计划生成物理计划
+  Rewriter              rewriter_;                 ///< 逻辑计划改写
 };

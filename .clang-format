@@ -1,52 +1,99 @@
 ---
 Language: Cpp
+
 # BasedOnStyle:	LLVM
-SortIncludes: false
+
+# 对 include 排序
+SortIncludes: true
+# The extra indent or outdent of access modifiers, e.g. public:.
 AccessModifierOffset: -2
-AlignAfterOpenBracket: DontAlign
+
+# like: 
+# someLongFunction(
+#     argument1, argument2
+# )
+AlignAfterOpenBracket: BlockIndent
+
+# 对齐: 
+# int         aaaa = 12;
+# float       b = 23;
 AlignConsecutiveAssignments: true
 AlignConsecutiveDeclarations: true
+
+# 统计文件中 & 和 * 的对齐情况进行选择格式化方式, 关闭
 DerivePointerAlignment: false
+# 指针位置: int *a;
 PointerAlignment: Right
+
 ConstructorInitializerIndentWidth: 4
 AlignEscapedNewlinesLeft: true
+# 注释对齐
 AlignTrailingComments: true
+# 运行所有函数形参在下一行
+# void myFunction(
+#     int a, int b, int c, int d, int e);
 AllowAllParametersOfDeclarationOnNextLine: true
+# 允许短的块在同一行: while (true) { continue; }
 AllowShortBlocksOnASingleLine: true
+# 允许短的函数在同一行: void myFunction() { return; }
 AllowShortFunctionsOnASingleLine: true
+# 允许短的 if 在同一行: if (true) { return; }
 AllowShortIfStatementsOnASingleLine: false
+# 允许短的 case 在同一行: case 1: return;
 AllowShortCaseLabelsOnASingleLine: true
+# 不允许短的循环在同一行
 AllowShortLoopsOnASingleLine: false
+# 允许短的模板在同一行
 AlwaysBreakTemplateDeclarations: true
 # false表示函数实参要么都在同一行，要么都各自一行
 BinPackArguments: false
+# 未知
 AlwaysBreakBeforeMultilineStrings: false
 BreakBeforeBinaryOperators: None
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializersBeforeComma: false
+# false表示函数形参要么都在同一行，要么都各自一行
 BinPackParameters: true
+# 行长度限制
 ColumnLimit: 120
-ConstructorInitializerAllOnOneLineOrOnePerLine: true
+# 构造器参数初始化要么都在同一行，要么都各自一行
+PackConstructorInitializers: CurrentLine
+# 未知
 DerivePointerBinding: true
+# 实验性功能 自动决定函数调用和声明时参数是在同一行还是各自一行
 ExperimentalAutoDetectBinPacking: false
+# 关闭自动case缩进
 IndentCaseLabels: true
+# 最大空行
 MaxEmptyLinesToKeep: 1
+# 关闭命名空间缩进
 NamespaceIndentation: None
+# Objective-C 的选项
 ObjCSpaceBeforeProtocolList: false
+# 看不懂
 PenaltyBreakBeforeFirstCallParameter: 19
 PenaltyBreakComment: 200
 PenaltyBreakString: 1000
 PenaltyBreakFirstLessLess: 120
 PenaltyExcessCharacter: 1000000
 PenaltyReturnTypeOnItsOwnLine: 200
+# deprecated
 AlwaysBreakAfterDefinitionReturnType: None
+# 关闭函数声明时在返回类型后换行
 AlwaysBreakAfterReturnType: None
+# 未知
 PointerBindsToType: true
+# true:  new int[3]{1, 2, 3};                   
+# false: new int[3]{ 1, 2, 3 };
 Cpp11BracedListStyle: true
+# 自动决定 C++ 标准
 Standard:        Auto
+# 缩进宽度
 IndentWidth:     2
+# Tab 宽度, 不使用 Tab
 TabWidth:        4
 UseTab:          Never
+# { 之前换行
 BreakBeforeBraces: Custom
 BraceWrapping:   
   AfterClass:      true
@@ -64,19 +111,27 @@ BraceWrapping:
   SplitEmptyFunction: false
   SplitEmptyRecord: false
   SplitEmptyNamespace: false
+# 未知
 IndentFunctionDeclarationAfterType: true
+# deprecated
 SpacesInParentheses: false
+# <> 内无空格
 SpacesInAngles: false
+# deprecated
 SpaceInEmptyParentheses: false
+# deprecated
 SpacesInCStyleCastParentheses: false
+# 未知
 SpaceAfterControlStatementKeyword: true
+# 允许赋值运算符前面的空格
 SpaceBeforeAssignmentOperators: true
+# 注释前面的空格
 SpacesBeforeTrailingComments: 2
+# 换行的缩进宽度
 ContinuationIndentWidth: 4
+# 不要格式化的标记
 CommentPragmas:  '^lint'
 MacroBlockBegin: "
 
 END_CATCH_ERROR$"
 ...
-
-
