@@ -123,21 +123,24 @@ RC Table::create(
 
 RC Table::drop(const char *base_dir)
 {
-  // 删除表, 获取索引, 删除索引
+  // 初始化
+  RC                 rc  = RC::SUCCESS;
+  BufferPoolManager &bpm = BufferPoolManager::instance();
+
+  // close data buffer pool and delete data file
   auto path = table_data_file(base_dir, name());
-  int  fail = remove(path.c_str());
+  rc        = bpm.close_file(path.c_str());
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to close BufferPool: %s", name());
+    return RC::FAILURE;
+  }
+  int fail = remove(path.c_str());
   if (fail) {
     LOG_ERROR("Failed to drop table data file: %s", name());
     return RC::FAIL_TO_DELETE_FILE;
   }
 
-  BufferPoolManager &bpm = BufferPoolManager::instance();
-  RC                 rc  = bpm.close_file(path.c_str());
-  if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to close BufferPool: %s", name());
-    return RC::FAILURE;
-  }
-
+  // meta has no buffer pool only need to delete the meta file
   path = table_meta_file(base_dir, name());
   fail = remove(path.c_str());
   if (fail) {
@@ -145,8 +148,14 @@ RC Table::drop(const char *base_dir)
     return RC::FAIL_TO_DELETE_FILE;
   }
 
+  // delete the index buffer pool and delete index file
   for (auto index : indexes_) {
     path = table_index_file(base_dir, name(), index->index_meta().name());
+    bpm.close_file(path.c_str());
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to close BufferPool: %s", name());
+      return RC::FAILURE;
+    }
     fail = remove(path.c_str());
     if (fail) {
       LOG_ERROR("Failed to drop index %s on table %s", index->index_meta().name(), name());
@@ -154,7 +163,7 @@ RC Table::drop(const char *base_dir)
     }
   }
 
-  return RC::SUCCESS;
+  return rc;
 }
 
 RC Table::open(const char *meta_file, const char *base_dir)
