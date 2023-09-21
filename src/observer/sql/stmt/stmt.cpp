@@ -35,7 +35,7 @@ See the Mulan PSL v2 for more details. */
 RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
 {
   stmt = nullptr;
-
+  // 生成stmt的过程，可以跳入具体的case进行查看
   switch (sql_node.flag) {
     case SCF_INSERT: {
       return InsertStmt::create(db, sql_node.insertion, stmt);

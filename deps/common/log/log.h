@@ -59,6 +59,7 @@ typedef enum
 class Log
 {
 public:
+  // 这里可以开启log
   Log(const std::string &log_name, const LOG_LEVEL log_level = LOG_LEVEL_INFO,
       const LOG_LEVEL console_level = LOG_LEVEL_WARN);
   ~Log(void);

@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/string.h"
 #include "common/log/log.h"
 #include "common/rc.h"
+#include "sql/parser/value.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 
@@ -133,5 +134,14 @@ RC FilterStmt::create_filter_unit(
   filter_unit->set_comp(comp);
 
   // 检查两个类型是否能够比较
+  // 现在只检测了左侧为日期属性，右侧为日期字符串的情况
+  if (filter_unit->left().is_attr && filter_unit->left().field.attr_type() == DATES &&
+      filter_unit->right().value.attr_type() == CHARS) {
+    int32_t check = convert_string_to_date(filter_unit->right().value.data());
+    if (check == -1)
+      return RC::FAILURE;
+    Value *change = const_cast<Value *>(&filter_unit->right().value);
+    change->set_date(check);
+  }
   return rc;
 }

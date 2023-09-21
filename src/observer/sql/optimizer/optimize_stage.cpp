@@ -107,6 +107,6 @@ RC OptimizeStage::create_logical_plan(SQLStageEvent *sql_event, unique_ptr<Logic
   if (nullptr == stmt) {
     return RC::UNIMPLENMENT;
   }
-
+  // XYM：逻辑计划生成器创建一个逻辑操作子
   return logical_plan_generator_.create(stmt, logical_operator);
 }

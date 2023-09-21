@@ -117,6 +117,7 @@ void val_to_str(const T &val, std::string &str, std::ios_base &(*radix)(std::ios
  * @return
  */
 std::string double_to_str(double v);
+std::string date_to_string(int32_t date);
 
 bool is_blank(const char *s);
 

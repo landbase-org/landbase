@@ -17,9 +17,11 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/string.h"
 #include "common/log/log.h"
 #include "storage/field/field.h"
+#include <cstdio>
 #include <sstream>
 
-const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "ints", "floats", "booleans"};
+// 这里的顺序必须和AttrType的顺序相同
+const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "dates","ints", "floats",  "booleans"};
 
 const char *attr_type_to_string(AttrType type)
 {
@@ -36,6 +38,37 @@ AttrType attr_type_from_string(const char *s)
     }
   }
   return UNDEFINED;
+}
+
+int32_t convert_string_to_date(const char *str_data)
+{
+  int year, month, day;
+  // TODO: add check to too long date str to improve the robust of code
+  // Example: 20000000000000000000-001010111111111111-22222222222222222
+  sscanf(str_data, "%d-%d-%d", &year, &month, &day);
+
+  auto check_date = [&]() -> bool {
+    if (year > 3999 || year < 0 || month > 12 || month < 1 || day < 0 || day > 31)
+      return false;
+    int m_days[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    if ((year % 400 == 0) || (year % 4 == 0 && year % 100 != 0)) {
+      // leap year
+      if (day <= m_days[month - 1] || (month == 2 && day == 29))
+        return true;
+      return false;
+    } else {
+      // not leap year
+      if (day <= m_days[month - 1])
+        return true;
+      return false;
+    }
+  };
+
+  if (!check_date()) {
+    return -1;
+  }
+  int32_t ans = year * 10000 + month * 100 + day;
+  return ans;
 }
 
 Value::Value(int val) { set_int(val); }
@@ -63,6 +96,12 @@ void Value::set_data(char *data, int length)
     case BOOLEANS: {
       num_value_.bool_value_ = *(int *)data != 0;
       length_                = length;
+    } break;
+    case DATES: {
+      // TODO: date(aka int32_t) size is 4,
+      ASSERT(length == 4, "SHOULD CHANGE TO int32_t BEFORE SET_DATE");
+      set_date(*(int32_t *)data);
+      length_ = length;
     } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
@@ -100,6 +139,14 @@ void Value::set_string(const char *s, int len /*= 0*/)
   length_ = str_value_.length();
 }
 
+void Value::set_date(Value::date data)
+{
+  // using int32_t as date , length is 4
+  attr_type_             = DATES;
+  num_value_.date_value_ = data;
+  length_                = 4;
+}
+
 void Value::set_value(const Value &value)
 {
   switch (value.attr_type_) {
@@ -115,6 +162,9 @@ void Value::set_value(const Value &value)
     case BOOLEANS: {
       set_boolean(value.get_boolean());
     } break;
+    case DATES: {
+      set_date(value.get_date());
+    } break;
     case UNDEFINED: {
       ASSERT(false, "got an invalid value type");
     } break;
@@ -126,6 +176,9 @@ const char *Value::data() const
   switch (attr_type_) {
     case CHARS: {
       return str_value_.c_str();
+    } break;
+    case DATES: {
+      return (const char *)&num_value_.date_value_;
     } break;
     default: {
       return (const char *)&num_value_;
@@ -149,6 +202,9 @@ std::string Value::to_string() const
     case CHARS: {
       os << str_value_;
     } break;
+    case DATES: {
+      os << common::date_to_string(num_value_.date_value_);
+    } break;
     default: {
       LOG_WARN("unsupported attr type: %d", attr_type_);
     } break;
@@ -156,8 +212,10 @@ std::string Value::to_string() const
   return os.str();
 }
 
+// XYM: the comparison rules details:
 int Value::compare(const Value &other) const
 {
+  bool type_match = true;
   if (this->attr_type_ == other.attr_type_) {
     switch (this->attr_type_) {
       case INTS: {
@@ -174,6 +232,9 @@ int Value::compare(const Value &other) const
             other.str_value_.length()
         );
       } break;
+      case DATES: {
+        return common::compare_date((void *)&num_value_.date_value_, (void *)&other.num_value_.date_value_);
+      } break;
       case BOOLEANS: {
         return common::compare_int((void *)&this->num_value_.bool_value_, (void *)&other.num_value_.bool_value_);
       }
@@ -187,8 +248,22 @@ int Value::compare(const Value &other) const
   } else if (this->attr_type_ == FLOATS && other.attr_type_ == INTS) {
     float other_data = other.num_value_.int_value_;
     return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other_data);
+  } else if (this->attr_type_ == DATES && other.attr_type_ == CHARS)
+  {
+    int32_t temp = convert_string_to_date(other.data());
+    if (temp == -1)return -1;
+    Value* change = const_cast<Value*>(&other);
+    change->set_date(temp);
+    return common::compare_date((void*)&this->num_value_.date_value_, (void*)&other.num_value_.date_value_);
   }
-  LOG_WARN("not supported");
+  else {
+    type_match = false;
+    // XYM: add assert to make debug more confident
+    // or unit the whole common::compare funciton and check the 
+    // comprision result to return a RC::COMPARE_FAILED and LOG_ERROR
+  }
+  ASSERT(type_match, "COMPARE DISMATCH");
+  LOG_WARN("not supported,Type Error");
   return -1;  // TODO return rc?
 }
 
@@ -288,3 +363,5 @@ bool Value::get_boolean() const
   }
   return false;
 }
+
+Value::date Value::get_date() const { return num_value_.date_value_; }

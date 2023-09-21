@@ -42,6 +42,7 @@ int sql_parse(const char *st, ParsedSqlResult *sql_result);
 
 RC parse(const char *st, ParsedSqlResult *sql_result)
 {
+  // don't try to find bug in function below
   sql_parse(st, sql_result);
   return RC::SUCCESS;
 }
