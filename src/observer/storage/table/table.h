@@ -105,9 +105,9 @@ private:
   RC init_record_handler(const char *base_dir);
 
 public:
-  Index               *find_index(const char *index_name) const;
-  Index               *find_index_by_field(const char *field_name) const;
-  std::vector<Index *> get_indexes() const { return indexes_; }
+  Index                      *find_index(const char *index_name) const;
+  Index                      *find_index_by_field(const char *field_name) const;
+  const std::vector<Index *> &get_indexes() const { return indexes_; }
 
 private:
   std::string          base_dir_;

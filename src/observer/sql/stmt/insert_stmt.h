@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/rc.h"
 #include "sql/stmt/stmt.h"
+#include <cstddef>
 
 class Table;
 class Db;
@@ -28,20 +29,22 @@ class InsertStmt : public Stmt
 {
 public:
   InsertStmt() = default;
-  InsertStmt(Table *table, const Value *values, int value_amount);
+  InsertStmt(Table *table, const std::vector<std::vector<Value>> &values_list, int value_list_amount);
 
   StmtType type() const override { return StmtType::INSERT; }
 
 public:
-  static RC create(Db *db, const InsertSqlNode &insert_sql, Stmt *&stmt);
+  static RC create(Db *db, InsertSqlNode &insert_sql, Stmt *&stmt);
 
 public:
-  Table       *table() const { return table_; }
-  const Value *values() const { return values_; }
-  int          value_amount() const { return value_amount_; }
+  Table                                 *table() const { return table_; }
+  const std::vector<std::vector<Value>> &values_list() const { return values_list_; }
+  std::vector<std::vector<Value>>       &values_list() { return values_list_; }
+  int                                    value_amount() const { return 0; }
+  int                                    value_list_amount() const { return value_list_amount_; }
 
 private:
-  Table       *table_        = nullptr;
-  const Value *values_       = nullptr;
-  int          value_amount_ = 0;
+  Table                          *table_ = nullptr;
+  std::vector<std::vector<Value>> values_list_;
+  int                             value_list_amount_ = 0;
 };

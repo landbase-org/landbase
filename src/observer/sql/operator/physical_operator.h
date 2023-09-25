@@ -45,6 +45,7 @@ enum class PhysicalOperatorType
   PROJECT,
   CALC,
   STRING_LIST,
+  INDEX_LIST,  // 索引列表
   DELETE,
   INSERT,
 };

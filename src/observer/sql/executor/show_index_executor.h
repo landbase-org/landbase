@@ -14,12 +14,13 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "common/log/log.h"
 #include "common/rc.h"
 #include "event/session_event.h"
 #include "event/sql_event.h"
 #include "session/session.h"
 #include "sql/executor/sql_result.h"
-#include "sql/operator/string_list_physical_operator.h"
+#include "sql/operator/index_list_physical_operator.h"
 #include "sql/stmt/show_index_stmt.h"
 #include "storage/db/db.h"
 
@@ -44,23 +45,26 @@ public:
 
     // get the table name of query index
     ShowIndexStmt *show_index_stmt = static_cast<ShowIndexStmt *>(stmt);
-    Table         *table           = db->find_table(show_index_stmt->getTableName().c_str());
+    const auto    &table_name      = show_index_stmt->getTableName();
+    Table         *table           = db->find_table(table_name.c_str());
+    if (table == nullptr) {  // table not exist;
+      LOG_ERROR("it is not exits with the table=%s of the query index", table_name.c_str());
+      return RC::FAILURE;
+    }
+    auto &indexes = table->get_indexes();
 
     // index header
     // Table  | Non_unique  | Key_name  | Seq_in_index |   Column_name
     // 表名     是否唯一索引    索引名称  序号(针对多列索引) 列名和列在索引中的
     TupleSchema tuple_schema;
-    tuple_schema.append_cell(TupleCellSpec("", "Table", "Table"));
-    tuple_schema.append_cell(TupleCellSpec("", "Non_unique", "Non_unique"));
-    tuple_schema.append_cell(TupleCellSpec("", "Key_name", "Key_name"));
-    tuple_schema.append_cell(TupleCellSpec("", "Seq_in_index", "Seq_in_index"));
-    tuple_schema.append_cell(TupleCellSpec("", "Column_name", "Column_name"));
+    tuple_schema.append_cell(TupleCellSpec("Table"));
+    tuple_schema.append_cell(TupleCellSpec("Non_unique"));
+    tuple_schema.append_cell(TupleCellSpec("Key_name"));
+    tuple_schema.append_cell(TupleCellSpec("Seq_in_index"));
+    tuple_schema.append_cell(TupleCellSpec("Column_name"));
     sql_result->set_tuple_schema(tuple_schema);
 
-    auto indexes = table->get_indexes();
-    for (size_t i = 0; i < indexes.size(); i++) {}
-
-    auto oper = new StringListPhysicalOperator;
+    auto oper = new IndexListPhysicalOperator(table_name, indexes);
     sql_result->set_operator(std::unique_ptr<PhysicalOperator>(oper));
 
     return RC::SUCCESS;

@@ -16,28 +16,32 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/insert_stmt.h"
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
+#include <cstdint>
 
 using namespace std;
 
-InsertPhysicalOperator::InsertPhysicalOperator(Table *table, vector<Value> &&values)
+InsertPhysicalOperator::InsertPhysicalOperator(Table *table, const std::vector<std::vector<Value>> &values_list)
     : table_(table),
-      values_(std::move(values))
+      values_list(values_list)
 {}
 
 RC InsertPhysicalOperator::open(Trx *trx)
 {
-  Record record;
-  RC     rc = table_->make_record(static_cast<int>(values_.size()), values_.data(), record);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to make record. rc=%s", strrc(rc));
-    return rc;
-  }
+  for (auto &values_ : values_list) {
+    Record record;
+    RC     rc = table_->make_record(static_cast<int>(values_.size()), values_.data(), record);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to make record. rc=%s", strrc(rc));
+      return rc;
+    }
 
-  rc = trx->insert_record(table_, record);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to insert record by transaction. rc=%s", strrc(rc));
+    rc = trx->insert_record(table_, record);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to insert record by transaction. rc=%s", strrc(rc));
+      return rc;
+    }
   }
-  return rc;
+  return RC::SUCCESS;
 }
 
 RC InsertPhysicalOperator::next() { return RC::RECORD_EOF; }
