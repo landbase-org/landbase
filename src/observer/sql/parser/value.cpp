@@ -17,11 +17,12 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/string.h"
 #include "common/log/log.h"
 #include "storage/field/field.h"
+#include <cmath>
 #include <cstdio>
 #include <sstream>
 
 // 这里的顺序必须和AttrType的顺序相同
-const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "dates","ints", "floats",  "booleans"};
+const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "dates", "ints", "floats", "booleans"};
 
 const char *attr_type_to_string(AttrType type)
 {
@@ -248,18 +249,27 @@ int Value::compare(const Value &other) const
   } else if (this->attr_type_ == FLOATS && other.attr_type_ == INTS) {
     float other_data = other.num_value_.int_value_;
     return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other_data);
-  } else if (this->attr_type_ == DATES && other.attr_type_ == CHARS)
-  {
+  } else if (this->attr_type_ == DATES && other.attr_type_ == CHARS) {
     int32_t temp = convert_string_to_date(other.data());
-    if (temp == -1)return -1;
-    Value* change = const_cast<Value*>(&other);
+    if (temp == -1)
+      return -1;
+    Value *change = const_cast<Value *>(&other);
     change->set_date(temp);
-    return common::compare_date((void*)&this->num_value_.date_value_, (void*)&other.num_value_.date_value_);
-  }
-  else {
+    return common::compare_date((void *)&this->num_value_.date_value_, (void *)&other.num_value_.date_value_);
+  } else if ((this->attr_type_ == FLOATS || this->attr_type_ == INTS) && other.attr_type_ == CHARS) {
+    Value self, oppsite = *this, *other;
+    self.type_cast(FLOATS);
+    oppsite.type_cast(FLOATS);
+    return common::compare_float((void *)&self.num_value_.float_value_, (void *)&oppsite.num_value_.float_value_);
+  } else if (this->attr_type_ == CHARS && (other.attr_type_ == INTS || other.attr_type_ == FLOATS)) {
+    Value self = *this, oppsite = other;
+    self.type_cast(FLOATS);
+    oppsite.type_cast(FLOATS);
+    return common::compare_float((void *)&self.num_value_.float_value_, (void *)&oppsite.num_value_.float_value_);
+  } else {
     type_match = false;
     // XYM: add assert to make debug more confident
-    // or unit the whole common::compare funciton and check the 
+    // or unit the whole common::compare funciton and check the
     // comprision result to return a RC::COMPARE_FAILED and LOG_ERROR
   }
   ASSERT(type_match, "COMPARE DISMATCH");
@@ -365,3 +375,69 @@ bool Value::get_boolean() const
 }
 
 Value::date Value::get_date() const { return num_value_.date_value_; }
+
+/**
+ * @brief 完成类型转换的函数
+ *
+ * @param target
+ * @return true 转换成功
+ * @return false 转换失败
+ */
+bool Value::type_cast(const AttrType target)
+{
+  if (attr_type_ == target)
+    return true;
+  std::stringstream ss;
+  switch (target) {
+    case INTS: {
+      int temp{0};
+      if (attr_type_ == FLOATS) {
+        temp = static_cast<int>(round(num_value_.float_value_));
+        set_int(temp);
+        return true;
+      } else if (attr_type_ == CHARS) {
+        ss << str_value_;
+        ss >> temp;
+        if (ss.fail())
+          temp = 0;
+        set_int(temp);
+        str_value_.clear();
+        return true;
+      }
+    }
+    case FLOATS: {
+      float temp{0.0f};
+      if (attr_type_ == INTS) {
+        temp = static_cast<float>(num_value_.int_value_);
+        set_float(temp);
+        return true;
+      } else if (attr_type_ == CHARS) {
+        ss << str_value_;
+        ss >> temp;
+        if (ss.fail())
+          temp = 0.0f;
+        set_float(temp);
+        return true;
+      }
+    }
+    case CHARS: {
+      std::string res;
+      if (attr_type_ == INTS) {
+        ss << num_value_.int_value_;
+        ss >> res;
+        set_string(res.c_str());
+        return true;
+      }
+      if (attr_type_ == FLOATS) {
+        ss << num_value_.float_value_;
+        ss >> res;
+        set_string(res.c_str());
+        return true;
+      }
+    }
+    default: {
+      LOG_WARN("Typecast Failed");
+      return false;
+    }
+  }
+}

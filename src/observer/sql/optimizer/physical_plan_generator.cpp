@@ -34,6 +34,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/table_scan_physical_operator.h"
 #include "sql/optimizer/physical_plan_generator.h"
+#include "sql/parser/value.h"
 
 using namespace std;
 
@@ -89,6 +90,7 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
 
   Index     *index      = nullptr;
   ValueExpr *value_expr = nullptr;
+  // AttrType   idx_tree_type;
   for (auto &expr : predicates) {
     if (expr->type() == ExprType::COMPARISON) {
       auto comparison_expr = static_cast<ComparisonExpr *>(expr.get());
@@ -120,7 +122,8 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
       }
 
       const Field &field = field_expr->field();
-      index              = table->find_index_by_field(field.field_name());
+      // idx_tree_type      = field.attr_type();
+      index = table->find_index_by_field(field.field_name());
       if (nullptr != index) {
         break;
       }
@@ -130,7 +133,18 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
   if (index != nullptr) {
     ASSERT(value_expr != nullptr, "got an index but value expr is null ?");
 
-    const Value               &value           = value_expr->get_value();
+    const Value &value = value_expr->get_value();
+    // Guess: in bplus tree must be same type, care for the type of value here
+    // for some value which type-dismatch better code for the idx select realize
+    // if (value.attr_type() != idx_tree_type) {
+    //   if (!const_cast<Value &>(value).type_cast(idx_tree_type)) {
+    //     LOG_WARN(
+    //         "Using %s data to init %s idx_scanner",
+    //         attr_type_to_string(value.attr_type()),
+    //         attr_type_to_string(idx_tree_type)
+    //     );
+    //   }
+    // }
     IndexScanPhysicalOperator *index_scan_oper = new IndexScanPhysicalOperator(
         table, index, table_get_oper.readonly(), &value, true /*left_inclusive*/, &value, true /*right_inclusive*/
     );

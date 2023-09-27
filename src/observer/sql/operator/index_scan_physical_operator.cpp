@@ -39,7 +39,6 @@ RC IndexScanPhysicalOperator::open(Trx *trx)
   if (nullptr == table_ || nullptr == index_) {
     return RC::INTERNAL;
   }
-
   IndexScanner *index_scanner = index_->create_scanner(
       left_value_.data(),
       left_value_.length(),

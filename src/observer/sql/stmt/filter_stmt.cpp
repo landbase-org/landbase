@@ -16,6 +16,8 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/string.h"
 #include "common/log/log.h"
 #include "common/rc.h"
+#include "sql/expr/expression.h"
+#include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
@@ -134,7 +136,7 @@ RC FilterStmt::create_filter_unit(
   filter_unit->set_comp(comp);
 
   // 检查两个类型是否能够比较
-  // 现在只检测了左侧为日期属性，右侧为日期字符串的情况
+  // 检测左侧为日期属性，右侧为日期字符串的情况 处理完直接return截断，不要影响别的类型的转换
   if (filter_unit->left().is_attr && filter_unit->left().field.attr_type() == DATES &&
       filter_unit->right().value.attr_type() == CHARS) {
     int32_t check = convert_string_to_date(filter_unit->right().value.data());
@@ -142,6 +144,32 @@ RC FilterStmt::create_filter_unit(
       return RC::FAILURE;
     Value *change = const_cast<Value *>(&filter_unit->right().value);
     change->set_date(check);
+    return rc;
+  }
+  // 如果左右均为值，有一个非CHARS就都转为FLOATS
+  if (!filter_unit->left().is_attr) {
+    Value& left_ref = const_cast<Value&>(filter_unit->left().value);
+    Value& right_ref = const_cast<Value&>(filter_unit->right().value);
+    if(filter_unit->left().value.attr_type() != CHARS || filter_unit->right().value.attr_type() != CHARS){
+      if(!left_ref.type_cast(FLOATS) || !right_ref.type_cast(FLOATS)){
+        return RC::FAILURE;
+      }
+    }
+  } else {
+    // 左侧为域，右侧为值
+    if (filter_unit->left().field.attr_type() != CHARS) {
+      Value   *right_chg = const_cast<Value *>(&filter_unit->right().value);
+      AttrType tar       = right_chg->attr_type() == INTS ? INTS : FLOATS;
+      if (!right_chg->type_cast(tar)) {
+        return RC::FAILURE;
+      }
+    } else if (filter_unit->right().value.attr_type() == FLOATS || filter_unit->right().value.attr_type() == INTS) {
+      Value *right_chg = const_cast<Value *>(&filter_unit->right().value);
+      // uniform to float for the higher precision
+      if (!right_chg->type_cast(FLOATS)) {
+        return RC::FAILURE;
+      }
+    }
   }
   return rc;
 }

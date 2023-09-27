@@ -64,7 +64,7 @@ public:
   void set_string(const char *s, int len = 0);
   void set_date(const date date);
   void set_value(const Value &value);
-
+  bool type_cast(const AttrType target);
   std::string to_string() const;
 
   int compare(const Value &other) const;
