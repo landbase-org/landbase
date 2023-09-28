@@ -147,27 +147,41 @@ RC FilterStmt::create_filter_unit(
     return rc;
   }
   // 如果左右均为值，有一个非CHARS就都转为FLOATS
-  if (!filter_unit->left().is_attr) {
-    Value& left_ref = const_cast<Value&>(filter_unit->left().value);
-    Value& right_ref = const_cast<Value&>(filter_unit->right().value);
-    if(filter_unit->left().value.attr_type() != CHARS || filter_unit->right().value.attr_type() != CHARS){
-      if(!left_ref.type_cast(FLOATS) || !right_ref.type_cast(FLOATS)){
+  if (!filter_unit->left().is_attr && !filter_unit->right().is_attr) {
+    Value &left_ref  = const_cast<Value &>(filter_unit->left().value);
+    Value &right_ref = const_cast<Value &>(filter_unit->right().value);
+    if (filter_unit->left().value.attr_type() != CHARS || filter_unit->right().value.attr_type() != CHARS) {
+      if (!left_ref.type_cast(FLOATS) || !right_ref.type_cast(FLOATS)) {
         return RC::FAILURE;
       }
     }
   } else {
-    // 左侧为域，右侧为值
-    if (filter_unit->left().field.attr_type() != CHARS) {
-      Value   *right_chg = const_cast<Value *>(&filter_unit->right().value);
-      AttrType tar       = right_chg->attr_type() == INTS ? INTS : FLOATS;
-      if (!right_chg->type_cast(tar)) {
-        return RC::FAILURE;
+    // 左侧为域，右侧为域
+    if (filter_unit->right().is_attr && filter_unit->right().is_attr) {
+      if (filter_unit->right().field.attr_type() != filter_unit->left().field.attr_type()) {
+        LOG_WARN(
+            "Compared Fields type dismatch %s with %s",
+            attr_type_to_string(filter_unit->left().field.attr_type()),
+            attr_type_to_string(filter_unit->right().field.attr_type())
+        );
       }
-    } else if (filter_unit->right().value.attr_type() == FLOATS || filter_unit->right().value.attr_type() == INTS) {
-      Value *right_chg = const_cast<Value *>(&filter_unit->right().value);
-      // uniform to float for the higher precision
-      if (!right_chg->type_cast(FLOATS)) {
-        return RC::FAILURE;
+    }
+    // 左侧为域，右侧为值
+    else if (filter_unit->left().is_attr && !filter_unit->right().is_attr) {
+      // status:1
+      if (filter_unit->left().field.attr_type() != CHARS) {
+        Value   *right_chg = const_cast<Value *>(&filter_unit->right().value);
+        AttrType tar       = right_chg->attr_type() == INTS ? INTS : FLOATS;
+        if (!right_chg->type_cast(tar)) {
+          return RC::FAILURE;
+        }
+      }  // status:2
+      else if (filter_unit->right().value.attr_type() == FLOATS || filter_unit->right().value.attr_type() == INTS) {
+        Value *right_chg = const_cast<Value *>(&filter_unit->right().value);
+        // uniform to float for the higher precision
+        if (!right_chg->type_cast(FLOATS)) {
+          return RC::FAILURE;
+        }
       }
     }
   }
