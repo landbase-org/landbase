@@ -183,6 +183,7 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
     return write_state(event, need_disconnect);
   }
 
+  // 写入数据的 header 部分
   const TupleSchema &schema   = sql_result->tuple_schema();
   const int          cell_num = schema.cell_num();
 
@@ -209,6 +210,7 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
     }
   }
 
+  // 如果 header 不为空的话, 打印一个换行符
   if (cell_num > 0) {
     char newline = '\n';
     rc           = writer_->writen(&newline, 1);
@@ -221,6 +223,8 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
 
   rc           = RC::SUCCESS;
   Tuple *tuple = nullptr;
+
+  // TODOH 将数据写入到sql_result中
   while (RC::SUCCESS == (rc = sql_result->next_tuple(tuple))) {
     assert(tuple != nullptr);
 

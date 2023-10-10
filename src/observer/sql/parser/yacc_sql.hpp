@@ -93,11 +93,17 @@ extern int yydebug;
     LE = 299,
     GE = 300,
     NE = 301,
-    NUMBER = 302,
-    FLOAT = 303,
-    ID = 304,
-    SSS = 305,
-    UMINUS = 306
+    SUM = 302,
+    COUNT = 303,
+    AVG = 304,
+    MIN = 305,
+    MAX = 306,
+    NUMBER = 307,
+    FLOAT = 308,
+    ID = 309,
+    AGGRE_ATTR = 310,
+    SSS = 311,
+    UMINUS = 312
   };
 #endif
 
@@ -105,12 +111,14 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 103 "yacc_sql.y"
+#line 108 "yacc_sql.y"
 
   ParsedSqlNode *                   sql_node;
   ConditionSqlNode *                condition;
   Value *                           value;
   enum CompOp                       comp;
+  enum AggreType                    aggre_type; 
+  AggreTypeNode *                   aggre_node;
   RelAttrSqlNode *                  rel_attr;
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
@@ -121,11 +129,12 @@ union YYSTYPE
   std::vector<ConditionSqlNode> *   condition_list;
   std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<std::string> *        relation_list;
-  char *                            string;
+  std::vector<std::string> *        aggre_attr_list;
+  char *                            string; // 是char*类型, 需要free
   int                               number;
   float                             floats;
 
-#line 129 "yacc_sql.hpp"
+#line 138 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

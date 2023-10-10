@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include <string>
 
 #include "common/log/log.h"
+#include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
 #include "storage/field/field.h"
 
@@ -118,6 +119,8 @@ public:
   const char *table_name() const { return field_.table_name(); }
 
   const char *field_name() const { return field_.field_name(); }
+
+  const AggreType aggre_type() const { return field_.aggre_type(); }
 
   RC get_value(const Tuple &tuple, Value &value) const override;
 

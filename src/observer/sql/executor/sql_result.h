@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/expr/tuple.h"
 #include "sql/operator/physical_operator.h"
+#include "sql/parser/parse_defs.h"
 
 class Session;
 
@@ -56,4 +57,6 @@ private:
   TupleSchema                       tuple_schema_;       ///< 返回的表头信息。可能有也可能没有
   RC                                return_code_ = RC::SUCCESS;
   std::string                       state_string_;
+  std::vector<AggreCalc>            aggre_calcs;  ///< 聚合函数的计算
+  bool                              is_started{false};
 };

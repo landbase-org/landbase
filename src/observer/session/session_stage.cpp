@@ -128,12 +128,13 @@ RC SessionStage::handle_sql(SQLStageEvent *sql_event)
     LOG_TRACE("failed to do query cache. rc=%s", strrc(rc));
     return rc;
   }
-  // 解析 SQL 语句
+  // 解析 SQL 语句 解析成 ParsedSqlNode
   rc = parse_stage_.handle_request(sql_event);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do parse. rc=%s", strrc(rc));
     return rc;
   }
+
   // 生成stmt
   rc = resolve_stage_.handle_request(sql_event);
   if (OB_FAIL(rc)) {
@@ -141,12 +142,15 @@ RC SessionStage::handle_sql(SQLStageEvent *sql_event)
     return rc;
   }
 
+  // 将Stmt转换成LogicalOperator，优化后输出PhysicalOperator(参考optimize_stage.cpp)
+  // 如果是命令执行类型的SQL请求，会创建对应的 CommandExecutor(参考 command_executor.cpp)
   rc = optimize_stage_.handle_request(sql_event);
   if (rc != RC::UNIMPLENMENT && rc != RC::SUCCESS) {
     LOG_TRACE("failed to do optimize. rc=%s", strrc(rc));
     return rc;
   }
 
+  // 最终执行阶段, 将执行计划的结果存储到`sqlResult`中
   rc = execute_stage_.handle_request(sql_event);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do execute. rc=%s", strrc(rc));

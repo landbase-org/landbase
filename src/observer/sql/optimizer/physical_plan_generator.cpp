@@ -34,6 +34,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/table_scan_physical_operator.h"
 #include "sql/optimizer/physical_plan_generator.h"
+#include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
 
 using namespace std;
@@ -153,6 +154,7 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
     oper = unique_ptr<PhysicalOperator>(index_scan_oper);
     LOG_TRACE("use index scan");
   } else {
+    // TODO AGGREGATION算子实现
     auto table_scan_oper = new TableScanPhysicalOperator(table, table_get_oper.readonly());
     table_scan_oper->set_predicates(std::move(predicates));
     oper = unique_ptr<PhysicalOperator>(table_scan_oper);
@@ -204,7 +206,7 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
   ProjectPhysicalOperator *project_operator = new ProjectPhysicalOperator;
   const vector<Field>     &project_fields   = project_oper.fields();
   for (const Field &field : project_fields) {
-    project_operator->add_projection(field.table(), field.meta());
+    project_operator->add_projection(field);
   }
 
   if (child_phy_oper) {

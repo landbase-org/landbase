@@ -38,8 +38,10 @@ RC PredicatePhysicalOperator::next()
   RC                rc   = RC::SUCCESS;
   PhysicalOperator *oper = children_.front().get();
 
+  // TODOH 在此过滤, 看是否符合where条件
   while (RC::SUCCESS == (rc = oper->next())) {
     Tuple *tuple = oper->current_tuple();
+
     if (nullptr == tuple) {
       rc = RC::INTERNAL;
       LOG_WARN("failed to get tuple from operator");
@@ -47,7 +49,7 @@ RC PredicatePhysicalOperator::next()
     }
 
     Value value;
-    rc = expression_->get_value(*tuple, value);
+    rc = expression_->get_value(*tuple, value);  // 根据expression判断 当前值是否符合where后面的条件, 如果不满足, 则继续
     if (rc != RC::SUCCESS) {
       return rc;
     }

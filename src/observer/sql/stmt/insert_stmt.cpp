@@ -24,7 +24,7 @@ InsertStmt::InsertStmt(Table *table, const std::vector<std::vector<Value>> &valu
       value_list_amount_(value_list_amount)
 {}
 
-RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
+RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
 {
   const char *table_name = inserts.relation_name.c_str();
   if (nullptr == db || nullptr == table_name || inserts.values_list.empty()) {

@@ -63,6 +63,7 @@ WHITE_SAPCE      [\ \t\b\f]
 DIGIT            [0-9]+
 
 ID               [A-Za-z_]+[A-Za-z0-9_]*
+AGGRE_ATTR       [A-Za-z0-9]+
 DOT              \.
 QUOTE            [\'\"]
 %x STR
@@ -115,7 +116,16 @@ LOAD                                    RETURN_TOKEN(LOAD);
 DATA                                    RETURN_TOKEN(DATA);
 INFILE                                  RETURN_TOKEN(INFILE);
 EXPLAIN                                 RETURN_TOKEN(EXPLAIN);
+
+  /*aggregation type*/
+SUM RETURN_TOKEN(SUM);
+COUNT RETURN_TOKEN(COUNT);
+AVG RETURN_TOKEN(AVG);
+MAX RETURN_TOKEN(MAX);
+MIN RETURN_TOKEN(MIN);
+
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
+{AGGRE_ATTR}                            yylval->string=strdup(yytext); RETURN_TOKEN(AGGRE_ATTR);
 "("                                     RETURN_TOKEN(LBRACE);
 ")"                                     RETURN_TOKEN(RBRACE);
 

@@ -61,3 +61,16 @@ void ProjectPhysicalOperator::add_projection(const Table *table, const FieldMeta
   TupleCellSpec *spec = new TupleCellSpec(table->name(), field_meta->name(), field_meta->name());
   tuple_.add_cell_spec(spec);
 }
+
+void ProjectPhysicalOperator::add_projection(const Field &field)
+{
+  // 对单表来说，展示的(alias) 字段总是字段名称，
+  // 对多表查询来说，展示的alias 需要带表名字
+  TupleCellSpec *spec = nullptr;
+  if (field.aggre_type() == AGGRE_NONE) {
+    spec = new TupleCellSpec(field.table_name(), field.meta()->name());
+  } else {
+    spec = new TupleCellSpec(field.table_name(), field.meta()->name(), field.alias().c_str(), field.aggre_type());
+  }
+  tuple_.add_cell_spec(spec);
+}
