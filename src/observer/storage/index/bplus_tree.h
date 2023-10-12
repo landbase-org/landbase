@@ -73,7 +73,7 @@ public:
       case CHARS: {
         return common::compare_string((void *)v1, attr_length_, (void *)v2, attr_length_);
       }
-      case DATES:{
+      case DATES: {
         return common::compare_date((void *)v1, (void *)v2);
       }
       default: {

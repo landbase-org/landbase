@@ -17,11 +17,8 @@ See the Mulan PSL v2 for more details. */
 #include <string.h>
 #include <string>
 
-#include "common/conf/ini.h"
-#include "common/lang/mutex.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
-#include "common/seda/callback.h"
 #include "event/session_event.h"
 #include "event/sql_event.h"
 #include "net/communicator.h"
@@ -94,9 +91,8 @@ void SessionStage::handle_request(StageEvent *event)
 
   Session::set_current_session(sev->session());
   sev->session()->set_current_request(sev);
-  SQLStageEvent *sql_event = new SQLStageEvent(sev, sql);
-  (void)handle_sql(sql_event);
-  delete sql_event;
+  SQLStageEvent sql_event = SQLStageEvent(sev, sql);
+  (void)handle_sql(&sql_event);
 
   Communicator *communicator    = sev->get_communicator();
   bool          need_disconnect = false;

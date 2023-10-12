@@ -288,7 +288,7 @@ std::string double_to_str(double v)
 std::string date_to_string(int32_t date)
 {
   std::stringstream ss;
-  std::string res;
+  std::string       res;
   ss << date / 10000 << '-';
   ss << std::setfill('0') << std::setw(2) << (date / 100) % 100 << '-';
   ss << std::setw(2) << date % 100;

@@ -141,6 +141,8 @@ public:
     this->owner_ = true;
   }
 
+  void set_value(int offset, const Value *value) { memcpy(data_ + offset, value->data(), value->length()); }
+
   char       *data() { return this->data_; }
   const char *data() const { return this->data_; }
   int         len() const { return this->len_; }

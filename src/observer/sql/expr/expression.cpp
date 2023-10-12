@@ -88,7 +88,7 @@ ComparisonExpr::~ComparisonExpr() {}
 // XYM: Compare operator get its value here
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
-  RC  rc         = RC::SUCCESS;
+  RC rc = RC::SUCCESS;
   // TODO : 完善此处对比较结果的处理
   int cmp_result = left.compare(right);
   result         = false;

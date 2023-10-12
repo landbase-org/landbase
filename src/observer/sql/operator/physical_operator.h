@@ -47,6 +47,7 @@ enum class PhysicalOperatorType
   STRING_LIST,
   INDEX_LIST,  // 索引列表
   DELETE,
+  UPDATE,  // 更新
   INSERT,
 };
 
