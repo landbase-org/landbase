@@ -103,6 +103,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         AVG
         MIN
         MAX
+        NOT
+        LK
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -292,7 +294,7 @@ create_index_stmt:    /*create index 语句的语法解析树*/
     }
     ;
 
-  show_index_stmt:    /*show index 语法解析树*/
+show_index_stmt:    /*show index 语法解析树*/
     SHOW INDEX FROM ID
     {
       $$ = new ParsedSqlNode(SCF_SHOW_INDEX);
@@ -714,6 +716,8 @@ comp_op:
     | LE { $$ = LESS_EQUAL; }
     | GE { $$ = GREAT_EQUAL; }
     | NE { $$ = NOT_EQUAL; }
+    | LK { $$ = LIKE; }
+    | NOT LK { $$ = NOT_LIKE;}
     ;
 
 aggre_type:

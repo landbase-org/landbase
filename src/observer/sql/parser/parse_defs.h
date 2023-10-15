@@ -23,6 +23,7 @@ See the Mulan PSL v2 for more details. */
 #include <vector>
 
 #include "sql/parser/value.h"
+#include "sql/parser/comp_op.h"
 
 class Expression;
 
@@ -243,21 +244,6 @@ struct RelAttrSqlNode
   std::string   relation_name;   ///< relation name (may be NULL) 表名
   std::string   attribute_name;  ///< attribute name              属性名
   AggreTypeNode aggretion_node;
-};
-
-/**
- * @brief 描述比较运算符
- * @ingroup SQLParser
- */
-enum CompOp
-{
-  EQUAL_TO,     ///< "="
-  LESS_EQUAL,   ///< "<="
-  NOT_EQUAL,    ///< "<>"
-  LESS_THAN,    ///< "<"
-  GREAT_EQUAL,  ///< ">="
-  GREAT_THAN,   ///< ">"
-  NO_OP
 };
 
 /**

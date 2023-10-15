@@ -213,31 +213,47 @@ std::string Value::to_string() const
   return os.str();
 }
 
-// XYM: the comparison rules details:
-int Value::compare(const Value &other) const
+/**
+ * @brief 比较两个Value
+ *
+ * @param comp_op 比较符号
+ * @param other 另一个Value
+ * @return bool 比较是否成功
+ */
+bool Value::compare(const CompOp &comp_op, const Value &other) const
 {
-  bool type_match = true;
+  int cmp_result = 0;
   if (this->attr_type_ == other.attr_type_) {
     switch (this->attr_type_) {
       case INTS: {
-        return common::compare_int((void *)&this->num_value_.int_value_, (void *)&other.num_value_.int_value_);
+        cmp_result = common::compare_int((void *)&this->num_value_.int_value_, (void *)&other.num_value_.int_value_);
       } break;
       case FLOATS: {
-        return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other.num_value_.float_value_);
+        cmp_result =
+            common::compare_float((void *)&this->num_value_.float_value_, (void *)&other.num_value_.float_value_);
       } break;
       case CHARS: {
-        return common::compare_string(
-            (void *)this->str_value_.c_str(),
-            this->str_value_.length(),
-            (void *)other.str_value_.c_str(),
-            other.str_value_.length()
-        );
+        if (comp_op == LIKE || comp_op == NOT_LIKE) {
+          cmp_result = common::string_match(
+              (void *)this->str_value_.c_str(),
+              this->str_value_.length(),
+              (void *)other.str_value_.c_str(),
+              other.str_value_.length()
+          );
+        } else {
+          cmp_result = common::compare_string(
+              (void *)this->str_value_.c_str(),
+              this->str_value_.length(),
+              (void *)other.str_value_.c_str(),
+              other.str_value_.length()
+          );
+        }
       } break;
       case DATES: {
-        return common::compare_date((void *)&num_value_.date_value_, (void *)&other.num_value_.date_value_);
+        cmp_result = common::compare_date((void *)&num_value_.date_value_, (void *)&other.num_value_.date_value_);
       } break;
       case BOOLEANS: {
-        return common::compare_int((void *)&this->num_value_.bool_value_, (void *)&other.num_value_.bool_value_);
+        cmp_result = common::compare_int((void *)&this->num_value_.bool_value_, (void *)&other.num_value_.bool_value_);
       }
       default: {
         LOG_WARN("unsupported type: %d", this->attr_type_);
@@ -245,36 +261,45 @@ int Value::compare(const Value &other) const
     }
   } else if (this->attr_type_ == INTS && other.attr_type_ == FLOATS) {
     float this_data = this->num_value_.int_value_;
-    return common::compare_float((void *)&this_data, (void *)&other.num_value_.float_value_);
+    cmp_result      = common::compare_float((void *)&this_data, (void *)&other.num_value_.float_value_);
   } else if (this->attr_type_ == FLOATS && other.attr_type_ == INTS) {
     float other_data = other.num_value_.int_value_;
-    return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other_data);
+    cmp_result       = common::compare_float((void *)&this->num_value_.float_value_, (void *)&other_data);
   } else if (this->attr_type_ == DATES && other.attr_type_ == CHARS) {
     int32_t temp = convert_string_to_date(other.data());
     if (temp == -1)
-      return -1;
+      cmp_result = -1;
     Value *change = const_cast<Value *>(&other);
     change->set_date(temp);
-    return common::compare_date((void *)&this->num_value_.date_value_, (void *)&other.num_value_.date_value_);
+    cmp_result = common::compare_date((void *)&this->num_value_.date_value_, (void *)&other.num_value_.date_value_);
   } else if ((this->attr_type_ == FLOATS || this->attr_type_ == INTS) && other.attr_type_ == CHARS) {
     Value self, oppsite = *this, *other;
     self.type_cast(FLOATS);
     oppsite.type_cast(FLOATS);
-    return common::compare_float((void *)&self.num_value_.float_value_, (void *)&oppsite.num_value_.float_value_);
+    cmp_result = common::compare_float((void *)&self.num_value_.float_value_, (void *)&oppsite.num_value_.float_value_);
   } else if (this->attr_type_ == CHARS && (other.attr_type_ == INTS || other.attr_type_ == FLOATS)) {
     Value self = *this, oppsite = other;
     self.type_cast(FLOATS);
     oppsite.type_cast(FLOATS);
-    return common::compare_float((void *)&self.num_value_.float_value_, (void *)&oppsite.num_value_.float_value_);
+    cmp_result = common::compare_float((void *)&self.num_value_.float_value_, (void *)&oppsite.num_value_.float_value_);
   } else {
-    type_match = false;
-    // XYM: add assert to make debug more confident
-    // or unit the whole common::compare funciton and check the
-    // comprision result to return a RC::COMPARE_FAILED and LOG_ERROR
+    LOG_WARN("not supported,Type Error");
+    return false;
   }
-  ASSERT(type_match, "COMPARE DISMATCH");
-  LOG_WARN("not supported,Type Error");
-  return -1;  // TODO return rc?
+
+  switch (comp_op) {
+    case EQUAL_TO: return 0 == cmp_result;
+    case LESS_EQUAL: return cmp_result <= 0;
+    case NOT_EQUAL: return cmp_result != 0;
+    case LESS_THAN: return cmp_result < 0;
+    case GREAT_EQUAL: return cmp_result >= 0;
+    case GREAT_THAN: return cmp_result > 0;
+    case LIKE: return cmp_result == 0;
+    case NOT_LIKE: return cmp_result != 0;
+    default: break;
+  }
+
+  return false;  // TODO return rc?
 }
 
 int Value::get_int() const

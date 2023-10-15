@@ -117,12 +117,14 @@ DATA                                    RETURN_TOKEN(DATA);
 INFILE                                  RETURN_TOKEN(INFILE);
 EXPLAIN                                 RETURN_TOKEN(EXPLAIN);
 
-  /*aggregation type*/
-SUM RETURN_TOKEN(SUM);
-COUNT RETURN_TOKEN(COUNT);
-AVG RETURN_TOKEN(AVG);
-MAX RETURN_TOKEN(MAX);
-MIN RETURN_TOKEN(MIN);
+SUM                                     RETURN_TOKEN(SUM);
+COUNT                                   RETURN_TOKEN(COUNT);
+AVG                                     RETURN_TOKEN(AVG);
+MAX                                     RETURN_TOKEN(MAX);
+MIN                                     RETURN_TOKEN(MIN);
+
+NOT                                     RETURN_TOKEN(NOT);
+LIKE                                    RETURN_TOKEN(LK);
 
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 {AGGRE_ATTR}                            yylval->string=strdup(yytext); RETURN_TOKEN(AGGRE_ATTR);

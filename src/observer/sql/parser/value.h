@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "sql/parser/comp_op.h"
 #include <string>
 
 /**
@@ -67,7 +68,7 @@ public:
   bool type_cast(const AttrType target);
   std::string to_string() const;
 
-  int compare(const Value &other) const;
+  bool compare(const CompOp &comp_op, const Value &other) const;
 
   const char *data() const;
   int         length() const { return length_; }

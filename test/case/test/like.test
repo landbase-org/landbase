@@ -1,0 +1,24 @@
+--echo create table
+create table user(id int, name char);
+insert into user values(1,'abcd');
+insert into user values(2,'aaaa');
+insert into user values(3,'AaBb');
+insert into user values(4,'!@#$');
+insert into user values(5,'[][]');
+insert into user values(6,'a');
+
+--sort select * from user;
+
+--echo LIKE Test
+select * from user where name like "a_c_";
+select * from user where name like "a%";
+select * from user where name like "A%b";
+select * from user where name like "[__]"
+select * from user where name like "[%]"
+
+--echo NOT LIKE Test
+select * from user where name not like "a_c_";
+select * from user where name not like "a%";
+select * from user where name not like "A%b";
+select * from user where name not like "[__]"
+select * from user where name not like "[%]"
