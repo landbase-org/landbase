@@ -28,7 +28,8 @@ static const Json::StaticString FIELD_FIELDS("fields");
 static const Json::StaticString FIELD_INDEXES("indexes");
 
 TableMeta::TableMeta(const TableMeta &other)
-    : name_(other.name_),
+    : table_id_(other.table_id_),
+      name_(other.name_),
       fields_(other.fields_),
       indexes_(other.indexes_),
       record_size_(other.record_size_)

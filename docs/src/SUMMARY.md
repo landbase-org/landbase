@@ -24,8 +24,10 @@
 
 - [OceanBase 数据库大赛](./game/introduction.md)
   - [提交测试需要满足的输出要求](./game/miniob-output-convention.md)
+  - [自助输出调试信息](./game/debug-output.md)
   - [2021届大赛题目介绍](./game/miniob_topics.md)
-  - [大赛手把手入门教程](./game/gitee-instructions.md)
+  - [使用GitHub参加训练营](./game/github-introduction.md)
+  - [使用Gitee参加训练营](./game/gitee-instructions.md)
   - [date 测试说明](./game/miniob-test-comment-date.md)
   - [date 实现解析](./game/miniob-date-implementation.md)
   - [drop table 实现解析](./game/miniob-drop-table-implementation.md)
@@ -39,3 +41,6 @@
   - [第5章 查询优化](./lectures/lecture-5.md)
   - [第6章 事务处理](./lectures/lecture-6.md)
   - [参考资料](./lectures/references.md)
+
+- [Blog](./blog/introduction.md)
+  - [High-Performance Concurrency Control Mechanisms for Main-Memory Databases](./blog/1.md)
