@@ -11,28 +11,9 @@
             "program": "${workspaceFolder}/${defaultBuildTask}/bin/observer",
             "args": ["-f", "${workspaceFolder}/etc/observer.ini", "-P", "cli"],
             "cwd": "${workspaceFolder}/${defaultBuildTask}/",
-            "preLaunchTask": "build_debug",
+            "preLaunchTask": "build",
             //设置成为neverOpen，这样在第一次运行的时候不会跳转到调试控制台
             "internalConsoleOptions": "neverOpen",
         },
-        // microsoft cppdbg插件选这个：
-        // {
-        //     "type": "cppdbg",
-        //     "request": "launch",
-        //     "name": "Debug",
-        //     "program": "${workspaceFolder}/${defaultBuildTask}/bin/observer",
-        //     "args": [
-        //         "-f",
-        //         "${workspaceFolder}/etc/observer.ini",
-        //         "-P",
-        //         "cli"
-        //     ],
-        //     "cwd": "${workspaceFolder}/${defaultBuildTask}/",
-        //     "externalConsole": true,
-        //     "internalConsoleOptions": "openOnSessionStart",
-        //     "osx": {
-        //         "MIMode": "lldb"
-        //     }
-        // }
     ]
 }

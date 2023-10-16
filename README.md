@@ -11,27 +11,18 @@
 
 ## debug 教程
 
-官方给 vscode 配好了开发环境, 安装 CodeLLDB 插件后按`F5`即可开始断点调试.
+安装 CMake Tools 和 CodeLLDB 插件后按`F5`即可开始断点调试.
 
-更改代码后按`F5`不会重新编译, 可以更改`.vscode/launch.json`: 
+## 推荐插件
 
-```diff
-{
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug",
-            "program": "${workspaceFolder}/${defaultBuildTask}/bin/observer",
-            "args": ["-f", "${workspaceFolder}/etc/observer.ini", "-P", "cli"],
--            "cwd": "${workspaceFolder}/${defaultBuildTask}/"
-+            "cwd": "${workspaceFolder}/${defaultBuildTask}/",
-+            "preLaunchTask": "build_debug"
-        }
-    ]
-}
-```
+- clangd : 语法提示
+- Cpp Reference : 在 VSCode 中快速打开 cpp reference 文档
+- GitLens : 更方便的查看 git 历史
+- Log File Highlighter : 高亮日志文件
+- Doxygen Documentation Generator : doxygen 支持
+- Todo Tree : 高亮 TODO, FIXME, NOTE 等注释
+- Yash : lex/yacc语法高亮
+- AZ AL Dev Tools/AL Code Outline : 快速查看当前文件的函数列表
 
 ## 以下是原README:
 

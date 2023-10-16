@@ -13,10 +13,6 @@
             "type": "shell",
             "command": "bash build.sh debug",
             "problemMatcher": [],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
         },
         {
             "label": "build_release",
@@ -27,6 +23,42 @@
             "label": "gen_parser",
             "type": "shell",
             "command": "cd ${workspaceFolder}/src/observer/sql/parser && bash gen_parser.sh"
-        }
+        },
+        {
+            "type": "cmake",
+            "label": "CMake: configure",
+            "command": "configure",
+            "targets": [
+                "observer"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "type": "cmake",
+            "label": "CMake: clean",
+            "command": "clean",
+            "targets": [
+                "observer"
+            ],
+            "problemMatcher": [],
+        },
+        {
+            "type": "cmake",
+            "label": "build",
+            "command": "build",
+            "targets": [
+                "observer"
+            ],
+            // 在新加 .cpp 文件后需要重新配置
+            "dependsOn": [
+                "CMake: configure"
+                // "CMake: clean",
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
     ]
 }
