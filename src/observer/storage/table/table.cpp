@@ -273,6 +273,40 @@ RC Table::visit_record(const RID &rid, bool readonly, std::function<void(Record 
   return record_handler_->visit_record(rid, readonly, visitor);
 }
 
+RC Table::update_record(Record &record, const FieldMeta *field_meta, const Value *value)
+{
+  RC rc = RC::SUCCESS;
+  // 找到所有和该字段有关的索引
+  auto indexs = this->find_indexes_by_field(field_meta->name());
+
+  // 删除之前的索引
+  if (!indexs.empty()) {
+    for (auto index : indexs) {
+      rc = index->delete_entry(record.data(), &record.rid());
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to delete index entry; table: %s, index: %s.", this->name(), index->index_meta().name());
+        return rc;
+      }
+    }
+  }
+
+  // 更新字段
+  // TODO：我看其他人会改 record_handler 类，再实现一个函数，但其实这里直接 memcpy 就可以了，不知道有没有什么隐患。
+  record.set_value(field_meta->offset(), value);
+
+  // 插入新的索引
+  if (!indexs.empty()) {
+    for (auto index : indexs) {
+      rc = index->insert_entry(record.data(), &record.rid());
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to delete index entry; table: %s, index: %s.", this->name(), index->index_meta().name());
+        return rc;
+      }
+    }
+  }
+  return rc;
+}
+
 RC Table::get_record(const RID &rid, Record &record)
 {
   const int record_size = table_meta_.record_size();
