@@ -62,6 +62,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         INDEX
         CALC
         SELECT
+        INNER
+        JOIN
         DESC
         SHOW
         SYNC
@@ -118,6 +120,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
+  JoinSqlNode *                     join_node;
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
@@ -125,6 +128,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<std::string> *        relation_list;
   std::vector<std::string> *        aggre_attr_list;
+  std::vector<JoinSqlNode> *        join_list;
   char *                            string; // 是char*类型, 需要free
   int                               number;
   float                             floats;
@@ -160,6 +164,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <aggre_attr_list>     aggre_attr_list
 %type <expression>          expression
 %type <expression_list>     expression_list
+%type <join_node>           join_node
+%type <join_list>           join_list
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -457,7 +463,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT selector FROM rel_list where
+    SELECT selector FROM rel_list join_list where
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -469,8 +475,12 @@ select_stmt:        /*  select 语句的语法解析树*/
         delete $4;
       }
       if ($5 != nullptr) {
-        $$->selection.conditions.swap(*$5);
+        $$->selection.joinctions.swap(*$5);
         delete $5;
+      }
+      if ($6 != nullptr) {
+        $$->selection.conditions.swap(*$6);
+        delete $6;
       }
     }
     ;
@@ -557,6 +567,43 @@ attr_list:
       free($3);
     }
     ;
+
+/**
+ * @description: JoinSql节点，包括表名和一些列条件
+ * @return {JoinSqlNode*} 
+ */
+join_node:
+    INNER JOIN rel_name ON condition_list
+    {
+      $$ = new JoinSqlNode{$3,*$5};
+      delete $3;
+      delete $5;
+    }
+    ;
+
+
+/**
+ * @description: 递归解析所有的join
+ * @return {std::vector<JoinSqlNode>*} 
+ */
+ join_list:
+       /* empty */
+    {
+      $$ = nullptr;
+    }
+    | join_node
+    {
+      $$ = new std::vector<JoinSqlNode>{*$1};
+      delete $1;   
+    }
+    | join_list join_node
+    {
+      $$->emplace_back(*$2);
+      delete $2;
+
+    }
+    ;
+
 
 /**
  * @description: 获取表名的列表
