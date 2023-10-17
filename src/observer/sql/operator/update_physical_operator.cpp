@@ -28,9 +28,6 @@ RC UpdatePhysicalOperator::next()
     return RC::RECORD_EOF;
   }
 
-  // 找到所有和该字段有关的索引
-  auto indexs = table_->find_indexes_by_field(field_meta_->name());
-
   PhysicalOperator *child = children_[0].get();
   while (RC::SUCCESS == (rc = child->next())) {
     Tuple *tuple = child->current_tuple();
@@ -42,30 +39,7 @@ RC UpdatePhysicalOperator::next()
     RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
     Record   &record    = row_tuple->record();
 
-    // 删除之前的索引
-    if (!indexs.empty()) {
-      for (auto index : indexs) {
-        rc = index->delete_entry(record.data(), &record.rid());
-        if (rc != RC::SUCCESS) {
-          LOG_WARN("failed to delete index entry; table: %s, index: %s.", table_->name(), index->index_meta().name());
-          return rc;
-        }
-      }
-    }
-
-    // 更新字段
-    record.set_value(field_meta_->offset(), value_);
-
-    // 插入新的索引
-    if (!indexs.empty()) {
-      for (auto index : indexs) {
-        rc = index->insert_entry(record.data(), &record.rid());
-        if (rc != RC::SUCCESS) {
-          LOG_WARN("failed to delete index entry; table: %s, index: %s.", table_->name(), index->index_meta().name());
-          return rc;
-        }
-      }
-    }
+    trx_->update_record(table_, record, field_meta_, value_);
 
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to delete record: %s", strrc(rc));

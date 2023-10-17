@@ -225,6 +225,10 @@ RC MvccTrx::visit_record(Table *table, Record &record, bool readonly)
   return rc;
 }
 
+RC MvccTrx::update_record(Table *table, Record &record, const FieldMeta *field_meta, const Value *value) {
+  return RC::SUCCESS;
+}
+
 /**
  * @brief 获取指定表上的事务使用的字段
  *

@@ -81,6 +81,8 @@ public:
    */
   RC visit_record(Table *table, Record &record, bool readonly) override;
 
+  RC update_record(Table *table, Record &record, const FieldMeta *field_meta, const Value *value) override;
+
   RC start_if_need() override;
   RC commit() override;
   RC rollback() override;
