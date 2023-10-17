@@ -141,7 +141,14 @@ public:
     this->owner_ = true;
   }
 
-  void set_value(int offset, const Value *value) { memcpy(data_ + offset, value->data(), value->length()); }
+  void set_value(int offset, const Value *value)
+  {
+    if (value->attr_type() == CHARS) {
+      memcpy(data_ + offset, value->data(), value->length() + 1);
+    } else {
+      memcpy(data_ + offset, value->data(), value->length());
+    }
+  }
 
   char       *data() { return this->data_; }
   const char *data() const { return this->data_; }
