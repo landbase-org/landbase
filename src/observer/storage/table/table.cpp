@@ -356,6 +356,17 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
       );
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
+    // 检查是否满足字段长度限制
+    if (field->type() == CHARS && value.length() > field->len()) {
+      LOG_WARN(
+          "Invalid value length. table name =%s, field name=%s, len=%d, but given=%d",
+          table_meta_.name(),
+          field->name(),
+          field->len(),
+          value.length()
+      );
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
   }
 
   // 复制所有字段的值
