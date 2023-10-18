@@ -36,8 +36,7 @@ UpdateStmt::~UpdateStmt()
   }
 }
 
-// TODO: 支持多个属性的更新
-RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
+RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
 {
   // 检查参数
   const char *table_name = update.relation_name.c_str();
@@ -67,6 +66,12 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   // 检查字段和值的类型是否匹配
   for (int i = 0; i < field_metas.size(); i++) {
     if (field_metas[i]->type() != update.value_list[i].attr_type()) {
+      // 日期格式特殊处理
+      if (field_metas[i]->type() == DATES && update.value_list[i].attr_type() == CHARS) {
+        int32_t dataval = convert_string_to_date(update.value_list[i].data());
+        update.value_list[i].set_date(dataval);
+        continue;
+      }
       LOG_ERROR(
           "Fail to update %s, field type(%d) and value type(%d) mismatch",
           table->name(),
