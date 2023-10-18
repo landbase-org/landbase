@@ -20,11 +20,13 @@ See the Mulan PSL v2 for more details. */
 #include "common/rc.h"
 #include "sql/stmt/stmt.h"
 #include "storage/field/field.h"
+#include "order_by_stmt.h"
 
 class FieldMeta;
 class FilterStmt;
 class Db;
 class Table;
+class OrderByStmt;
 
 /**
  * @brief 表示select语句
@@ -45,9 +47,11 @@ public:
   const std::vector<Table *> &tables() const { return tables_; }
   const std::vector<Field>   &query_fields() const { return query_fields_; }
   FilterStmt                 *filter_stmt() const { return filter_stmt_; }
+  OrderByStmt                *order_by_stmt() const {return order_stmt_; }
 
 private:
   std::vector<Field>   query_fields_;
   std::vector<Table *> tables_;
   FilterStmt          *filter_stmt_ = nullptr;
+  OrderByStmt         *order_stmt_  = nullptr;
 };

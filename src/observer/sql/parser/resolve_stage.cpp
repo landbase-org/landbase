@@ -17,9 +17,6 @@ See the Mulan PSL v2 for more details. */
 
 #include "resolve_stage.h"
 
-#include "common/conf/ini.h"
-#include "common/io/io.h"
-#include "common/lang/string.h"
 #include "common/log/log.h"
 #include "event/session_event.h"
 #include "event/sql_event.h"
