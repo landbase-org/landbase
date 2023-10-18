@@ -234,9 +234,9 @@ RC PhysicalPlanGenerator::create_plan(InsertLogicalOperator &insert_oper, unique
   return RC::SUCCESS;
 }
 
-RC PhysicalPlanGenerator::create_plan(UpdateLogicalOperator &delete_oper, unique_ptr<PhysicalOperator> &oper)
+RC PhysicalPlanGenerator::create_plan(UpdateLogicalOperator &update_oper, unique_ptr<PhysicalOperator> &oper)
 {
-  vector<unique_ptr<LogicalOperator>> &child_opers = delete_oper.children();
+  vector<unique_ptr<LogicalOperator>> &child_opers = update_oper.children();
 
   unique_ptr<PhysicalOperator> child_physical_oper;
 
@@ -251,7 +251,7 @@ RC PhysicalPlanGenerator::create_plan(UpdateLogicalOperator &delete_oper, unique
   }
 
   oper = unique_ptr<PhysicalOperator>(
-      new UpdatePhysicalOperator(delete_oper.table(), delete_oper.field_meta(), delete_oper.value())
+      new UpdatePhysicalOperator(update_oper.table(), update_oper.field_metas(), update_oper.values())
   );
 
   if (child_physical_oper) {

@@ -15,11 +15,14 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/update_stmt.h"
 #include "storage/db/db.h"
 
-UpdateStmt::UpdateStmt(Table *table, FilterStmt *filter_stmt, const FieldMeta *field_meta, const Value *value)
+UpdateStmt::UpdateStmt(
+    Table *table, FilterStmt *filter_stmt, std::vector<const FieldMeta *> &field_meta,
+    std::vector<const Value *> &values
+)
     : table_(table),
       filter_stmt_(filter_stmt),
-      field_meta_(field_meta),
-      value_(value)
+      field_metas_(std::move(field_meta)),
+      values_(std::move(values))
 {}
 
 UpdateStmt::~UpdateStmt()
@@ -28,9 +31,8 @@ UpdateStmt::~UpdateStmt()
     delete filter_stmt_;
     filter_stmt_ = nullptr;
   }
-  if (value_ != nullptr) {
-    delete value_;
-    value_ = nullptr;
+  for (auto &value : values_) {
+    delete value;
   }
 }
 
@@ -52,25 +54,34 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   }
 
   // 查找字段元信息
-  auto field_meta = table->table_meta().field(update.attribute_name.c_str());
-  if (field_meta == nullptr) {
-    LOG_ERROR("Fail to find field %s in table %s", update.attribute_name.c_str(), table->name());
-    return RC::SCHEMA_FIELD_NOT_EXIST;
+  std::vector<const FieldMeta *> field_metas;
+  for (auto &field_name : update.attr_list) {
+    auto field_meta = table->table_meta().field(field_name.c_str());
+    if (field_meta == nullptr) {
+      LOG_ERROR("Fail to find field %s in table %s", field_name.c_str(), table->name());
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
+    field_metas.push_back(field_meta);
   }
 
   // 检查字段和值的类型是否匹配
-  if (field_meta->type() != update.value.attr_type()) {
-    LOG_ERROR(
-        "Fail to update %s, field type(%d) and value type(%d) mismatch",
-        table->name(),
-        field_meta->type(),
-        update.value.attr_type()
-    );
-    return RC::INVALID_ARGUMENT;
+  for (int i = 0; i < field_metas.size(); i++) {
+    if (field_metas[i]->type() != update.value_list[i].attr_type()) {
+      LOG_ERROR(
+          "Fail to update %s, field type(%d) and value type(%d) mismatch",
+          table->name(),
+          field_metas[i]->type(),
+          update.value_list[i].attr_type()
+      );
+      return RC::INVALID_ARGUMENT;
+    }
   }
 
   // 新建 Value
-  auto *value = new Value(update.value);
+  std::vector<const Value *> values;
+  for (auto &attr : update.value_list) {
+    values.emplace_back(new Value(attr));
+  }
 
   // 设置过滤条件
   std::unordered_map<std::string, Table *> table_map;
@@ -86,6 +97,6 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   }
 
   // 新建 Stmt
-  stmt = new UpdateStmt(table, filter_stmt, field_meta, value);
+  stmt = new UpdateStmt(table, filter_stmt, field_metas, values);
   return RC::SUCCESS;
 }

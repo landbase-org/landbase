@@ -38,9 +38,10 @@ RC VacuousTrx::delete_record(Table *table, Record &record) { return table->delet
 
 RC VacuousTrx::visit_record(Table *table, Record &record, bool readonly) { return RC::SUCCESS; }
 
-RC VacuousTrx::update_record(Table *table, Record &record, const FieldMeta *field_meta, const Value *value)
-{
-  return table->update_record(record, field_meta, value);
+RC VacuousTrx::update_record(
+      Table *table, Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<const Value *> &values
+  ){
+  return table->update_record(record, field_metas, values);
 }
 
 RC VacuousTrx::start_if_need() { return RC::SUCCESS; }

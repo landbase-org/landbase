@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
+#include <utility>
 
 #include "common/log/log.h"
 #include "common/lang/string.h"
@@ -124,6 +125,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
+  std::pair<std::vector<std::string>, std::vector<Value>> * update_list;
   std::vector<ConditionSqlNode> *   condition_list;
   std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<std::string> *        relation_list;
@@ -156,6 +158,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <attr_info>           attr_def
 %type <value_list>          value_list
 %type <value_list_list>     value_list_list
+%type <update_list>         update_list
 %type <condition_list>      where
 %type <condition_list>      condition_list
 %type <rel_attr_list>       selector
@@ -448,20 +451,42 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     }
     ;
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where 
+    UPDATE ID SET update_list where 
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.value = *$6;
-      if ($7 != nullptr) {
-        $$->update.conditions.swap(*$7);
-        delete $7;
+      $$->update.attr_list = $4->first;
+      $$->update.value_list = $4->second;
+
+      if ($5 != nullptr) {
+        $$->update.conditions.swap(*$5);
+        delete $5;
       }
       free($2);
-      free($4);
+      delete $4;
     }
     ;
+
+update_list:
+    ID EQ value
+    {
+      $$ = new std::pair<std::vector<std::string>, std::vector<Value>>;
+      $$->first.emplace_back($1);
+      $$->second.emplace_back(*$3);
+
+      delete $1;
+      delete $3;
+    }
+    | update_list COMMA ID EQ value
+    {
+      $$ = $1;
+      $$->first.emplace_back($3);
+      $$->second.emplace_back(*$5);
+      delete $3;
+      delete $5;
+    }
+    ;
+
 select_stmt:        /*  select 语句的语法解析树*/
     SELECT selector FROM rel_list join_list where
     {
