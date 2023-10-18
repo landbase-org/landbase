@@ -28,23 +28,24 @@ class UpdateStmt : public Stmt
 {
 public:
   UpdateStmt() = default;
-  UpdateStmt(Table *table, FilterStmt *filter_stmt, const FieldMeta *field_meta, const Value *values);
+  UpdateStmt(
+      Table *table, FilterStmt *filter_stmt, std::vector<const FieldMeta *> &field_meta, std::vector<const Value *> &values
+  );
   ~UpdateStmt() override;
 
 public:
-  static RC create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt);
+  static RC create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt);
 
 public:
-  Table           *table() const { return table_; }
-  FilterStmt      *filter_stmt() { return filter_stmt_; }
-  const Value     *value() const { return value_; }
-  const FieldMeta *field_meta() const { return field_meta_; }
-  StmtType         type() const override { return StmtType::UPDATE; }
+  Table      *table() const { return table_; }
+  FilterStmt *filter_stmt() { return filter_stmt_; }
+  const auto &field_metas() const { return field_metas_; }
+  const auto &values() const { return values_; }
+  StmtType    type() const override { return StmtType::UPDATE; }
 
 private:
-  Table           *table_      = nullptr;
-  const FieldMeta *field_meta_ = nullptr;
-  const Value     *value_      = nullptr;
-
-  FilterStmt *filter_stmt_ = nullptr;
+  Table                         *table_ = nullptr;
+  std::vector<const FieldMeta *> field_metas_;
+  std::vector<const Value *>     values_;
+  FilterStmt                    *filter_stmt_ = nullptr;
 };
