@@ -214,7 +214,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
 
   // add up the join's conditions
   for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
-    std::vector<ConditionSqlNode> const& tmp_vec_condi = select_sql.joinctions[i].join_conditions;
+    std::vector<ConditionSqlNode> const &tmp_vec_condi = select_sql.joinctions[i].join_conditions;
     for (auto j : tmp_vec_condi)
       conditions.emplace_back(j);
   }
@@ -223,12 +223,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // 有关 where 条件的处理, 过滤出需要的数据
   FilterStmt *filter_stmt = nullptr;
   rc                      = FilterStmt::create(
-      db,
-      default_table,
-      &table_map,
-      conditions.data(),
-      static_cast<int>(conditions.size()),
-      filter_stmt
+      db, default_table, &table_map, conditions.data(), static_cast<int>(conditions.size()), filter_stmt
   );
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");

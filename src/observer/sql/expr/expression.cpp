@@ -89,7 +89,7 @@ ComparisonExpr::~ComparisonExpr() {}
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
   // TODO : 完善此处对比较结果的处理
-  result = left.compare(comp_,right);
+  result = left.compare(comp_, right);
 
   return RC::SUCCESS;
 }

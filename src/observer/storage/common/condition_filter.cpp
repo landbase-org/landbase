@@ -136,7 +136,7 @@ bool DefaultConditionFilter::filter(const Record &rec) const
     right_value.set_value(right_.value);
   }
 
-  return left_value.compare(comp_op_,right_value);
+  return left_value.compare(comp_op_, right_value);
 }
 
 CompositeConditionFilter::~CompositeConditionFilter()

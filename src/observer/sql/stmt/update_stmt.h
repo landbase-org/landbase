@@ -29,7 +29,8 @@ class UpdateStmt : public Stmt
 public:
   UpdateStmt() = default;
   UpdateStmt(
-      Table *table, FilterStmt *filter_stmt, std::vector<const FieldMeta *> &field_meta, std::vector<const Value *> &values
+      Table *table, FilterStmt *filter_stmt, std::vector<const FieldMeta *> &field_meta,
+      std::vector<const Value *> &values
   );
   ~UpdateStmt() override;
 

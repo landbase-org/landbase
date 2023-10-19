@@ -63,7 +63,7 @@ const char *FieldMeta::name() const { return name_.c_str(); }
 
 AttrType FieldMeta::type() const { return attr_type_; }
 
-bool FieldMeta::nullable() const {return nullable_;}
+bool FieldMeta::nullable() const { return nullable_; }
 
 int FieldMeta::offset() const { return attr_offset_; }
 
@@ -79,12 +79,12 @@ void FieldMeta::desc(std::ostream &os) const
 
 void FieldMeta::to_json(Json::Value &json_value) const
 {
-  json_value[FIELD_NAME]    = name_;
-  json_value[FIELD_TYPE]    = attr_type_to_string(attr_type_);
+  json_value[FIELD_NAME]     = name_;
+  json_value[FIELD_TYPE]     = attr_type_to_string(attr_type_);
   json_value[FIELD_NULLABLE] = nullable_;
-  json_value[FIELD_OFFSET]  = attr_offset_;
-  json_value[FIELD_LEN]     = attr_len_;
-  json_value[FIELD_VISIBLE] = visible_;
+  json_value[FIELD_OFFSET]   = attr_offset_;
+  json_value[FIELD_LEN]      = attr_len_;
+  json_value[FIELD_VISIBLE]  = visible_;
 }
 
 RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
