@@ -57,6 +57,7 @@ RC TableMeta::init(int32_t table_id, const char *name, int field_num, const Attr
 
   RC rc = RC::SUCCESS;
 
+  // mvcc 事务需要一些字段储存事务数据，所有有可能需要额外的字段
   int                      field_offset  = 0;
   int                      trx_field_num = 0;
   const vector<FieldMeta> *trx_fields    = TrxKit::instance()->trx_fields();
@@ -65,7 +66,9 @@ RC TableMeta::init(int32_t table_id, const char *name, int field_num, const Attr
 
     for (size_t i = 0; i < trx_fields->size(); i++) {
       const FieldMeta &field_meta = (*trx_fields)[i];
-      fields_[i] = FieldMeta(field_meta.name(), field_meta.type(), field_offset, field_meta.len(), false /*visible*/);
+      fields_[i]                  = FieldMeta(
+          field_meta.name(), field_meta.type(), field_meta.nullable(), field_offset, field_meta.len(), false /*visible*/
+      );
       field_offset += field_meta.len();
     }
 
@@ -74,10 +77,12 @@ RC TableMeta::init(int32_t table_id, const char *name, int field_num, const Attr
     fields_.resize(field_num);
   }
 
+  // 加入字段
   for (int i = 0; i < field_num; i++) {
     const AttrInfoSqlNode &attr_info = attributes[i];
-    rc                               = fields_[i + trx_field_num]
-             .init(attr_info.name.c_str(), attr_info.type, field_offset, attr_info.length, true /*visible*/);
+    rc                               = fields_[i + trx_field_num].init(
+        attr_info.name.c_str(), attr_info.type, attr_info.nullable, field_offset, attr_info.length, true /*visible*/
+    );
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name.c_str());
       return rc;

@@ -74,7 +74,7 @@ RC Table::create(
 
   RC rc = RC::SUCCESS;
 
-  // 使用 table_name.table记录一个表的元数据
+  // 使用 table_name.table 记录一个表的元数据
   // 判断表文件是否已经存在
   int fd = ::open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
   if (fd < 0) {

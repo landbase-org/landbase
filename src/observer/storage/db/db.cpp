@@ -81,7 +81,7 @@ RC Db::create_table(const char *table_name, int attribute_count, const AttrInfoS
 {
   RC rc = RC::SUCCESS;
   // check table_name
-  if (opened_tables_.count(table_name) != 0) {
+  if (opened_tables_.contains(table_name)) {
     LOG_WARN("%s has been opened before.", table_name);
     return RC::SCHEMA_TABLE_EXIST;
   }
