@@ -29,6 +29,7 @@ enum AttrType
   INTS,      ///< 整数类型(4字节)
   FLOATS,    ///< 浮点数类型(4字节)
   BOOLEANS,  ///< boolean类型，当前不是由parser解析出来的，是程序内部使用的
+  NULLS,     ///< null 类型
 };
 
 const char *attr_type_to_string(AttrType type);
@@ -44,7 +45,7 @@ class Value
   using date = int32_t;
 
 public:
-  Value() = default;
+  Value();  // 没有参数的构造函数默认构造 null 变量
 
   Value(AttrType attr_type, char *data, int length = 4) : attr_type_(attr_type) { this->set_data(data, length); }
 
@@ -56,16 +57,17 @@ public:
   Value(const Value &other)            = default;
   Value &operator=(const Value &other) = default;
 
-  void set_type(AttrType type) { this->attr_type_ = type; }
-  void set_data(char *data, int length);
-  void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
-  void set_int(int val);
-  void set_float(float val);
-  void set_boolean(bool val);
-  void set_string(const char *s, int len = 0);
-  void set_date(const date date);
-  void set_value(const Value &value);
-  bool type_cast(const AttrType target);
+  void        set_type(AttrType type) { this->attr_type_ = type; }
+  void        set_data(char *data, int length);
+  void        set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
+  void        set_int(int val);
+  void        set_float(float val);
+  void        set_boolean(bool val);
+  void        set_string(const char *s, int len = 0);
+  void        set_date(const date date);
+  void        set_null();
+  void        set_value(const Value &value);
+  bool        type_cast(const AttrType target);
   std::string to_string() const;
 
   bool compare(const CompOp &comp_op, const Value &other) const;
@@ -85,10 +87,14 @@ public:
   std::string get_string() const;
   bool        get_boolean() const;
   date        get_date() const;
+  bool        get_null() const;
+  bool        is_nullable() const;
 
 private:
   AttrType attr_type_ = UNDEFINED;
   int      length_    = 0;
+  bool     nullable   = false;  // 是否可以为null
+  bool     is_null    = false;  // 是否为null
 
   union
   {

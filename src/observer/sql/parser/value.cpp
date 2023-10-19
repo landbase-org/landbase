@@ -72,6 +72,8 @@ int32_t convert_string_to_date(const char *str_data)
   return ans;
 }
 
+Value::Value() { set_null(); }
+
 Value::Value(int val) { set_int(val); }
 
 Value::Value(float val) { set_float(val); }
@@ -148,6 +150,14 @@ void Value::set_date(Value::date data)
   length_                = 4;
 }
 
+void Value::set_null()
+{
+  this->attr_type_ = NULLS;
+  this->nullable = true;
+  this->is_null  = true;
+  this->length_  = 0;
+}
+
 void Value::set_value(const Value &value)
 {
   switch (value.attr_type_) {
@@ -166,6 +176,9 @@ void Value::set_value(const Value &value)
     case DATES: {
       set_date(value.get_date());
     } break;
+    case NULLS: {
+      set_null();
+    }
     case UNDEFINED: {
       ASSERT(false, "got an invalid value type");
     } break;
@@ -400,6 +413,10 @@ bool Value::get_boolean() const
 }
 
 Value::date Value::get_date() const { return num_value_.date_value_; }
+
+bool Value::get_null() const { return this->is_null; }
+
+bool Value::is_nullable() const { return this->nullable; }
 
 /**
  * @brief 完成类型转换的函数
