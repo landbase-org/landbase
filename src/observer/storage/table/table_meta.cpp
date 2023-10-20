@@ -92,7 +92,7 @@ RC TableMeta::init(int32_t table_id, const char *name, int field_num, const Attr
   // 加入其他字段
   for (int i = 0; i < field_num; i++) {
     const AttrInfoSqlNode &attr_info = attributes[i];
-    rc                               = fields_[i + trx_field_num].init(
+    rc                               = fields_[trx_field_num + null_field_num + i].init(
         attr_info.name.c_str(), attr_info.type, attr_info.nullable, field_offset, attr_info.length, true /*visible*/
     );
     if (rc != RC::SUCCESS) {
@@ -154,10 +154,19 @@ int TableMeta::field_num() const { return fields_.size(); }
 int TableMeta::sys_field_num() const
 {
   const vector<FieldMeta> *trx_fields = TrxKit::instance()->trx_fields();
-  if (nullptr == trx_fields) {
-    return 0;
-  }
-  return static_cast<int>(trx_fields->size()) + 1;  // trx_field + null_field
+
+  auto trx_field_num = nullptr == trx_fields ? 0 : trx_fields->size();
+
+  return trx_field_num + 1;  // trx_field + null_field
+}
+
+const common::Bitmap TableMeta::null_field(char *data) const
+{
+  auto           offset = fields_[sys_field_num() - 1].offset();
+  auto           len    = fields_[sys_field_num() - 1].len();
+  common::Bitmap null_field(data + offset, len);
+
+  return null_field;
 }
 
 const IndexMeta *TableMeta::index(const char *name) const

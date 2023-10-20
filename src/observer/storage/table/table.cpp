@@ -375,21 +375,28 @@ const char *Table::name() const { return table_meta_.name(); }
 
 const TableMeta &Table::table_meta() const { return table_meta_; }
 
+// Record: __null | 其他字段...
 RC Table::make_record(int value_num, const Value *values, Record &record)
 {
+  const int normal_field_start_index = table_meta_.sys_field_num();
+
   // 检查 value 数量是否和字段数目相同
-  if (value_num + table_meta_.sys_field_num() != table_meta_.field_num()) {
+  if (value_num + normal_field_start_index != table_meta_.field_num()) {
     LOG_WARN("Input values don't match the table's schema, table name:%s", table_meta_.name());
     return RC::SCHEMA_FIELD_MISSING;
   }
 
-  const int normal_field_start_index = table_meta_.sys_field_num();
+  // 检查 value 和字段是否匹配
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value     &value = values[i];
 
-    if (!field->nullable() && value.is_null()) {
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    if (value.is_null()) {
+      if (!field->nullable()) {
+        return RC::SCHEMA_FIELD_NOT_NULLABLE;
+      } else {
+        continue;
+      }
     }
 
     if (field->type() != value.attr_type()) {
@@ -407,14 +414,22 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     }
   }
 
-  // 复制所有字段的值
+  // 复制所有字段的值，注意处理 null 值
   int   record_size = table_meta_.record_size();
   char *record_data = (char *)malloc(record_size);
+
+  auto null_field = table_meta_.null_field(record_data);
 
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field    = table_meta_.field(i + normal_field_start_index);
     const Value     &value    = values[i];
     size_t           copy_len = field->len();
+
+    if (value.is_null()) {
+      null_field.set_bit(normal_field_start_index + 1);
+      continue;
+    }
+
     if (field->type() == CHARS) {
       const size_t data_len = value.length();
       if (copy_len > data_len) {

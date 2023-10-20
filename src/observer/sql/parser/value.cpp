@@ -153,7 +153,7 @@ void Value::set_date(Value::date data)
 void Value::set_null()
 {
   this->attr_type_ = NULLS;
-  this->nullable   = true;
+  this->nullable_  = true;
   this->length_    = 0;
 }
 
@@ -415,7 +415,7 @@ Value::date Value::get_date() const { return num_value_.date_value_; }
 
 bool Value::is_null() const { return this->attr_type_ == NULLS; }
 
-bool Value::is_nullable() const { return this->nullable; }
+bool Value::is_nullable() const { return this->nullable_; }
 
 /**
  * @brief 完成类型转换的函数

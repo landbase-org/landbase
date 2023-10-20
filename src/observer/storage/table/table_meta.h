@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include <string>
 #include <vector>
 
+#include "common/lang/bitmap.h"
 #include "common/lang/serializable.h"
 #include "common/rc.h"
 #include "storage/field/field_meta.h"
@@ -50,9 +51,11 @@ public:
   const std::vector<FieldMeta> *field_metas() const { return &fields_; }
   auto                          trx_fields() const -> const std::pair<const FieldMeta *, int>;
 
-  // Record：__trx_xid_begin | __trx_xid_end | __null | 其他字段...
+  // Field: __trx_xid_begin | __trx_xid_end | __null | 其他字段...
   int field_num() const;      // 包括 sys_field
   int sys_field_num() const;  // 包括 trx_field 和 null_field
+
+  const common::Bitmap null_field(char *data) const;
 
   const IndexMeta *index(const char *name) const;
   const IndexMeta *find_index_by_field(const char *field) const;

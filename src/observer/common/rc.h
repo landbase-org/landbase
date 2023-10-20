@@ -75,7 +75,8 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(VARIABLE_NOT_VALID)          \
   DEFINE_RC(LOGBUF_FULL)                 \
   DEFINE_RC(FAILURE)                     \
-  DEFINE_RC(FAIL_TO_DELETE_FILE)
+  DEFINE_RC(FAIL_TO_DELETE_FILE)         \
+  DEFINE_RC(SCHEMA_FIELD_NOT_NULLABLE)
 
 enum class RC
 {

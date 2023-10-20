@@ -93,7 +93,7 @@ public:
 private:
   AttrType attr_type_ = UNDEFINED;
   int      length_    = 0;
-  bool     nullable   = false;  // 是否可以为null
+  bool     nullable_  = false;  // 是否可以为null
 
   union
   {
