@@ -153,9 +153,8 @@ void Value::set_date(Value::date data)
 void Value::set_null()
 {
   this->attr_type_ = NULLS;
-  this->nullable = true;
-  this->is_null  = true;
-  this->length_  = 0;
+  this->nullable   = true;
+  this->length_    = 0;
 }
 
 void Value::set_value(const Value &value)
@@ -414,7 +413,7 @@ bool Value::get_boolean() const
 
 Value::date Value::get_date() const { return num_value_.date_value_; }
 
-bool Value::get_null() const { return this->is_null; }
+bool Value::is_null() const { return this->attr_type_ == NULLS; }
 
 bool Value::is_nullable() const { return this->nullable; }
 

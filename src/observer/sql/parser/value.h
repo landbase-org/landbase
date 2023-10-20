@@ -87,14 +87,13 @@ public:
   std::string get_string() const;
   bool        get_boolean() const;
   date        get_date() const;
-  bool        get_null() const;
+  bool        is_null() const;
   bool        is_nullable() const;
 
 private:
   AttrType attr_type_ = UNDEFINED;
   int      length_    = 0;
   bool     nullable   = false;  // 是否可以为null
-  bool     is_null    = false;  // 是否为null
 
   union
   {

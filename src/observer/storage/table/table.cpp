@@ -88,7 +88,7 @@ RC Table::create(
 
   close(fd);
 
-  // 创建文件
+  // 创建表元信息
   if ((rc = table_meta_.init(table_id, name, attribute_count, attributes)) != RC::SUCCESS) {
     LOG_ERROR("Failed to init table meta. name:%s, ret:%d", name, rc);
     return rc;  // delete table file
@@ -377,7 +377,7 @@ const TableMeta &Table::table_meta() const { return table_meta_; }
 
 RC Table::make_record(int value_num, const Value *values, Record &record)
 {
-  // 检查字段类型是否一致
+  // 检查 value 数量是否和字段数目相同
   if (value_num + table_meta_.sys_field_num() != table_meta_.field_num()) {
     LOG_WARN("Input values don't match the table's schema, table name:%s", table_meta_.name());
     return RC::SCHEMA_FIELD_MISSING;
@@ -387,6 +387,11 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value     &value = values[i];
+
+    if (!field->nullable() && value.is_null()) {
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+
     if (field->type() != value.attr_type()) {
       Value *change = const_cast<Value *>(&value);
       if (change->type_cast(field->type()))

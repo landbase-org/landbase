@@ -50,8 +50,9 @@ public:
   const std::vector<FieldMeta> *field_metas() const { return &fields_; }
   auto                          trx_fields() const -> const std::pair<const FieldMeta *, int>;
 
-  int field_num() const;  // sys field included
-  int sys_field_num() const;
+  // Record：__trx_xid_begin | __trx_xid_end | __null | 其他字段...
+  int field_num() const;      // 包括 sys_field
+  int sys_field_num() const;  // 包括 trx_field 和 null_field
 
   const IndexMeta *index(const char *name) const;
   const IndexMeta *find_index_by_field(const char *field) const;

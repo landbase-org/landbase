@@ -57,12 +57,14 @@ RC TableMeta::init(int32_t table_id, const char *name, int field_num, const Attr
 
   RC rc = RC::SUCCESS;
 
+  const int null_field_num = 1;  // null 字段
+
   // mvcc 事务需要一些字段储存事务数据，所有有可能需要额外的字段
   int                      field_offset  = 0;
   int                      trx_field_num = 0;
   const vector<FieldMeta> *trx_fields    = TrxKit::instance()->trx_fields();
   if (trx_fields != nullptr) {
-    fields_.resize(field_num + trx_fields->size());
+    fields_.resize(trx_fields->size() + null_field_num + field_num);
 
     for (size_t i = 0; i < trx_fields->size(); i++) {
       const FieldMeta &field_meta = (*trx_fields)[i];
@@ -74,10 +76,20 @@ RC TableMeta::init(int32_t table_id, const char *name, int field_num, const Attr
 
     trx_field_num = static_cast<int>(trx_fields->size());
   } else {
-    fields_.resize(field_num);
+    fields_.resize(null_field_num + field_num);
   }
 
-  // 加入字段
+  // 加入 null 字段, 使用 bitmap 标识各字段是否为 null
+  const size_t null_field_len = (trx_field_num + 1 + field_num) / 8 + 1;
+  rc                          = fields_[trx_field_num].init(
+      "__null", CHARS, false, field_offset, null_field_len, false /*visible*/
+  );
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to init null field. table name=%s", name);
+  }
+  field_offset += null_field_len;
+
+  // 加入其他字段
   for (int i = 0; i < field_num; i++) {
     const AttrInfoSqlNode &attr_info = attributes[i];
     rc                               = fields_[i + trx_field_num].init(
@@ -145,7 +157,7 @@ int TableMeta::sys_field_num() const
   if (nullptr == trx_fields) {
     return 0;
   }
-  return static_cast<int>(trx_fields->size());
+  return static_cast<int>(trx_fields->size()) + 1;  // trx_field + null_field
 }
 
 const IndexMeta *TableMeta::index(const char *name) const
