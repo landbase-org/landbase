@@ -298,10 +298,19 @@ RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_me
     }
   }
 
+  auto bitmap = table_meta_.bitmap_of_null_field(record.data());
+
   // 更新字段
+  // 从parser阶段开始 field_metas 和 values 的数量一定一直是一致的
   // TODO：我看其他人会改 record_handler 类，再实现一个函数，但其实这里直接 memcpy 就可以了，不知道有没有什么隐患。
   for (int i = 0; i < field_metas.size(); ++i) {
-    record.set_value(field_metas[i]->offset(), values[i]);
+    int field_index = table_meta_.field_index(field_metas[i]);
+    if (values[i]->is_null()) {
+      bitmap.set_bit(field_index);
+    } else {
+      bitmap.clear_bit(field_index);
+      record.set_value(field_metas[i]->offset(), values[i]);
+    }
   }
 
   // 插入新的索引
@@ -427,10 +436,11 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     size_t           copy_len = field->len();
 
     if (value.is_null()) {
-      null_field.set_bit(normal_field_start_index + 1);
+      null_field.set_bit(normal_field_start_index + i);
       continue;
     }
 
+    null_field.clear_bit(normal_field_start_index + i);
     if (field->type() == CHARS) {
       const size_t data_len = value.length();
       if (copy_len > data_len) {

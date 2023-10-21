@@ -146,6 +146,7 @@ RC FilterStmt::create_filter_unit(
     change->set_date(check);
     return rc;
   }
+
   // 如果左右均为值，有一个非CHARS就都转为FLOATS
   if (!filter_unit->left().is_attr && !filter_unit->right().is_attr) {
     Value &left_ref  = const_cast<Value &>(filter_unit->left().value);
@@ -168,6 +169,12 @@ RC FilterStmt::create_filter_unit(
     }
     // 左侧为域，右侧为值
     else if (filter_unit->left().is_attr && !filter_unit->right().is_attr) {
+
+      // 如果右侧是 null, ，可以比较
+      if (filter_unit->right().value.is_null()) {
+        return RC::SUCCESS;
+      }
+
       // status:1
       if (filter_unit->left().field.attr_type() != CHARS) {
         Value   *right_chg = const_cast<Value *>(&filter_unit->right().value);

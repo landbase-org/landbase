@@ -270,6 +270,9 @@ bool Value::compare(const CompOp &comp_op, const Value &other) const
       case BOOLEANS: {
         cmp_result = common::compare_int((void *)&this->num_value_.bool_value_, (void *)&other.num_value_.bool_value_);
       }
+      case NULLS: {
+        cmp_result = 0;
+      }
       default: {
         LOG_WARN("unsupported type: %d", this->attr_type_);
       }
@@ -297,6 +300,9 @@ bool Value::compare(const CompOp &comp_op, const Value &other) const
     self.type_cast(FLOATS);
     oppsite.type_cast(FLOATS);
     cmp_result = common::compare_float((void *)&self.num_value_.float_value_, (void *)&oppsite.num_value_.float_value_);
+  } else if (this->is_null() || other.is_null()) {
+    // 跳到这里说明两个Value的类型不同，且其中一个是NULL，即只有一个null, 不管比较符是什么，都返回false
+    return false;
   } else {
     LOG_WARN("not supported,Type Error");
     return false;
