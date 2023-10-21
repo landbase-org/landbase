@@ -172,6 +172,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <expression_list>     expression_list
 %type <join_node>           join_node
 %type <join_list>           join_list
+%type <join_list>           select_join_list
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -512,7 +513,7 @@ update_list:
     ;
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT selector FROM rel_list join_list where
+    SELECT selector FROM rel_list select_join_list where
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -630,17 +631,23 @@ join_node:
     }
     ;
 
-
+select_join_list:
+      /*empty*/
+    {
+      $$ = nullptr; 
+    }
+    | join_list
+    {
+      $$ = $1; 
+    }
+    ;
 /**
  * @description: 递归解析所有的join
  * @return {std::vector<JoinSqlNode>*} 
  */
  join_list:
-       /* empty */
-    {
-      $$ = nullptr;
-    }
-    | join_node
+
+     join_node
     {
       $$ = new std::vector<JoinSqlNode>{*$1};
       delete $1;   
