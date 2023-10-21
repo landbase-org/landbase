@@ -90,6 +90,7 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
             return RC::SCHEMA_FIELD_TYPE_MISMATCH;
           }
           change->set_date(mid);
+          continue;
         }
         LOG_WARN(
             "field type mismatch. table=%s, field=%s, field type=%d, value_type=%d",
