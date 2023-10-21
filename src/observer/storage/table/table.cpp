@@ -418,7 +418,8 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   int   record_size = table_meta_.record_size();
   char *record_data = (char *)malloc(record_size);
 
-  auto null_field = table_meta_.null_field(record_data);
+  // 将整个record的数据传入，会返回 __null 字段的 bitmap
+  auto null_field = table_meta_.bitmap_of_null_field(record_data);
 
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field    = table_meta_.field(i + normal_field_start_index);
@@ -672,4 +673,15 @@ RC Table::sync()
   }
   LOG_INFO("Sync table over. table=%s", name());
   return rc;
+}
+
+bool Table::is_null(const FieldMeta *field_meta, char *data) const
+{
+  auto null_field  = table_meta_.bitmap_of_null_field(data);
+  int  field_index = table_meta_.field_index(field_meta);
+  if (field_index == -1) {
+    LOG_ERROR("Failed to find field index. table=%s, field=%s", name(), field_meta->name());
+    return false;
+  }
+  return null_field.get_bit(field_index);
 }

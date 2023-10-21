@@ -126,6 +126,12 @@ const std::pair<const FieldMeta *, int> TableMeta::trx_fields() const
   return std::pair<const FieldMeta *, int>{fields_.data(), sys_field_num()};
 }
 
+const FieldMeta *TableMeta::null_field() const
+{
+  int null_field_index = sys_field_num() - 1;
+  return &fields_[null_field_index];
+}
+
 const FieldMeta *TableMeta::field(int index) const { return &fields_[index]; }
 const FieldMeta *TableMeta::field(const char *name) const
 {
@@ -138,6 +144,17 @@ const FieldMeta *TableMeta::field(const char *name) const
     }
   }
   return nullptr;
+}
+
+int TableMeta::field_index(const FieldMeta *field_meta) const
+{
+  for (int i = 0; i < fields_.size(); i++) {
+    if (field_meta->offset() == fields_[i].offset()) {
+      return i;
+    }
+  }
+  LOG_ERROR("Invalid field meta. field name=%s", field_meta->name());
+  return -1;
 }
 
 const FieldMeta *TableMeta::find_field_by_offset(int offset) const
@@ -160,11 +177,11 @@ int TableMeta::sys_field_num() const
   return trx_field_num + 1;  // trx_field + null_field
 }
 
-const common::Bitmap TableMeta::null_field(char *data) const
+const common::Bitmap TableMeta::bitmap_of_null_field(char *data) const
 {
-  auto           offset = fields_[sys_field_num() - 1].offset();
-  auto           len    = fields_[sys_field_num() - 1].len();
-  common::Bitmap null_field(data + offset, len);
+  auto           offset = null_field()->offset();
+  auto           size   = field_num();
+  common::Bitmap null_field(data + offset, size);
 
   return null_field;
 }

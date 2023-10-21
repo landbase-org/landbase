@@ -90,6 +90,8 @@ public:
 
   RecordFileHandler *record_handler() const { return record_handler_; }
 
+  bool is_null(const FieldMeta *field_meta, char *data) const;
+
 public:
   int32_t     table_id() const { return table_meta_.table_id(); }
   const char *name() const;

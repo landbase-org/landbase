@@ -124,6 +124,8 @@ public:
 
   RC get_value(const Tuple &tuple, Value &value) const override;
 
+  bool is_null(char *data) const;
+
 private:
   Field field_;
 };

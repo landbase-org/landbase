@@ -58,6 +58,8 @@ public:
 
   const char *get_data(const Record &record);
 
+  bool is_null(char *data) const;
+
 private:
   const Table     *table_ = nullptr;
   const FieldMeta *field_ = nullptr;
