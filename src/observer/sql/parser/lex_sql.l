@@ -125,6 +125,7 @@ AVG                                     RETURN_TOKEN(AVG);
 MAX                                     RETURN_TOKEN(MAX);
 MIN                                     RETURN_TOKEN(MIN);
 
+IS                                      RETURN_TOKEN(IS_);
 NOT                                     RETURN_TOKEN(NOT);
 LIKE                                    RETURN_TOKEN(LK);
 

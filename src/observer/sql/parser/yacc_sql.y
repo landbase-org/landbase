@@ -107,6 +107,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         AVG
         MIN
         MAX
+        IS_ // 加 _ 是为了防止和comp_op冲突
         NOT
         LK
 
@@ -821,6 +822,8 @@ comp_op:
     | NE { $$ = NOT_EQUAL; }
     | LK { $$ = LIKE; }
     | NOT LK { $$ = NOT_LIKE;}
+    | IS_ { $$ = IS;}
+    | IS_ NOT { $$ = IS_NOT;}
     ;
 
 aggre_type:

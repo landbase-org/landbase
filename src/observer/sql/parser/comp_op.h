@@ -16,5 +16,7 @@ enum CompOp
   GREAT_THAN,   ///< ">"
   LIKE,         ///< LIKE
   NOT_LIKE,     ///< NOT LIKE
+  IS,           ///< 是某种类型的
+  IS_NOT,       ///< 不是某种类型的
   NO_OP,        ///< no condition
 };

@@ -105,7 +105,9 @@ RC ComparisonExpr::try_get_value(Value &cell) const
     const Value &right_cell       = right_value_expr->get_value();
 
     bool value = false;
-    RC   rc    = compare_value(left_cell, right_cell, value);
+
+    RC rc = compare_value(left_cell, right_cell, value);
+
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to compare tuple cells. rc=%s", strrc(rc));
     } else {
