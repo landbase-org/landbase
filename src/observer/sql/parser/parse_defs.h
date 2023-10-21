@@ -22,6 +22,7 @@ See the Mulan PSL v2 for more details. */
 #include <unordered_map>
 #include <vector>
 
+#include "common/log/log.h"
 #include "sql/parser/comp_op.h"
 #include "sql/parser/value.h"
 
@@ -106,13 +107,24 @@ public:
           case AGGRE_SUM: f_sum += value.get_float(); break;
           default: break;
         }
-      }
+      } break;
+      case NULLS: {
+        i_count--;
+      } break;
       default: break;
     }
   }
 
   void update(Value value)
   {
+    if (value.attr_type() != attr_type_ && value.is_null()) {
+      return;
+    }
+
+    if (attr_type_ == NULLS && value.attr_type() != NULLS) {
+      attr_type_ = value.attr_type();
+    }
+
     i_count++;
 
     switch (attr_type_) {
@@ -147,7 +159,7 @@ public:
           case AGGRE_SUM: f_sum += value.get_float(); break;
           default: break;
         }
-      }
+      } break;
       default: break;
     }
   }
