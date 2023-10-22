@@ -29,8 +29,19 @@ class FieldMeta;
 class OrderByUnit
 {
 public:
-  Field order_field;
-  bool  is_asc = true;
+  OrderByUnit()  = default;
+  ~OrderByUnit() = default;
+  void             set_table(Table *table);
+  void             set_order(OrderType type);
+  void             set_field_meta(const FieldMeta *&filed_meta);
+  bool             get_asc() const { return is_asc; };
+  const FieldMeta *get_fields() const { return &order_field; }
+  Table           *get_table() const { return order_table_; }
+
+private:
+  Table    *order_table_;
+  FieldMeta order_field;
+  bool      is_asc = true;
 };
 
 /**
@@ -38,7 +49,8 @@ public:
  */
 class OrderByStmt : public Stmt
 {
-  OrderByStmt()  = default;
+public:
+  OrderByStmt() = default;
   virtual ~OrderByStmt();
   StmtType type() const override { return StmtType::ORDER_BY; }
 
@@ -51,6 +63,9 @@ public:
       Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables, const OrderSqlNode &orderby,
       OrderByUnit *&order_unit
   );
+
+public:
+  const std::vector<OrderByUnit *> &order_units() const { return order_units_; }
 
 private:
   std::vector<OrderByUnit *> order_units_;
