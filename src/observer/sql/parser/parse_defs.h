@@ -122,7 +122,7 @@ public:
   void update(Value value)
   {
     // 如果传进来的是 null，同时不是 count(*)，不更新
-    if (value.attr_type() != attr_type_ && value.is_null() && aggre_type_ != AGGRE_COUNT_ALL) {
+    if (value.is_null() && aggre_type_ != AGGRE_COUNT_ALL) {
       return;
     }
     // 有时第一个加进来的值是NULL, 需要更新attr_type
