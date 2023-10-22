@@ -20,7 +20,6 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   return RC::SUCCESS;
 }
 
-// TODO: 将更新交于事务处理，目前事务不完善，暂时交由物理操作处理
 RC UpdatePhysicalOperator::next()
 {
   RC rc = RC::SUCCESS;
@@ -39,7 +38,7 @@ RC UpdatePhysicalOperator::next()
     RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
     Record   &record    = row_tuple->record();
 
-    trx_->update_record(table_, record, field_meta_, value_);
+    trx_->update_record(table_, record, field_metas_, values_);
 
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to delete record: %s", strrc(rc));

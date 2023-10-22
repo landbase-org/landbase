@@ -274,11 +274,19 @@ RC Table::visit_record(const RID &rid, bool readonly, std::function<void(Record 
   return record_handler_->visit_record(rid, readonly, visitor);
 }
 
-RC Table::update_record(Record &record, const FieldMeta *field_meta, const Value *value)
+RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<const Value *> &values)
 {
   RC rc = RC::SUCCESS;
   // 找到所有和该字段有关的索引
-  auto indexs = this->find_indexes_by_field(field_meta->name());
+  std::vector<Index *> indexs;
+  for (auto index : indexes_) {
+    for (auto field_meta : field_metas) {
+      if (index->index_meta().field() == field_meta->name()) {
+        indexs.push_back(index);
+        break;
+      }
+    }
+  }
 
   // 删除之前的索引
   if (!indexs.empty()) {
@@ -293,7 +301,9 @@ RC Table::update_record(Record &record, const FieldMeta *field_meta, const Value
 
   // 更新字段
   // TODO：我看其他人会改 record_handler 类，再实现一个函数，但其实这里直接 memcpy 就可以了，不知道有没有什么隐患。
-  record.set_value(field_meta->offset(), value);
+  for (int i = 0; i < field_metas.size(); ++i) {
+    record.set_value(field_metas[i]->offset(), values[i]);
+  }
 
   // 插入新的索引
   if (!indexs.empty()) {
@@ -619,7 +629,7 @@ std::vector<Index *> Table::find_indexes_by_field(const char *field_name) const
   std::vector<Index *> res;
   for (auto index : indexes_) {
     if (0 == strcmp(index->index_meta().field(), field_name)) {
-      res.push_back(index);
+      res.emplace_back(index);
     }
   }
   return res;

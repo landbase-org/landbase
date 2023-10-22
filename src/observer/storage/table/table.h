@@ -78,7 +78,7 @@ public:
   RC insert_record(Record &record);
   RC delete_record(const Record &record);
   RC visit_record(const RID &rid, bool readonly, std::function<void(Record &)> visitor);
-  RC update_record(Record &record, const FieldMeta *field_meta, const Value *value);
+  RC update_record(Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<const Value *> &values);
   RC get_record(const RID &rid, Record &record);
 
   RC recover_insert_record(Record &record);
