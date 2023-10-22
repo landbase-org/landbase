@@ -92,6 +92,11 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
           change->set_date(mid);
           continue;
         }
+        // 如果可以转换，就转换一下
+        auto &change = const_cast<Value &>(values[i]);
+        if (change.type_cast(field_type)) {
+          continue;
+        }
         LOG_WARN(
             "field type mismatch. table=%s, field=%s, field type=%d, value_type=%d",
             table_name,
