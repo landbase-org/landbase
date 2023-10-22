@@ -36,7 +36,7 @@ RC OrderPhysicalOperator::get_inited()
       tup_ptr->cell_at(i, temp);
       val_vec->emplace_back(temp);
     }
-    req_tuples_.emplace_back(val_vec);
+    ori_data.emplace_back(val_vec);
   }
   // order the ValueGrp with order rules
   std::function<bool(ValueGrp * &left, ValueGrp * &right)> cmprule = [&](ValueGrp *&left, ValueGrp *&right) -> bool {
@@ -59,10 +59,14 @@ RC OrderPhysicalOperator::get_inited()
     return false;
   };
 
-  sort(req_tuples_.begin(), req_tuples_.end(), cmprule);
+  sort(ori_data.begin(), ori_data.end(), cmprule);
 
-  for (auto unit : order_units_) {}
-  ordered_iter_ = req_tuples_.begin();
+  ordered_tuple = new std::vector<ValueListTuple>(ori_data.size(), ValueListTuple());
+  for (int i = 0, j = 0; i < ori_data.size() && j < ordered_tuple->size(); i++, j++) {
+    (*ordered_tuple)[j].set_cells(*ori_data[i]);
+  }
+
+  ordered_iter_ = (*ordered_tuple).begin();
   is_inited_    = true;
 
   return RC::SUCCESS;
@@ -74,12 +78,14 @@ OrderPhysicalOperator::~OrderPhysicalOperator()
     delete order_unit;
   }
   order_units_.clear();
-  for (auto valgrp : req_tuples_) {
+  for (auto valgrp : ori_data) {
     valgrp->clear();
     delete valgrp;
   }
-  req_tuples_.clear();
+  ordered_tuple->clear();
+  ori_data.clear();
   ord_idx_asc.clear();
+  delete ordered_tuple;
 }
 
 RC OrderPhysicalOperator::open(Trx *trx)
@@ -95,11 +101,11 @@ RC OrderPhysicalOperator::open(Trx *trx)
 RC OrderPhysicalOperator::next()
 {
   if (is_inited_) {
-    if (req_tuples_.empty()) {
+    if ((*ordered_tuple).empty()) {
       return RC::RECORD_EOF;
     } else {
       ordered_iter_++;
-      return ordered_iter_ != req_tuples_.end() ? RC::SUCCESS : RC::RECORD_EOF;
+      return ordered_iter_ != (*ordered_tuple).end() ? RC::SUCCESS : RC::RECORD_EOF;
     }
   }
   // get inited
@@ -122,14 +128,12 @@ RC OrderPhysicalOperator::close()
 Tuple *OrderPhysicalOperator::current_tuple()
 {
   // new a ValueListTuple
-  ValueListTuple *ret = new ValueListTuple();
-  ret->set_cells(*(*ordered_iter_));
-  return ret;
+  return &(*ordered_iter_);
 }
 
 void OrderPhysicalOperator::print_infor()
 {
-  for (auto valgrp : req_tuples_) {
+  for (auto valgrp : ori_data) {
     std::string line;
     for (auto &item : *valgrp) {
       line += item.to_string();

@@ -39,9 +39,10 @@ public:
   using ValueGrp = std::vector<Value>;
 
 private:
-  bool                              is_inited_ = false;  // 是否已经初始化
-  std::vector<std::pair<int, bool>> ord_idx_asc;         // 表示order的第idx个cell是否为ASC排序
-  std::vector<OrderByUnit *>        order_units_;
-  std::vector<ValueGrp *>           req_tuples_;
-  std::vector<ValueGrp *>::iterator ordered_iter_;
+  bool                                  is_inited_ = false;  // 是否已经初始化
+  std::vector<std::pair<int, bool>>     ord_idx_asc;         // 表示order的第idx个cell是否为ASC排序
+  std::vector<OrderByUnit *>            order_units_;
+  std::vector<ValueGrp *>               ori_data;
+  std::vector<ValueListTuple>::iterator ordered_iter_;
+  std::vector<ValueListTuple>          *ordered_tuple;
 };

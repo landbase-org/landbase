@@ -80,6 +80,10 @@ RC OrderByStmt::create_orderby_unit(
   Table           *table_tmp = nullptr;
   const FieldMeta *field_mt  = nullptr;
   RC               rc        = get_unit_info(db, default_table, tables, orderby.rel_attr, table_tmp, field_mt);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("Order field not found");
+    return rc;
+  }
   temp->set_table(table_tmp);
   temp->set_field_meta(field_mt);
   temp->set_order(orderby.order_type);
