@@ -130,6 +130,7 @@ NOT                                     RETURN_TOKEN(NOT);
 LIKE                                    RETURN_TOKEN(LK);
 
 NULL                                    RETURN_TOKEN(NULL_T);
+NULLABLE                                RETURN_TOKEN(NULL_T);
 
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 {AGGRE_ATTR}                            yylval->string=strdup(yytext); RETURN_TOKEN(AGGRE_ATTR);
