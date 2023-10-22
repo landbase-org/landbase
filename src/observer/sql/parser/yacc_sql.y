@@ -65,6 +65,9 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         SELECT
         INNER
         JOIN
+        ORDER
+        ASC
+        BY
         DESC
         SHOW
         SYNC
@@ -117,13 +120,15 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   ConditionSqlNode *                condition;
   Value *                           value;
   enum CompOp                       comp;
-  enum AggreType                    aggre_type; 
+  enum AggreType                    aggre_type;
+  enum OrderType                    order_type;
   AggreTypeNode *                   aggre_node;
   RelAttrSqlNode *                  rel_attr;
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
   JoinSqlNode *                     join_node;
+  OrderSqlNode *                    order_node;
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
@@ -133,6 +138,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   std::vector<std::string> *        relation_list;
   std::vector<std::string> *        aggre_attr_list;
   std::vector<JoinSqlNode> *        join_list;
+  std::vector<OrderSqlNode> *       order_list;
   char *                            string; // 是char*类型, 需要free
   int                               number;
   float                             floats;
@@ -154,6 +160,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <number>              number
 %type <comp>                comp_op
 %type <aggre_type>          aggre_type
+%type <order_type>          order_type
 %type <rel_attr>            rel_attr_aggre
 %type <aggre_node>          aggre_node
 %type <rel_attr>            rel_attr        // (table column)
@@ -173,6 +180,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <expression_list>     expression_list
 %type <join_node>           join_node
 %type <join_list>           join_list
+%type <order_node>          order_node
+%type <order_list>          order_list
 %type <join_list>           select_join_list
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
@@ -514,7 +523,7 @@ update_list:
     ;
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT selector FROM rel_list select_join_list where
+    SELECT selector FROM rel_list select_join_list where order_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -532,6 +541,10 @@ select_stmt:        /*  select 语句的语法解析树*/
       if ($6 != nullptr) {
         $$->selection.conditions.swap(*$6);
         delete $6;
+      }
+      if ($7 != nullptr) {
+        $$->selection.orders.swap(*$7);
+        delete $7;
       }
     }
     ;
@@ -619,12 +632,13 @@ attr_list:
     }
     ;
 
+
 /**
  * @description: JoinSql节点，包括表名和一些列条件
  * @return {JoinSqlNode*} 
  */
 join_node:
-    INNER JOIN rel_name ON condition_list
+      INNER JOIN rel_name ON condition_list
     {
       $$ = new JoinSqlNode{$3,*$5};
       delete $3;
@@ -647,7 +661,6 @@ select_join_list:
  * @return {std::vector<JoinSqlNode>*} 
  */
  join_list:
-
      join_node
     {
       $$ = new std::vector<JoinSqlNode>{*$1};
@@ -657,9 +670,47 @@ select_join_list:
     {
       $$->emplace_back(*$2);
       delete $2;
-
     }
     ;
+
+
+/**
+ * @description: OrderBy Sql Node
+ * @return {std::vector<OrderSqlNode>*} 
+ */
+order_node:
+    rel_attr order_type
+    {
+      $$ = new OrderSqlNode{*$1,$2};
+      delete $1;
+    }
+    ;
+
+
+/**
+ * @description: 递归解析所有的orderby
+ * @return {OrderSqlNode*} 
+ */
+order_list:
+      /* empty */
+    {
+      $$ = nullptr;
+    }
+    | order_node
+    {
+      $$ = new std::vector<OrderSqlNode>{*$1};
+      delete $1;
+    }
+    | ORDER BY order_node
+    {
+      $$ = new std::vector<OrderSqlNode>{*$3};
+      delete $3;
+    }
+    | order_list COMMA order_node
+    {
+      $$->emplace_back(*$3);
+      delete $3;
+    }
 
 
 /**
@@ -833,6 +884,11 @@ aggre_type:
     | MAX   { $$ = AGGRE_MAX; }
     | MIN   { $$ = AGGRE_MIN; }
 
+order_type:
+      /* empty */
+      {$$ = ORDER_ASC; }
+    | ASC   { $$ = ORDER_ASC; }
+    | DESC  { $$ = ORDER_DESC; }
 
 load_data_stmt:
     LOAD DATA INFILE SSS INTO TABLE ID 

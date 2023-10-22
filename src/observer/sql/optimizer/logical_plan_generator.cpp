@@ -20,6 +20,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/insert_logical_operator.h"
 #include "sql/operator/join_logical_operator.h"
 #include "sql/operator/logical_operator.h"
+#include "sql/operator/order_logical_operator.h"
 #include "sql/operator/predicate_logical_operator.h"
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
@@ -117,6 +118,13 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     return rc;
   }
 
+  unique_ptr<LogicalOperator> orderby_oper;
+  rc = create_plan(select_stmt->order_by_stmt(), orderby_oper);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to create order logical plan. rc=%s", strrc(rc));
+    return rc;
+  }
+
   unique_ptr<LogicalOperator> project_oper(new ProjectLogicalOperator(all_fields));
   if (predicate_oper) {
     if (table_oper) {
@@ -127,6 +135,12 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     if (table_oper) {
       project_oper->add_child(std::move(table_oper));
     }
+  }
+
+  if (orderby_oper) {
+    orderby_oper->add_child(std::move(project_oper));
+    logical_operator.swap(orderby_oper);
+    return RC::SUCCESS;
   }
 
   logical_operator.swap(project_oper);
@@ -162,6 +176,21 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   }
 
   logical_operator = std::move(predicate_oper);
+  return RC::SUCCESS;
+}
+
+RC LogicalPlanGenerator::create_plan(OrderByStmt *order_by_stmt, std::unique_ptr<LogicalOperator> &logical_operator)
+{
+  const std::vector<OrderByUnit *> order_units = order_by_stmt->order_units();
+  if (order_units.empty()) {
+    LOG_INFO("No OrderByUnits");
+    logical_operator = nullptr;
+    return RC::SUCCESS;
+  }
+
+  unique_ptr<OrderLogicalOperator> order_oper = std::make_unique<OrderLogicalOperator>(order_units);
+
+  logical_operator = std::move(order_oper);
   return RC::SUCCESS;
 }
 

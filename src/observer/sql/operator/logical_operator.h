@@ -41,6 +41,7 @@ enum class LogicalOperatorType
   UPDATE,      ///< 更新字段
   DELETE,      ///< 删除，删除可能会有子查询
   EXPLAIN,     ///< 查看执行计划
+  ORDER_BY     ///< 排序
 };
 
 /**

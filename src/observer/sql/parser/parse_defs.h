@@ -33,6 +33,16 @@ class Expression;
  */
 
 /**
+ * @description: Order类型
+ */
+enum OrderType
+{
+  NONE,  // 无ORDER要求
+  ORDER_ASC,   // 升序
+  ORDER_DESC   // 降序
+};
+
+/**
  * @description: 聚合类型
  */
 enum AggreType
@@ -294,6 +304,12 @@ struct JoinSqlNode
   std::vector<ConditionSqlNode> join_conditions;
 };
 
+struct OrderSqlNode
+{
+  RelAttrSqlNode rel_attr;
+  OrderType      order_type = OrderType::ORDER_ASC;
+};
+
 /**
  * @brief 描述一个select语句
  * @ingroup SQLParser
@@ -311,6 +327,7 @@ struct SelectSqlNode
   std::vector<std::string>      relations;   ///< 查询的表
   std::vector<ConditionSqlNode> conditions;  ///< 查询条件，使用AND串联起来多个条件
   std::vector<JoinSqlNode>      joinctions;  ///< Join-list
+  std::vector<OrderSqlNode>     orders;      ///< Order-requirements
 };
 
 /**
