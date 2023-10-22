@@ -58,6 +58,13 @@ public:
 
   const char *get_data(const Record &record);
 
+  /**
+   * @brief 传入一个record数据，查询该record中该字段是否为null
+   *
+   * @param data Record data
+   * @return true 该字段为null
+   * @return false  该字段不为null
+   */
   bool is_null(char *data) const;
 
 private:

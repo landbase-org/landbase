@@ -49,13 +49,14 @@ static RC get_fields(
     const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables, const Db *db
 )
 {
+  // TODO: 目前不支持 select count(1) from user;， 不过这个sql语法的意义到底是啥，没啥用
   if (is_aggre) {
     // 当前 aggre 查询的情况只有 attr
     // 默认只有一张表
     Table *table = tables.front();
     for (auto &attribute : attributes) {
-      const auto attr_names = attribute.aggretion_node.attribute_names;
-      const auto aggre_type = attribute.aggretion_node.aggre_type;
+      const auto  attr_names = attribute.aggretion_node.attribute_names;
+      const auto &aggre_type = attribute.aggretion_node.aggre_type;
 
       if (attr_names.size() != 1) {
         LOG_WARN("query aggretion size is %d != 1", attr_names.size());
@@ -71,7 +72,9 @@ static RC get_fields(
           LOG_WARN("Aggregation type %s cannot match parameters '*'", aggreType2str(aggre_type).c_str());
           return RC::FAILURE;
         } else {  // COUNT(*) 的情况, 默认为第一列
-          field_meta = table->table_meta().field(0);
+          auto &change = const_cast<AggreType &>(aggre_type);
+          change       = AGGRE_COUNT_ALL;
+          field_meta   = table->table_meta().field(0);
         }
       } else {
         if (nullptr == field_meta) {  // 查询的列名不存在
@@ -185,6 +188,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   auto &attributes = select_sql.attributes;
 
   // attributes是否合法
+  // example: select id, count(1) from t1; -> failure
   size_t aggregation_num = 0;
   for (auto &attribute : attributes) {
     if (attribute.aggretion_node.aggre_type != AGGRE_NONE) {

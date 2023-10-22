@@ -41,6 +41,7 @@ enum AggreType
   AGGRE_MAX,
   AGGRE_MIN,
   AGGRE_COUNT,
+  AGGRE_COUNT_ALL,
   AGGRE_AVG,
   AGGRE_SUM
 };
@@ -51,6 +52,7 @@ static std::string aggreType2str(AggreType aggre)
       {AGGRE_MAX, "MAX"},
       {AGGRE_MIN, "MIN"},
       {AGGRE_COUNT, "COUNT"},
+      {AGGRE_COUNT_ALL, "COUNT"},
       {AGGRE_AVG, "AVG"},
       {AGGRE_SUM, "SUM"},
   };
@@ -109,7 +111,9 @@ public:
         }
       } break;
       case NULLS: {
-        i_count--;
+        if (aggre_type_ != AGGRE_COUNT_ALL) {
+          i_count--;
+        }
       } break;
       default: break;
     }
@@ -117,10 +121,11 @@ public:
 
   void update(Value value)
   {
-    if (value.attr_type() != attr_type_ && value.is_null()) {
+    // 如果传进来的是 null，同时不是 count(*)，不更新
+    if (value.attr_type() != attr_type_ && value.is_null() && aggre_type_ != AGGRE_COUNT_ALL) {
       return;
     }
-
+    // 有时第一个加进来的值是NULL, 需要更新attr_type
     if (attr_type_ == NULLS && value.attr_type() != NULLS) {
       attr_type_ = value.attr_type();
     }
@@ -166,7 +171,7 @@ public:
 
   const Value get_value()
   {
-    if (aggre_type_ == AGGRE_COUNT)
+    if (aggre_type_ == AGGRE_COUNT || aggre_type_ == AGGRE_COUNT_ALL)
       return Value((int)i_count);
 
     switch (attr_type_) {

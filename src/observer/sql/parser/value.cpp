@@ -237,26 +237,29 @@ std::string Value::to_string() const
  */
 bool Value::compare(const CompOp &comp_op, const Value &other) const
 {
+  // 目前 IS 和 IS_NOT 仅用于判断是否为 NULL
   switch (comp_op) {
     case IS: {
-      if (this->attr_type() == other.attr_type()) {
+      if (this->is_null() && other.is_null()) {
         return true;
       } else {
         return false;
       }
     } break;
     case IS_NOT: {
-      if (this->attr_type() != other.attr_type()) {
+      if (this->attr_type() != other.attr_type() && other.is_null()) {
         return true;
       } else {
         return false;
       }
     } break;
     default: {
-      if (this->is_null() || other.is_null()) {
-        return false;
-      }
-    }
+    } break;
+  }
+
+  // 比较运算符中出现null就返回false
+  if (this->is_null() || other.is_null()) {
+    return false;
   }
 
   int cmp_result = 0;
