@@ -39,20 +39,22 @@ RC OrderPhysicalOperator::get_inited()
     ori_data.emplace_back(val_vec);
   }
   // order the ValueGrp with order rules
-  std::function<bool(ValueGrp * &left, ValueGrp * &right)> cmprule = [&](ValueGrp *&left, ValueGrp *&right) -> bool {
+  auto cmprule = [&](ValueGrp *&left, ValueGrp *&right) -> bool {
     for (auto [idx, asc] : ord_idx_asc) {
-      if (asc) {
-        // 升序
-        if ((*left)[idx].compare(CompOp::LESS_THAN, (*right)[idx]))
-          return true;
-        else if ((*left)[idx].compare(CompOp::GREAT_THAN, (*right)[idx]))
-          return false;
+      auto &left_val  = (*left)[idx];
+      auto &right_val = (*right)[idx];
+
+      if (left_val.is_null())
+        return asc;
+      if (right_val.is_null())
+        return !asc;
+
+      if (left_val.compare(CompOp::LESS_THAN, right_val)) {
+        return asc;
+      } else if (left_val.compare(CompOp::GREAT_THAN, right_val)) {
+        return !asc;
       } else {
-        // 降序
-        if ((*left)[idx].compare(CompOp::GREAT_THAN, (*right)[idx]))
-          return true;
-        else if ((*left)[idx].compare(CompOp::LESS_THAN, (*right)[idx]))
-          return false;
+        continue;
       }
     }
     // return a default value
