@@ -26,4 +26,6 @@ GPATH
 GTAGS
 docs/book
 /ttest/
+/test/submit/question_list*.md
+/test/submit/config.yaml
 #*#
