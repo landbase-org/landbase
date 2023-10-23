@@ -19,6 +19,8 @@ except:
   print("cannot load argparse module")
   exit(1)
 
+# 编译到目录的文件名
+BUILD_NAME = 'build_test'  
 _logger = logging.getLogger('MiniOBTest')
 
 """
@@ -66,7 +68,7 @@ class Result(Enum):
 class GlobalConfig:
   default_encoding = "UTF-8"
   debug = False
-  source_code_build_path_name = "build"
+  source_code_build_path_name = BUILD_NAME
 
 def __get_build_path(work_dir: str):
   return work_dir + '/' + GlobalConfig.source_code_build_path_name
@@ -851,7 +853,7 @@ def __init_options():
                             help='test cases. If none, we will iterate the test case directory. Split with \',\' if more than one')
 
   # 测试时服务器程序的数据文件存放目录
-  options_parser.add_argument('--work-dir', action='store', dest='work_dir', default='',
+  options_parser.add_argument('--work-dir', action='store', dest='work_dir', default='../..',  # 工作路径修改为 /project/base/dir/build
                             help='the directory of miniob database\'s data for test')
 
   # 服务程序端口号，客户端也使用这个端口连接服务器。目前还不具备通过配置文件解析端口配置的能力
@@ -917,12 +919,12 @@ def __init_test_suite(options) -> TestSuite:
   test_suite = TestSuite()
   test_suite.set_test_case_base_dir(os.path.abspath(options.project_dir + '/test/case/test'))
   test_suite.set_test_result_base_dir(os.path.abspath(options.project_dir + '/test/case/result'))
-  test_suite.set_test_result_tmp_dir(os.path.abspath(options.work_dir + '/result_output'))
+  test_suite.set_test_result_tmp_dir(os.path.abspath(options.work_dir + '/' + BUILD_NAME + '/result_output'))
 
   test_suite.set_server_port(options.server_port)
   test_suite.set_use_unix_socket(not options.not_use_unix_socket)
   test_suite.set_db_server_base_dir(__get_build_path(options.work_dir))
-  test_suite.set_db_data_dir(options.work_dir + '/data')
+  test_suite.set_db_data_dir(options.work_dir + '/' + BUILD_NAME + '/data')
   test_suite.set_db_config(os.path.abspath(options.project_dir + '/etc/observer.ini'))
 
   if options.test_cases is not None:
@@ -1024,7 +1026,7 @@ def compile(work_dir: str, build_dir: str, cmake_args: str, make_args: str, rebu
   make_command = ["make", "--silent", "-C", build_path]
   if isinstance(make_args, str):
     if not make_args:
-      make_command.append('-j4')
+      make_command.append('-j12')  # 编译的核数，直接拉满
     else:
       args = make_args.split(';')
       for arg in args:
