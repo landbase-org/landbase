@@ -448,7 +448,7 @@ RC Table::init_record_handler(const char *base_dir)
   return rc;
 }
 
-RC Table::get_record_scanner(RecordFileScanner &scanner, Trx *trx, bool readonly, ConditionFilter* filter_ptr)
+RC Table::get_record_scanner(RecordFileScanner &scanner, Trx *trx, bool readonly, ConditionFilter *filter_ptr)
 {
   RC rc = scanner.open_scan(this, *data_buffer_pool_, trx, readonly, nullptr);
   if (rc != RC::SUCCESS) {
@@ -457,8 +457,9 @@ RC Table::get_record_scanner(RecordFileScanner &scanner, Trx *trx, bool readonly
   return rc;
 }
 
-RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name)
+RC Table::create_index(Trx *trx, const std::vector<FieldMeta> *field_metas, const char *index_name)
 {
+  const auto &field_meta = &((*field_metas)[0]);
   if (common::is_blank(index_name) || nullptr == field_meta) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name());
     return RC::INVALID_ARGUMENT;

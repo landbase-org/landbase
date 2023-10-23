@@ -84,9 +84,9 @@ public:
   RC recover_insert_record(Record &record);
 
   // TODO refactor
-  RC create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name);
+  RC create_index(Trx *trx, const std::vector<FieldMeta> *field_metas, const char *index_name);
 
-  RC get_record_scanner(RecordFileScanner &scanner, Trx *trx, bool readonly, ConditionFilter* filter_ptr=nullptr);
+  RC get_record_scanner(RecordFileScanner &scanner, Trx *trx, bool readonly, ConditionFilter *filter_ptr = nullptr);
 
   RecordFileHandler *record_handler() const { return record_handler_; }
 
