@@ -98,7 +98,7 @@ ADD_SUBDIRECTORY(deps)
 ADD_SUBDIRECTORY(src/obclient)
 ADD_SUBDIRECTORY(src/observer)
 ADD_SUBDIRECTORY(test/perf)
-ADD_SUBDIRECTORY(benchmark)
+# ADD_SUBDIRECTORY(benchmark)  # 这是单索引的unittest， 不能测试了
 ADD_SUBDIRECTORY(tools)
 
 IF(WITH_UNIT_TESTS)
