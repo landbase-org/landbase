@@ -102,3 +102,5 @@ private:
   } num_value_;
   std::string str_value_;
 };
+
+CompOp compare_value(const Value &left, const Value &right);

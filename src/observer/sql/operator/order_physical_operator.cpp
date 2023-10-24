@@ -44,17 +44,24 @@ RC OrderPhysicalOperator::get_inited()
       auto &left_val  = (*left)[idx];
       auto &right_val = (*right)[idx];
 
-      if (left_val.is_null())
-        return asc;
-      if (right_val.is_null())
-        return !asc;
+      auto comp_result = compare_value(left_val, right_val);
 
-      if (left_val.compare(CompOp::LESS_THAN, right_val)) {
-        return asc;
-      } else if (left_val.compare(CompOp::GREAT_THAN, right_val)) {
-        return !asc;
-      } else {
-        continue;
+      switch (comp_result) {
+        case EQUAL_TO: {
+          continue;
+        } break;
+        case LESS_THAN: {
+          return asc;
+        } break;
+        case GREAT_THAN: {
+          return !asc;
+        } break;
+        default: {
+          LOG_ERROR(
+              "Error at compare value,left: %s, right: %s", left_val.to_string().c_str(), right_val.to_string().c_str()
+          );
+          continue;
+        } break;
       }
     }
     // return a default value

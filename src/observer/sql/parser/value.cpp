@@ -72,6 +72,83 @@ int32_t convert_string_to_date(const char *str_data)
   return ans;
 }
 
+/**
+ * @brief 在sql查询语句中如果出现了null, 就返回false, 例如 where 3 < null，返回false
+ * 但是在 order by是，null是可以比较的，null会被当做最小值
+ *
+ * @param left
+ * @param right
+ * @return CompOp 比较结果，EQUAL_TO, LESS_THAN, GREAT_THAN, NO_OP
+ */
+CompOp compare_value(const Value &left, const Value &right)
+{
+  if (left.attr_type() != right.attr_type()) {
+    if (!left.is_null() && !right.is_null()) {
+      LOG_ERROR(
+          "Failed to compare value, type not match. left=%s, right=%s",
+          attr_type_to_string(left.attr_type()),
+          attr_type_to_string(right.attr_type())
+      );
+      return CompOp::NO_OP;
+    }
+    // 否则说明其中一方是 null
+    if (left.is_null()) {
+      return CompOp::LESS_THAN;
+    }
+    if (right.is_null()) {
+      return CompOp::GREAT_THAN;
+    }
+  }
+
+  int comp_result = 0;
+  switch (left.attr_type()) {
+    case CHARS: {
+      auto left_str  = left.get_string();
+      auto right_str = right.get_string();
+      comp_result    = common::compare_string(
+          (void *)left_str.c_str(), left_str.length(), (void *)right_str.c_str(), right_str.length()
+      );
+    } break;
+    case DATES: {
+      auto left_date  = left.get_date();
+      auto right_date = right.get_date();
+      comp_result     = common::compare_date((void *)&left_date, (void *)&right_date);
+    } break;
+    case INTS: {
+      auto left_int  = left.get_int();
+      auto right_int = right.get_int();
+      comp_result    = common::compare_int((void *)&left_int, (void *)&right_int);
+    } break;
+    case FLOATS: {
+      auto left_float  = left.get_float();
+      auto right_float = right.get_float();
+      comp_result      = common::compare_float((void *)&left_float, (void *)&right_float);
+    } break;
+    case BOOLEANS: {
+      auto left_bool  = left.get_boolean();
+      auto right_bool = right.get_boolean();
+      comp_result     = common::compare_int((void *)&left_bool, (void *)&right_bool);
+    } break;
+    case NULLS: {
+      // 类型相同又同为 null ，返回相等
+      return CompOp::EQUAL_TO;
+    } break;
+    default: {
+      LOG_ERROR("unknown data type. type=%s", attr_type_to_string(left.attr_type()));
+      return CompOp::NO_OP;
+    } break;
+  }
+
+  if (comp_result == 0)
+    return CompOp::EQUAL_TO;
+  if (comp_result < 0)
+    return CompOp::LESS_THAN;
+  if (comp_result > 0)
+    return CompOp::GREAT_THAN;
+
+  return CompOp::NO_OP;
+}
+
 Value::Value() { set_null(); }
 
 Value::Value(int val) { set_int(val); }

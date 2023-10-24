@@ -1,40 +1,40 @@
 1. CREATE TABLE
-create table t_order_by(id int, score float, name char);
+CREATE TABLE T_ORDER_BY(ID INT, SCORE FLOAT, NAME CHAR);
 SUCCESS
-create table t_order_by_2(id int, age int);
+CREATE TABLE T_ORDER_BY_2(ID INT, AGE INT);
 SUCCESS
 
 2. INSERT RECORDS
-insert into t_order_by values(3, 1.0, 'a');
+INSERT INTO T_ORDER_BY VALUES(3, 1.0, 'A');
 SUCCESS
-insert into t_order_by values(1, 2.0, 'b');
+INSERT INTO T_ORDER_BY VALUES(1, 2.0, 'B');
 SUCCESS
-insert into t_order_by values(4, 3.0, 'c');
+INSERT INTO T_ORDER_BY VALUES(4, 3.0, 'C');
 SUCCESS
-insert into t_order_by values(3, 2.0, 'c');
+INSERT INTO T_ORDER_BY VALUES(3, 2.0, 'C');
 SUCCESS
-insert into t_order_by values(3, 4.0, 'c');
+INSERT INTO T_ORDER_BY VALUES(3, 4.0, 'C');
 SUCCESS
-insert into t_order_by values(3, 3.0, 'd');
+INSERT INTO T_ORDER_BY VALUES(3, 3.0, 'D');
 SUCCESS
-insert into t_order_by values(3, 2.0, 'f');
+INSERT INTO T_ORDER_BY VALUES(3, 2.0, 'F');
 SUCCESS
 
-insert into t_order_by_2 values(1, 10);
+INSERT INTO T_ORDER_BY_2 VALUES(1, 10);
 SUCCESS
-insert into t_order_by_2 values(2, 20);
+INSERT INTO T_ORDER_BY_2 VALUES(2, 20);
 SUCCESS
-insert into t_order_by_2 values(3, 10);
+INSERT INTO T_ORDER_BY_2 VALUES(3, 10);
 SUCCESS
-insert into t_order_by_2 values(3, 20);
+INSERT INTO T_ORDER_BY_2 VALUES(3, 20);
 SUCCESS
-insert into t_order_by_2 values(3, 40);
+INSERT INTO T_ORDER_BY_2 VALUES(3, 40);
 SUCCESS
-insert into t_order_by_2 values(4, 20);
+INSERT INTO T_ORDER_BY_2 VALUES(4, 20);
 SUCCESS
 
 3. PRIMARY ORDER BY
-select * from t_order_by order by id;
+SELECT * FROM T_ORDER_BY ORDER BY ID;
 1 | 2 | B
 3 | 1 | A
 3 | 2 | C
@@ -44,7 +44,7 @@ select * from t_order_by order by id;
 4 | 3 | C
 ID | SCORE | NAME
 
-select * from t_order_by order by id asc;
+SELECT * FROM T_ORDER_BY ORDER BY ID ASC;
 1 | 2 | B
 3 | 1 | A
 3 | 2 | C
@@ -54,7 +54,7 @@ select * from t_order_by order by id asc;
 4 | 3 | C
 ID | SCORE | NAME
 
-select * from t_order_by order by id desc;
+SELECT * FROM T_ORDER_BY ORDER BY ID DESC;
 1 | 2 | B
 3 | 1 | A
 3 | 2 | C
@@ -64,7 +64,7 @@ select * from t_order_by order by id desc;
 4 | 3 | C
 ID | SCORE | NAME
 
-select * from t_order_by order by score desc;
+SELECT * FROM T_ORDER_BY ORDER BY SCORE DESC;
 1 | 2 | B
 3 | 1 | A
 3 | 2 | C
@@ -74,7 +74,7 @@ select * from t_order_by order by score desc;
 4 | 3 | C
 ID | SCORE | NAME
 
-select * from t_order_by order by name desc;
+SELECT * FROM T_ORDER_BY ORDER BY NAME DESC;
 1 | 2 | B
 3 | 1 | A
 3 | 2 | C
@@ -85,7 +85,7 @@ select * from t_order_by order by name desc;
 ID | SCORE | NAME
 
 4. ORDER BY MORE THAN ONE FIELDS
-select * from t_order_by order by id, score, name;
+SELECT * FROM T_ORDER_BY ORDER BY ID, SCORE, NAME;
 ID | SCORE | NAME
 1 | 2 | B
 3 | 1 | A
@@ -95,7 +95,7 @@ ID | SCORE | NAME
 3 | 4 | C
 4 | 3 | C
 
-select * from t_order_by order by id desc, score asc, name desc;
+SELECT * FROM T_ORDER_BY ORDER BY ID DESC, SCORE ASC, NAME DESC;
 ID | SCORE | NAME
 4 | 3 | C
 3 | 1 | A
@@ -106,7 +106,7 @@ ID | SCORE | NAME
 1 | 2 | B
 
 5. ORDER BY ASSOCIATE WITH WHERE CONDITION
-select * from t_order_by where id=3 and name>='a' order by score desc, name;
+SELECT * FROM T_ORDER_BY WHERE ID=3 AND NAME>='A' ORDER BY SCORE DESC, NAME;
 ID | SCORE | NAME
 3 | 4 | C
 3 | 3 | D
@@ -115,7 +115,7 @@ ID | SCORE | NAME
 3 | 1 | A
 
 6. MULTI-TABLE ORDER BY
-select * from t_order_by,t_order_by_2 order by t_order_by.id,t_order_by.score,t_order_by.name,t_order_by_2.id,t_order_by_2.age;
+SELECT * FROM T_ORDER_BY,T_ORDER_BY_2 ORDER BY T_ORDER_BY.ID,T_ORDER_BY.SCORE,T_ORDER_BY.NAME,T_ORDER_BY_2.ID,T_ORDER_BY_2.AGE;
 T_ORDER_BY.ID | T_ORDER_BY.SCORE | T_ORDER_BY.NAME | T_ORDER_BY_2.ID | T_ORDER_BY_2.AGE
 1 | 2 | B | 1 | 10
 1 | 2 | B | 2 | 20
@@ -160,7 +160,7 @@ T_ORDER_BY.ID | T_ORDER_BY.SCORE | T_ORDER_BY.NAME | T_ORDER_BY_2.ID | T_ORDER_B
 4 | 3 | C | 3 | 40
 4 | 3 | C | 4 | 20
 
-select * from t_order_by, t_order_by_2 where t_order_by.id=t_order_by_2.id order by t_order_by.score desc, t_order_by_2.age asc, t_order_by.id asc, t_order_by.name;
+SELECT * FROM T_ORDER_BY, T_ORDER_BY_2 WHERE T_ORDER_BY.ID=T_ORDER_BY_2.ID ORDER BY T_ORDER_BY.SCORE DESC, T_ORDER_BY_2.AGE ASC, T_ORDER_BY.ID ASC, T_ORDER_BY.NAME;
 T_ORDER_BY.ID | T_ORDER_BY.SCORE | T_ORDER_BY.NAME | T_ORDER_BY_2.ID | T_ORDER_BY_2.AGE
 3 | 4 | C | 3 | 10
 3 | 4 | C | 3 | 20
