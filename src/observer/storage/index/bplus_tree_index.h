@@ -14,6 +14,8 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "storage/field/field.h"
+#include "storage/field/field_meta.h"
 #include "storage/index/bplus_tree.h"
 #include "storage/index/index.h"
 
@@ -27,12 +29,13 @@ public:
   BplusTreeIndex() = default;
   virtual ~BplusTreeIndex() noexcept;
 
-  RC create(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta);
-  RC open(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta);
+  RC create(const char *file_name, const IndexMeta &index_meta, const std::vector<FieldMeta> &field_metas);
+  RC open(const char *file_name, const IndexMeta &index_meta, const std::vector<FieldMeta> &field_metas);
   RC close();
 
-  RC insert_entry(const char *record, const RID *rid) override;
-  RC delete_entry(const char *record, const RID *rid) override;
+  const char *make_key(const char *record, const RID *rid) const;
+  RC          insert_entry(const char *record, const RID *rid) override;
+  RC          delete_entry(const char *record, const RID *rid) override;
 
   /**
    * 扫描指定范围的数据

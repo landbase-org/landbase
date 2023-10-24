@@ -14,10 +14,14 @@ See the Mulan PSL v2 for more details. */
 
 #include "storage/index/bplus_tree_index.h"
 #include "common/log/log.h"
+#include "sql/parser/value.h"
+#include "storage/field/field.h"
+#include "storage/field/field_meta.h"
+#include <unistd.h>
 
 BplusTreeIndex::~BplusTreeIndex() noexcept { close(); }
 
-RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
+RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, const std::vector<FieldMeta> &field_metas)
 {
   if (inited_) {
     LOG_WARN(
@@ -29,9 +33,19 @@ RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, co
     return RC::RECORD_OPENNED;
   }
 
-  Index::init(index_meta, field_meta);
+  Index::init(index_meta, field_metas);
 
-  RC rc = index_handler_.create(file_name, field_meta.type(), field_meta.len());
+  // init index_handler
+  std::vector<int>      field_lengths;
+  std::vector<int>      field_offsets;
+  std::vector<AttrType> field_types;
+  for (size_t i = 0; i < field_metas.size(); i++) {
+    field_lengths.emplace_back(field_metas[i].len());
+    field_offsets.emplace_back(field_metas[i].offset());
+    field_types.emplace_back(field_metas[i].type());
+  }
+  RC rc = index_handler_.create(file_name, field_types, field_lengths, field_offsets);
+
   if (RC::SUCCESS != rc) {
     LOG_WARN(
         "Failed to create index_handler, file_name:%s, index:%s, field:%s, rc:%s",
@@ -50,7 +64,7 @@ RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, co
   return RC::SUCCESS;
 }
 
-RC BplusTreeIndex::open(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
+RC BplusTreeIndex::open(const char *file_name, const IndexMeta &index_meta, const std::vector<FieldMeta> &field_meta)
 {
   if (inited_) {
     LOG_WARN(
@@ -94,15 +108,9 @@ RC BplusTreeIndex::close()
   return RC::SUCCESS;
 }
 
-RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
-{
-  return index_handler_.insert_entry(record + field_meta_.offset(), rid);
-}
+RC BplusTreeIndex::insert_entry(const char *record, const RID *rid) { return index_handler_.insert_entry(record, rid); }
 
-RC BplusTreeIndex::delete_entry(const char *record, const RID *rid)
-{
-  return index_handler_.delete_entry(record + field_meta_.offset(), rid);
-}
+RC BplusTreeIndex::delete_entry(const char *record, const RID *rid) { return index_handler_.delete_entry(record, rid); }
 
 IndexScanner *BplusTreeIndex::create_scanner(
     const char *left_key, int left_len, bool left_inclusive, const char *right_key, int right_len, bool right_inclusive
