@@ -182,6 +182,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <join_list>           join_list
 %type <order_node>          order_node
 %type <order_list>          order_list
+%type <order_list>          select_order_list
 %type <join_list>           select_join_list
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
@@ -523,7 +524,7 @@ update_list:
     ;
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT selector FROM rel_list select_join_list where order_list
+    SELECT selector FROM rel_list select_join_list where select_order_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -673,45 +674,51 @@ select_join_list:
     }
     ;
 
-
-/**
- * @description: OrderBy Sql Node
- * @return {std::vector<OrderSqlNode>*} 
- */
-order_node:
-    rel_attr order_type
+select_order_list:
+      /* empty */
     {
-      $$ = new OrderSqlNode{*$1,$2};
-      delete $1;
+      $$ = nullptr; // 没有order
+    }
+    | ORDER BY order_list
+    {
+      $$ = $3;
     }
     ;
-
 
 /**
  * @description: 递归解析所有的orderby
  * @return {OrderSqlNode*} 
  */
 order_list:
-      /* empty */
-    {
-      $$ = nullptr;
-    }
-    | order_node
+      order_node
     {
       $$ = new std::vector<OrderSqlNode>{*$1};
       delete $1;
-    }
-    | ORDER BY order_node
-    {
-      $$ = new std::vector<OrderSqlNode>{*$3};
-      delete $3;
     }
     | order_list COMMA order_node
     {
       $$->emplace_back(*$3);
       delete $3;
     }
+    ;
 
+/**
+ * @description: OrderBy Sql Node
+ * @return {std::vector<OrderSqlNode>*} 
+ */
+order_node:
+      rel_attr order_type
+    {
+      $$ = new OrderSqlNode{*$1,$2};
+      delete $1;
+    }
+    ;
+
+order_type:
+           { $$ = ORDER_ASC; }
+    | ASC  { $$ = ORDER_ASC; }
+    | DESC { $$ = ORDER_DESC; }
+    ;
 
 /**
  * @description: 获取表名的列表
@@ -884,11 +891,7 @@ aggre_type:
     | MAX   { $$ = AGGRE_MAX; }
     | MIN   { $$ = AGGRE_MIN; }
 
-order_type:
-      /* empty */
-      {$$ = ORDER_ASC; }
-    | ASC   { $$ = ORDER_ASC; }
-    | DESC  { $$ = ORDER_DESC; }
+
 
 load_data_stmt:
     LOAD DATA INFILE SSS INTO TABLE ID 
