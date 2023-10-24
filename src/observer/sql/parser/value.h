@@ -88,12 +88,10 @@ public:
   bool        get_boolean() const;
   date        get_date() const;
   bool        is_null() const;
-  bool        is_nullable() const;
 
 private:
   AttrType attr_type_ = UNDEFINED;
   int      length_    = 0;
-  bool     nullable_  = false;  // 是否可以为null
 
   union
   {
