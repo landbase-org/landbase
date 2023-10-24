@@ -245,9 +245,9 @@ RC Table::insert_record(Record &record)
     return rc;
   }
 
-  rc = insert_entry_of_indexes(record.data(), record.rid());
+  rc = insert_entry_of_indexes(record);
   if (rc != RC::SUCCESS) {  // 可能出现了键值重复
-    RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
+    RC rc2 = delete_entry_of_indexes(record, false /*error_on_not_exists*/);
     if (rc2 != RC::SUCCESS) {
       LOG_ERROR(
           "Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
@@ -277,26 +277,10 @@ RC Table::visit_record(const RID &rid, bool readonly, std::function<void(Record 
 RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<const Value *> &values)
 {
   RC rc = RC::SUCCESS;
-  // 找到所有和该字段有关的索引
-  std::vector<Index *> indexs;
-  for (auto index : indexes_) {
-    for (auto field_meta : field_metas) {
-      if (index->index_meta().field() == field_meta->name()) {
-        indexs.push_back(index);
-        break;
-      }
-    }
-  }
-
   // 删除之前的索引
-  if (!indexs.empty()) {
-    for (auto index : indexs) {
-      rc = index->delete_entry(record.data(), &record.rid());
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("failed to delete index entry; table: %s, index: %s.", this->name(), index->index_meta().name());
-        return rc;
-      }
-    }
+  rc = delete_entry_of_indexes(record, true);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to delete index entries when update. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
   }
 
   auto bitmap = table_meta_.bitmap_of_null_field(record.data());
@@ -315,14 +299,9 @@ RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_me
   }
 
   // 插入新的索引
-  if (!indexs.empty()) {
-    for (auto index : indexs) {
-      rc = index->insert_entry(record.data(), &record.rid());
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("failed to delete index entry; table: %s, index: %s.", this->name(), index->index_meta().name());
-        return rc;
-      }
-    }
+  rc = insert_entry_of_indexes(record);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to insert index entries when update. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
   }
   return rc;
 }
@@ -357,9 +336,9 @@ RC Table::recover_insert_record(Record &record)
     return rc;
   }
 
-  rc = insert_entry_of_indexes(record.data(), record.rid());
+  rc = insert_entry_of_indexes(record);
   if (rc != RC::SUCCESS) {  // 可能出现了键值重复
-    RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
+    RC rc2 = delete_entry_of_indexes(record, false /*error_on_not_exists*/);
     if (rc2 != RC::SUCCESS) {
       LOG_ERROR(
           "Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
@@ -439,6 +418,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
     if (value.is_null()) {
       null_field.set_bit(normal_field_start_index + i);
+      // memcpy(record_data + field->offset(), "\0", copy_len);
       continue;
     }
 
@@ -595,27 +575,41 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
 
 RC Table::delete_record(const Record &record)
 {
-  RC rc = RC::SUCCESS;
-  for (Index *index : indexes_) {
-    rc = index->delete_entry(record.data(), &record.rid());
-    ASSERT(
-        RC::SUCCESS == rc,
-        "failed to delete entry from index. table name=%s, index name=%s, rid=%s, rc=%s",
-        name(),
-        index->index_meta().name(),
-        record.rid().to_string().c_str(),
-        strrc(rc)
-    );
+  RC rc = delete_entry_of_indexes(record, true);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to delete index entries. table=%s, rc=%d:%s", name(), rc, strrc(rc));
+    return rc;
   }
   rc = record_handler_->delete_record(&record.rid());
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to delete record. table=%s, rc=%d:%s", name(), rc, strrc(rc));
+    return rc;
+  }
   return rc;
 }
 
-RC Table::insert_entry_of_indexes(const char *record, const RID &rid)
+RC Table::insert_entry_of_indexes(const Record &record)
 {
+  Record tmp_record(record);
+  auto   bitmap = table_meta_.bitmap_of_null_field(tmp_record.data());
+
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
-    rc = index->insert_entry(record, &rid);
+    // 含有 null 值的字段不插入索引
+    bool has_null    = false;
+    auto field_meta  = index->field_meta();
+    int  field_index = table_meta_.field_index(&field_meta);
+    if (field_index == -1) {
+      LOG_ERROR("Failed to find field index. table=%s, field=%s", name(), field_meta.name());
+      return RC::INTERNAL;
+    }
+    has_null = bitmap.get_bit(field_index);
+
+    if (has_null) {
+      continue;
+    }
+
+    rc = index->insert_entry(record.data(), &record.rid());
     if (rc != RC::SUCCESS) {
       break;
     }
@@ -623,11 +617,28 @@ RC Table::insert_entry_of_indexes(const char *record, const RID &rid)
   return rc;
 }
 
-RC Table::delete_entry_of_indexes(const char *record, const RID &rid, bool error_on_not_exists)
+RC Table::delete_entry_of_indexes(const Record &record, bool error_on_not_exists)
 {
+  Record tmp_record(record);
+  auto   bitmap = table_meta_.bitmap_of_null_field(tmp_record.data());
+
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
-    rc = index->delete_entry(record, &rid);
+    // 含有 null 值的字段不需要从索引里删除
+    bool has_null    = false;
+    auto field_meta  = index->field_meta();
+    int  field_index = table_meta_.field_index(&field_meta);
+    if (field_index == -1) {
+      LOG_ERROR("Failed to find field index. table=%s, field=%s", name(), field_meta.name());
+      return RC::INTERNAL;
+    }
+    has_null = bitmap.get_bit(field_index);
+
+    if (has_null) {
+      continue;
+    }
+
+    rc = index->delete_entry(record.data(), &record.rid());
     if (rc != RC::SUCCESS) {
       if (rc != RC::RECORD_INVALID_KEY || !error_on_not_exists) {
         break;
