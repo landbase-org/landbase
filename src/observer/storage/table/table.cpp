@@ -480,7 +480,7 @@ RC Table::init_record_handler(const char *base_dir)
   return rc;
 }
 
-RC Table::get_record_scanner(RecordFileScanner &scanner, Trx *trx, bool readonly, ConditionFilter* filter_ptr)
+RC Table::get_record_scanner(RecordFileScanner &scanner, Trx *trx, bool readonly, ConditionFilter *filter_ptr)
 {
   RC rc = scanner.open_scan(this, *data_buffer_pool_, trx, readonly, nullptr);
   if (rc != RC::SUCCESS) {

@@ -18,7 +18,7 @@ See the Mulan PSL v2 for more details. */
 
 using namespace std;
 
-RC ExplainPhysicalOperator::open(Trx * trx)
+RC ExplainPhysicalOperator::open(Trx *trx)
 {
   ASSERT(children_.size() == 1, "explain must has 1 child");
   children_.front()->open(trx);

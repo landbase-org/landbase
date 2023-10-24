@@ -4,7 +4,6 @@
 #include "sql/parser/parse_defs.h"
 #include "storage/field/field_meta.h"
 #include "storage/table/table.h"
-#include "order_by_stmt.h"
 
 RC get_unit_info(
     Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables, const RelAttrSqlNode &attr,

@@ -15,8 +15,8 @@ See the Mulan PSL v2 for more details. */
 #include <string.h>
 #include <string>
 
-#include "optimize_stage.h"
 #include "event/sql_event.h"
+#include "optimize_stage.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/stmt/stmt.h"
 
@@ -61,7 +61,7 @@ RC OptimizeStage::handle_request(SQLStageEvent *sql_event)
 RC OptimizeStage::optimize(unique_ptr<LogicalOperator> &oper)
 {
   // do nothing
-  auto& checkout_ptr = *oper;
+  auto &checkout_ptr = *oper;
   return RC::SUCCESS;
 }
 
