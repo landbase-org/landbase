@@ -29,7 +29,12 @@ class TableScanPhysicalOperator : public PhysicalOperator
 public:
   TableScanPhysicalOperator(Table *table, bool readonly) : table_(table), readonly_(readonly) {}
 
-  virtual ~TableScanPhysicalOperator() = default;
+  virtual ~TableScanPhysicalOperator()
+  {
+    for (auto ptr : tuples_)
+      delete ptr;
+    tuples_.clear();
+  }
 
   std::string param() const override;
 
@@ -47,11 +52,12 @@ private:
   RC filter(RowTuple &tuple, bool &result);
 
 private:
-  Table                                   *table_    = nullptr;
-  Trx                                     *trx_      = nullptr;
-  bool                                     readonly_ = false;
-  RecordFileScanner                        record_scanner_;
-  Record                                   current_record_;
-  RowTuple                                 tuple_;
-  std::vector<std::unique_ptr<Expression>> predicates_;  // TODO chang predicate to table tuple filter
+  Table                                                   *table_    = nullptr;
+  Trx                                                     *trx_      = nullptr;
+  bool                                                     readonly_ = false;
+  RecordFileScanner                                        record_scanner_;
+  Record                                                   current_record_;
+  std::pair<const Table *, const std::vector<FieldMeta> *> oper_meta;
+  std::vector<RowTuple *>                                  tuples_;
+  std::vector<std::unique_ptr<Expression>>                 predicates_;  // TODO chang predicate to table tuple filter
 };
