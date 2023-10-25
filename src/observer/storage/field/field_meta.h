@@ -31,14 +31,15 @@ class FieldMeta
 {
 public:
   FieldMeta();
-  FieldMeta(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible);
+  FieldMeta(const char *name, AttrType attr_type, bool nullable, int attr_offset, int attr_len, bool visible);
   ~FieldMeta() = default;
 
-  RC init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible);
+  RC init(const char *name, AttrType attr_type, bool nullable, int attr_offset, int attr_len, bool visible);
 
 public:
   const char *name() const;
   AttrType    type() const;
+  bool        nullable() const;
   int         offset() const;
   int         len() const;
   bool        visible() const;
@@ -53,6 +54,7 @@ public:
 protected:
   std::string name_;
   AttrType    attr_type_;
+  bool        nullable_;
   int         attr_offset_;
   int         attr_len_;
   bool        visible_;

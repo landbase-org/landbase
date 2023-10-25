@@ -26,6 +26,7 @@ InsertStmt::InsertStmt(Table *table, const std::vector<std::vector<Value>> &valu
 
 RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
 {
+  // 检查参数
   const char *table_name = inserts.relation_name.c_str();
   if (nullptr == db || nullptr == table_name || inserts.values_list.empty()) {
     LOG_WARN(
@@ -44,26 +45,35 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
+  // 检查变量是否满足字段的约束
   const auto      &value_list = inserts.values_list;
   const TableMeta &table_meta = table->table_meta();
   const int        field_num  = table_meta.field_num() - table_meta.sys_field_num();
-
-  for (const auto &values_ : value_list) {
-    const Value *values    = values_.data();
-    const int    value_num = static_cast<int>(values_.size());
+  for (const auto &values : value_list) {
+    const int value_num = values.size();
     if (field_num != value_num) {
       LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
       return RC::SCHEMA_FIELD_MISSING;
     }
 
-    // check fields type
+    // 检查字段和变量类型是否匹配，字段不可为空时变量是否为空
     const int sys_field_num = table_meta.sys_field_num();
     for (int i = 0; i < value_num; i++) {
       const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
       const AttrType   field_type = field_meta->type();
       const AttrType   value_type = values[i].attr_type();
+
+      if (values[i].is_null()) {
+        if (!field_meta->nullable()) {
+          LOG_WARN("table %s field %s is not nullable", table_meta.name(), field_meta->name());
+          return RC::SCHEMA_FIELD_NOT_NULLABLE;
+        } else {
+          continue;
+        }
+      }
+
       if (field_type != value_type) {
-        // TODO try to convert the value type to field type
+        // 转换日期 value
         if (field_type == DATES && value_type == CHARS) {
           Value *change = const_cast<Value *>(&values[i]);
           // PS: must convert the string to int_32 here!
@@ -80,7 +90,21 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
             return RC::SCHEMA_FIELD_TYPE_MISMATCH;
           }
           change->set_date(mid);
+          continue;
         }
+        // 如果可以转换，就转换一下
+        auto &change = const_cast<Value &>(values[i]);
+        if (change.type_cast(field_type)) {
+          continue;
+        }
+        LOG_WARN(
+            "field type mismatch. table=%s, field=%s, field type=%d, value_type=%d",
+            table_name,
+            field_meta->name(),
+            field_type,
+            value_type
+        );
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
     }
   }

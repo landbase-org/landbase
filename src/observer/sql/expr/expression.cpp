@@ -22,6 +22,8 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
   return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
 }
 
+bool FieldExpr::is_null(char *data) const { return field_.is_null(data); }
+
 RC ValueExpr::get_value(const Tuple &tuple, Value &value) const
 {
   value = value_;
@@ -88,7 +90,7 @@ ComparisonExpr::~ComparisonExpr() {}
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
   // TODO : 完善此处对比较结果的处理
-  result = left.compare(comp_,right);
+  result = left.compare(comp_, right);
 
   return RC::SUCCESS;
 }
@@ -102,7 +104,9 @@ RC ComparisonExpr::try_get_value(Value &cell) const
     const Value &right_cell       = right_value_expr->get_value();
 
     bool value = false;
-    RC   rc    = compare_value(left_cell, right_cell, value);
+
+    RC rc = compare_value(left_cell, right_cell, value);
+
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to compare tuple cells. rc=%s", strrc(rc));
     } else {

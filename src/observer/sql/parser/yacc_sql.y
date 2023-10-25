@@ -84,6 +84,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         STRING_T
         FLOAT_T
         DATE_T
+        NULL_T
         HELP
         EXIT
         DOT //QUOTE
@@ -109,6 +110,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         AVG
         MIN
         MAX
+        IS_ // 加 _ 是为了防止和comp_op冲突
         NOT
         LK
 
@@ -140,6 +142,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   char *                            string; // 是char*类型, 需要free
   int                               number;
   float                             floats;
+  bool                              nullable;
 }
 
 %token <number> NUMBER
@@ -163,6 +166,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <rel_attr>            rel_attr        // (table column)
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
+%type <nullable>            nullable // 用于标识字段是否可以为 null
 %type <value_list>          value_list
 %type <value_list_list>     value_list_list
 %type <update_list>         update_list
@@ -369,23 +373,41 @@ attr_def_list:
     ;
     
 attr_def:
-    ID type LBRACE number RBRACE 
+    ID type LBRACE number RBRACE nullable
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
+      $$->nullable = $6;
       free($1);
     }
-    | ID type
+    | ID type nullable
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
+      $$->nullable = $3;
       free($1);
     }
     ;
+
+nullable:
+    /* empty */
+    {
+      $$ = false;
+    }
+    | NOT NULL_T
+    {
+      $$ = false;
+    }
+    | NULL_T
+    {
+      $$ = true;
+    }
+    ;
+
 number:
     NUMBER {$$ = $1;}
     ;
@@ -446,6 +468,9 @@ value:
       char *tmp = common::substr($1,1,strlen($1)-2);
       $$ = new Value(tmp);
       free(tmp);
+    }
+    | NULL_T {
+      $$ = new Value();
     }
     ;
     
@@ -722,7 +747,7 @@ where:
       $$ = nullptr;
     }
     | WHERE condition_list {
-      $$ = $2;  
+      $$ = $2;
     }
     ;
 condition_list:
@@ -855,6 +880,8 @@ comp_op:
     | NE { $$ = NOT_EQUAL; }
     | LK { $$ = LIKE; }
     | NOT LK { $$ = NOT_LIKE;}
+    | IS_ { $$ = IS;}
+    | IS_ NOT { $$ = IS_NOT;}
     ;
 
 aggre_type:

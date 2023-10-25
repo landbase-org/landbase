@@ -49,7 +49,7 @@ enum class PhysicalOperatorType
   DELETE,
   UPDATE,  // 更新
   INSERT,
-  ORDER_BY // 排序
+  ORDER_BY  // 排序
 };
 
 /**

@@ -86,9 +86,11 @@ public:
   // TODO refactor
   RC create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name);
 
-  RC get_record_scanner(RecordFileScanner &scanner, Trx *trx, bool readonly, ConditionFilter* filter_ptr=nullptr);
+  RC get_record_scanner(RecordFileScanner &scanner, Trx *trx, bool readonly, ConditionFilter *filter_ptr = nullptr);
 
   RecordFileHandler *record_handler() const { return record_handler_; }
+
+  bool is_null(const FieldMeta *field_meta, char *data) const;
 
 public:
   int32_t     table_id() const { return table_meta_.table_id(); }
@@ -99,8 +101,8 @@ public:
   RC sync();
 
 private:
-  RC insert_entry_of_indexes(const char *record, const RID &rid);
-  RC delete_entry_of_indexes(const char *record, const RID &rid, bool error_on_not_exists);
+  RC insert_entry_of_indexes(const Record &record);
+  RC delete_entry_of_indexes(const Record &record, bool error_on_not_exists);
 
 private:
   RC init_record_handler(const char *base_dir);

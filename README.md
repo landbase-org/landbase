@@ -22,7 +22,6 @@
 - Doxygen Documentation Generator : doxygen 支持
 - Todo Tree : 高亮 TODO, FIXME, NOTE 等注释
 - Yash : lex/yacc语法高亮
-- AZ AL Dev Tools/AL Code Outline : 快速查看当前文件的函数列表
 
 ## 以下是原README:
 

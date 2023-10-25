@@ -33,3 +33,5 @@ int Field::get_int(const Record &record)
 }
 
 const char *Field::get_data(const Record &record) { return record.data() + field_->offset(); }
+
+bool Field::is_null(char *data) const { return table_->is_null(field_, data); }

@@ -65,6 +65,15 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
 
   // 检查字段和值的类型是否匹配
   for (int i = 0; i < field_metas.size(); i++) {
+    if (update.value_list[i].is_null()) {
+      if (field_metas[i]->nullable()) {
+        continue;
+      } else {
+        LOG_ERROR("Field %s is not nullable", field_metas[i]->name());
+        return RC::SCHEMA_FIELD_NOT_NULLABLE;
+      }
+    }
+
     if (field_metas[i]->type() != update.value_list[i].attr_type()) {
       // 日期格式特殊处理
       if (field_metas[i]->type() == DATES && update.value_list[i].attr_type() == CHARS) {

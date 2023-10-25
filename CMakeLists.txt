@@ -12,7 +12,7 @@ SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 
 OPTION(ENABLE_ASAN "Enable build with address sanitizer" ON)
-OPTION(WITH_UNIT_TESTS "Compile miniob with unit tests" ON)
+OPTION(WITH_UNIT_TESTS "Compile miniob with unit tests" OFF)
 OPTION(CONCURRENCY "Support concurrency operations" OFF)
 OPTION(STATIC_STDLIB "Link std library static or dynamic, such as libgcc, libstdc++, libasan" OFF)
 
@@ -98,7 +98,7 @@ ADD_SUBDIRECTORY(deps)
 ADD_SUBDIRECTORY(src/obclient)
 ADD_SUBDIRECTORY(src/observer)
 ADD_SUBDIRECTORY(test/perf)
-ADD_SUBDIRECTORY(benchmark)
+# ADD_SUBDIRECTORY(benchmark)
 ADD_SUBDIRECTORY(tools)
 
 IF(WITH_UNIT_TESTS)

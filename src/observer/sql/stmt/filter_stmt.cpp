@@ -136,6 +136,13 @@ RC FilterStmt::create_filter_unit(
   filter_unit->set_comp(comp);
 
   // 检查两个类型是否能够比较
+
+  // 如果一边出现了 null, 则可比较
+  if (!filter_unit->left().is_attr && filter_unit->left().value.is_null() ||
+      (!filter_unit->right().is_attr && filter_unit->right().value.is_null())) {
+    return RC::SUCCESS;
+  }
+
   // 检测左侧为日期属性，右侧为日期字符串的情况 处理完直接return截断，不要影响别的类型的转换
   if (filter_unit->left().is_attr && filter_unit->left().field.attr_type() == DATES &&
       filter_unit->right().value.attr_type() == CHARS) {
@@ -146,6 +153,7 @@ RC FilterStmt::create_filter_unit(
     change->set_date(check);
     return rc;
   }
+
   // 如果左右均为值，有一个非CHARS就都转为FLOATS
   if (!filter_unit->left().is_attr && !filter_unit->right().is_attr) {
     Value &left_ref  = const_cast<Value &>(filter_unit->left().value);

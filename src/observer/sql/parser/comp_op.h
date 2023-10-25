@@ -16,5 +16,7 @@ enum CompOp
   GREAT_THAN,   ///< ">"
   LIKE,         ///< LIKE
   NOT_LIKE,     ///< NOT LIKE
+  IS,           ///< 目前仅用于判断是否为 null
+  IS_NOT,       ///< 目前仅用于判断是否为 null
   NO_OP,        ///< no condition
 };

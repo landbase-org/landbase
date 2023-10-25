@@ -22,6 +22,7 @@ See the Mulan PSL v2 for more details. */
 #include <unordered_map>
 #include <vector>
 
+#include "common/log/log.h"
 #include "sql/parser/comp_op.h"
 #include "sql/parser/value.h"
 
@@ -50,6 +51,7 @@ enum AggreType
   AGGRE_MAX,
   AGGRE_MIN,
   AGGRE_COUNT,
+  AGGRE_COUNT_ALL,
   AGGRE_AVG,
   AGGRE_SUM
 };
@@ -60,6 +62,7 @@ static std::string aggreType2str(AggreType aggre)
       {AGGRE_MAX, "MAX"},
       {AGGRE_MIN, "MIN"},
       {AGGRE_COUNT, "COUNT"},
+      {AGGRE_COUNT_ALL, "COUNT"},
       {AGGRE_AVG, "AVG"},
       {AGGRE_SUM, "SUM"},
   };
@@ -116,13 +119,27 @@ public:
           case AGGRE_SUM: f_sum += value.get_float(); break;
           default: break;
         }
-      }
+      } break;
+      case NULLS: {
+        if (aggre_type_ != AGGRE_COUNT_ALL) {
+          i_count--;
+        }
+      } break;
       default: break;
     }
   }
 
   void update(Value value)
   {
+    // 如果传进来的是 null，同时不是 count(*)，不更新
+    if (value.is_null() && aggre_type_ != AGGRE_COUNT_ALL) {
+      return;
+    }
+    // 有时第一个加进来的值是NULL, 需要更新attr_type
+    if (attr_type_ == NULLS && value.attr_type() != NULLS) {
+      attr_type_ = value.attr_type();
+    }
+
     i_count++;
 
     switch (attr_type_) {
@@ -157,14 +174,14 @@ public:
           case AGGRE_SUM: f_sum += value.get_float(); break;
           default: break;
         }
-      }
+      } break;
       default: break;
     }
   }
 
   const Value get_value()
   {
-    if (aggre_type_ == AGGRE_COUNT)
+    if (aggre_type_ == AGGRE_COUNT || aggre_type_ == AGGRE_COUNT_ALL)
       return Value((int)i_count);
 
     switch (attr_type_) {
@@ -351,9 +368,9 @@ struct DeleteSqlNode
  */
 struct UpdateSqlNode
 {
-  std::string                   relation_name;   ///< Relation to update
-  std::vector<std::string>      attr_list;       ///< 更新的字段
-  std::vector<Value>            value_list;      ///< 更新的值
+  std::string                   relation_name;  ///< Relation to update
+  std::vector<std::string>      attr_list;      ///< 更新的字段
+  std::vector<Value>            value_list;     ///< 更新的值
   std::vector<ConditionSqlNode> conditions;
 };
 
@@ -366,9 +383,10 @@ struct UpdateSqlNode
  */
 struct AttrInfoSqlNode
 {
-  AttrType    type;    ///< Type of attribute
-  std::string name;    ///< Attribute name
-  size_t      length;  ///< Length of attribute
+  AttrType    type;      ///< Type of attribute
+  std::string name;      ///< Attribute name
+  size_t      length;    ///< Length of attribute
+  bool        nullable;  ///< 是否可以为null
 };
 
 /**
