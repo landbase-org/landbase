@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "sql/operator/physical_operator.h"
+#include "storage/field/field_meta.h"
 #include "storage/index/index.h"
 #include <vector>
 
@@ -26,56 +27,21 @@ See the Mulan PSL v2 for more details. */
 class IndexListPhysicalOperator : public PhysicalOperator
 {
 public:
-  IndexListPhysicalOperator() {}
-  IndexListPhysicalOperator(std::string table_name, const std::vector<Index *> &indexes)
-      : indexes_(indexes),
-        table_name_(table_name)
-  {
-    iterator_ = indexes_.begin();
-  }
-
+  IndexListPhysicalOperator() = default;
+  IndexListPhysicalOperator(std::string table_name, const std::vector<Index *> &indexes);
   virtual ~IndexListPhysicalOperator() = default;
 
-  PhysicalOperatorType type() const override { return PhysicalOperatorType::INDEX_LIST; }
-
-  RC open(Trx *) override { return RC::SUCCESS; }
-
-  RC next() override
-  {
-    if (!started_) {
-      started_  = true;
-      iterator_ = indexes_.begin();
-    } else if (iterator_ != indexes_.end()) {
-      ++iterator_;
-    }
-    return iterator_ == indexes_.end() ? RC::RECORD_EOF : RC::SUCCESS;
-  }
-
-  virtual RC close() override { return RC::SUCCESS; }
-
-  virtual Tuple *current_tuple() override  // 获取当前迭代器中的结果
-  {
-    if (iterator_ == indexes_.end()) {
-      return nullptr;
-    }
-
-    vector<Value> cells;
-    const auto    index = *iterator_;
-    const auto   &meta  = index->index_meta();
-    cells.push_back(Value(table_name_.c_str()));  // 表名
-    cells.push_back(Value(1));                    // 是否为唯一索引, 默认是
-    cells.push_back(Value(meta.name()));          // 索引名称
-    cells.push_back(Value(1));                    // 索引序号, 当前是单索引, 默认为1
-    cells.push_back(Value(meta.field()));         // 索引的列表名称
-    tuple_.set_cells(cells);
-
-    return &tuple_;
-  }
+  PhysicalOperatorType type() const override;
+  RC                   open(Trx *) override;
+  RC                   next() override;
+  virtual RC           close() override;
+  virtual Tuple       *current_tuple() override;  // 获取当前迭代器中的结果
 
 private:
-  std::string                    table_name_;
-  std::vector<Index *>           indexes_;
-  std::vector<Index *>::iterator iterator_;
-  bool                           started_ = false;
-  ValueListTuple                 tuple_;  // 返回结果的tuple
+  std::string          table_name_;
+  std::vector<Index *> indexes_;
+  size_t               cur_index_idx_;    // 当前位于index
+  size_t               cur_fields_idx_;   // 当前field的下标
+  bool                 started_ = false;  // 是否已经开始
+  ValueListTuple       tuple_;            // 返回结果的tuple
 };
