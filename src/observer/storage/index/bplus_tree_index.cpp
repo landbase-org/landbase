@@ -141,7 +141,10 @@ RC BplusTreeIndexScanner::open(
 }
 
 RC BplusTreeIndexScanner::next_entry(RID *rid) { return tree_scanner_.next_entry(*rid); }
-
+RC BplusTreeIndexScanner::next_entry(RID *rid, bool idx_need_increase)
+{
+  return tree_scanner_.next_entry(*rid, idx_need_increase);
+}
 RC BplusTreeIndexScanner::destroy()
 {
   delete this;

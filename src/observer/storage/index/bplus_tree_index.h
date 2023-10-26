@@ -63,6 +63,7 @@ public:
   ~BplusTreeIndexScanner() noexcept override;
 
   RC next_entry(RID *rid) override;
+  RC next_entry(RID *rid, bool idx_need_increase) override;
   RC destroy() override;
 
   RC open(

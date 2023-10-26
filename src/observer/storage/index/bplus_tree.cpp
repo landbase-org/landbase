@@ -1629,7 +1629,7 @@ RC BplusTreeHandler::delete_entry(const char *user_key, const RID *rid)
     return RC::NOMEM;
   }
   char *key = static_cast<char *>(pkey.get());
-  
+
 
   BplusTreeOperationType op = BplusTreeOperationType::DELETE;
   LatchMemo              latch_memo(disk_buffer_pool_);
@@ -1822,6 +1822,59 @@ RC BplusTreeScanner::next_entry(RID &rid)
   }
 
   iter_index_++;
+
+  LeafIndexNodeHandler node(tree_handler_.file_header_, current_frame_);
+  if (iter_index_ < node.size()) {
+    if (touch_end()) {
+      return RC::RECORD_EOF;
+    }
+
+    fetch_item(rid);
+    return RC::SUCCESS;
+  }
+
+  RC      rc            = RC::SUCCESS;
+  PageNum next_page_num = node.next_page();
+  if (BP_INVALID_PAGE_NUM == next_page_num) {
+    return RC::RECORD_EOF;
+  }
+
+  const int memo_point = latch_memo_.memo_point();
+  rc                   = latch_memo_.get_page(next_page_num, current_frame_);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get next page. page num=%d, rc=%s", next_page_num, strrc(rc));
+    return rc;
+  }
+
+  /**
+   * 如果这里直接去加锁，那可能会造成死锁
+   * 因为这里访问页面的方式顺序与插入、删除的顺序不一样
+   * 如果加锁失败，就由上层做重试
+   */
+  bool locked = latch_memo_.try_slatch(current_frame_);
+  if (!locked) {
+    return RC::LOCKED_NEED_WAIT;
+  }
+
+  latch_memo_.release_to(memo_point);
+  iter_index_ = -1;  // `next` will add 1
+  return next_entry(rid);
+}
+RC BplusTreeScanner::next_entry(RID &rid, bool idx_need_increase)
+{
+  if (nullptr == current_frame_) {
+    return RC::RECORD_EOF;
+  }
+
+  if (!first_emitted_) {
+    fetch_item(rid);
+    first_emitted_ = true;
+    return RC::SUCCESS;
+  }
+
+  if (idx_need_increase) {
+    iter_index_++;
+  }
 
   LeafIndexNodeHandler node(tree_handler_.file_header_, current_frame_);
   if (iter_index_ < node.size()) {

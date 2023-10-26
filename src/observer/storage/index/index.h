@@ -102,6 +102,7 @@ public:
    * 遍历元素数据
    * 如果没有更多的元素，返回RECORD_EOF
    */
-  virtual RC next_entry(RID *rid) = 0;
-  virtual RC destroy()            = 0;
+  virtual RC next_entry(RID *rid)                     = 0;
+  virtual RC next_entry(RID *rid, bool need_increase) = 0;  // TODO 修改了事物执行之后修改这里
+  virtual RC destroy()                                = 0;
 };

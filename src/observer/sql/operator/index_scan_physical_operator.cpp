@@ -73,7 +73,9 @@ RC IndexScanPhysicalOperator::next()
   record_page_handler_.cleanup();
 
   bool filter_result = false;
-  while (RC::SUCCESS == (rc = index_scanner_->next_entry(&rid))) {
+  while (RC::SUCCESS == (rc = index_scanner_->next_entry(&rid, (get_idx_increase())))) {
+    set_idx_increase(true);
+    
     rc = record_handler_->get_record(record_page_handler_, &rid, readonly_, &current_record_);
     if (rc != RC::SUCCESS) {
       return rc;

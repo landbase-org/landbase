@@ -632,6 +632,7 @@ public:
   );
 
   RC next_entry(RID &rid);
+  RC next_entry(RID &rid, bool need_increase);  // TODO 修改了事物执行之后修改这里
 
   RC close();
 

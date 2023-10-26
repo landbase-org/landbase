@@ -40,6 +40,9 @@ public:
   RC next() override;
   RC close() override;
 
+  void set_idx_increase(bool flag) { idx_iterator_neet_increase = flag; }
+  bool get_idx_increase() { return idx_iterator_neet_increase; }
+
   Tuple *current_tuple() override;
 
   void set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs);
@@ -62,10 +65,11 @@ private:
 
   const char *left_value_;
   const char *right_value_;
-  size_t left_value_len_;
-  size_t right_value_len_;
-  bool        left_inclusive_  = false;
-  bool        right_inclusive_ = false;
+  size_t      left_value_len_;
+  size_t      right_value_len_;
+  bool        left_inclusive_            = false;
+  bool        right_inclusive_           = false;
+  bool        idx_iterator_neet_increase = true;
 
   std::vector<std::unique_ptr<Expression>> predicates_;
 };
