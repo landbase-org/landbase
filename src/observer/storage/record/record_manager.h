@@ -166,6 +166,8 @@ public:
    */
   RC insert_record(const char *data, RID *rid);
 
+  RC update_record(const char *data, const RID *rid);
+
   /**
    * @brief 数据库恢复时，在指定位置插入数据
    *
@@ -275,6 +277,8 @@ public:
    * @param rid         返回该记录的标识符
    */
   RC insert_record(const char *data, int record_size, RID *rid);
+
+  RC update_record(const char *data, const RID *rid);
 
   /**
    * @brief 数据库恢复时，在指定文件指定位置插入数据
