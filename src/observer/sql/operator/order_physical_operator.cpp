@@ -5,102 +5,84 @@
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/comp_op.h"
 #include "sql/parser/value.h"
-#include <algorithm>
-#include <functional>
-
-RC OrderPhysicalOperator::get_inited()
+#include <bits/chrono.h>
+#include <bits/iterator_concepts.h>
+#include <chrono>
+#include <cstddef>
+#include <future>
+#include <vector>
+#define THRESHOULD 1000
+#define PARREL
+/**
+ * @brief
+ *
+ * @param begin
+ * @param end
+ * @param rule
+ */
+void p_sort(
+    std::vector<Tuple *>::iterator begin, std::vector<Tuple *>::iterator end,
+    std::function<bool(Tuple *const &left, Tuple *const &right)> rule
+)
 {
-  // get all the vector<Value>
+#ifdef PARREL
+  if (end - begin < THRESHOULD) {
+    std::sort(begin, end, rule);
+    return;
+  }
+  int  mid   = (end - begin) >> 1;
+  auto front = std::async(std::launch::async, p_sort, begin, begin + mid, rule);
+  auto back  = std::async(std::launch::async, p_sort, begin + mid + 1, end, rule);
+  front.wait();
+  back.wait();
+  std::inplace_merge(begin, begin + mid, end, rule);
+  return;
+#else
+  std::sort(begin, end, rule);
+#endif
+}
+
+RC OrderPhysicalOperator::initialize()
+{
+  // 取出数据
   bool got_rules = false;
+  auto get_st    = std::chrono::high_resolution_clock::now();
   while (RC::SUCCESS == children_[0]->next()) {
     Tuple *tup_ptr = children_[0]->current_tuple();
     if (tup_ptr == nullptr) {
-      LOG_WARN("Order's child has no tuple");
+      LOG_WARN("Faild to get Row/Join");
       return RC::INTERNAL;
     }
-    if (!got_rules) {
-      auto tuple_spec = dynamic_cast<ProjectTuple *>(tup_ptr)->get_tuple_cell_spec();
-      for (auto unit : order_units_) {
-        for (size_t idx{0}; idx < tuple_spec.size(); idx++) {
-          if (strcmp(tuple_spec[idx]->table_name(), unit->get_table()->name()) == 0 &&
-              strcmp(tuple_spec[idx]->field_name(), unit->get_fields()->name()) == 0) {
-            ord_idx_asc.emplace_back(make_pair(idx, unit->get_asc()));
-          }
-        }
-      }
-      got_rules = true;
-    }
-    ValueGrp *val_vec = new ValueGrp();
-    Value     temp;
-    for (int i{0}; i < tup_ptr->cell_num(); i++) {
-      tup_ptr->cell_at(i, temp);
-      val_vec->emplace_back(temp);
-    }
-    ori_data.emplace_back(val_vec);
+    ordered_tuples_.emplace_back(tup_ptr);
   }
-  // order the ValueGrp with order rules
-  auto cmprule = [&](ValueGrp *&left, ValueGrp *&right) -> bool {
-    for (auto [idx, asc] : ord_idx_asc) {
-      auto &left_val  = (*left)[idx];
-      auto &right_val = (*right)[idx];
+  auto get_ed   = std::chrono::high_resolution_clock::now();
+  auto get_cost = std::chrono::duration_cast<chrono::milliseconds>(get_ed - get_st);
+  LOG_DEBUG("get cost:%d", get_cost.count());
+  
+  // 排序
+  auto sort_st = std::chrono::high_resolution_clock::now();
+  p_sort(ordered_tuples_.begin(), ordered_tuples_.end(), comprule);
+  auto sort_ed   = std::chrono::high_resolution_clock::now();
+  auto sort_cost = std::chrono::duration_cast<chrono::milliseconds>(sort_ed - sort_st);
+  LOG_DEBUG("sort cost:%d", sort_cost.count());
 
-      auto comp_result = compare_value(left_val, right_val);
-
-      switch (comp_result) {
-        case EQUAL_TO: {
-          continue;
-        } break;
-        case LESS_THAN: {
-          return asc;
-        } break;
-        case GREAT_THAN: {
-          return !asc;
-        } break;
-        default: {
-          LOG_ERROR(
-              "Error at compare value,left: %s, right: %s", left_val.to_string().c_str(), right_val.to_string().c_str()
-          );
-          continue;
-        } break;
-      }
-    }
-    // return a default value
-    return false;
-  };
-
-  sort(ori_data.begin(), ori_data.end(), cmprule);
-
-  ordered_tuple = new std::vector<ValueListTuple>(ori_data.size(), ValueListTuple());
-  for (int i = 0, j = 0; i < ori_data.size() && j < ordered_tuple->size(); i++, j++) {
-    (*ordered_tuple)[j].set_cells(*ori_data[i]);
-  }
-
-  ordered_iter_ = (*ordered_tuple).begin();
-  is_inited_    = true;
+  iterator_  = ordered_tuples_.begin();
+  is_inited_ = true;
 
   return RC::SUCCESS;
 }
 
 OrderPhysicalOperator::~OrderPhysicalOperator()
 {
-  for (auto order_unit : order_units_) {
-    delete order_unit;
-  }
-  order_units_.clear();
-  for (auto valgrp : ori_data) {
-    valgrp->clear();
-    delete valgrp;
-  }
-  ordered_tuple->clear();
-  ori_data.clear();
-  ord_idx_asc.clear();
-  delete ordered_tuple;
+  order_rules.clear();
+  order_reqs.clear();
+  ordered_tuples_.clear();
 }
 
 RC OrderPhysicalOperator::open(Trx *trx)
 {
   if (children_.size() > 1) {
-    LOG_WARN("order should only have one child -> project");
+    LOG_WARN("Order should only have one child -> TableScan/Join");
     return RC::INTERNAL;
   }
 
@@ -109,20 +91,23 @@ RC OrderPhysicalOperator::open(Trx *trx)
 
 RC OrderPhysicalOperator::next()
 {
-  if (is_inited_) {
-    if ((*ordered_tuple).empty()) {
+
+  if (!is_inited_) {
+    RC rc = RC::SUCCESS;
+    rc    = initialize();
+    if (RC::SUCCESS != rc) {
+      LOG_WARN("Error at Order-init");
+      return rc;
+    }
+  } else {
+    if (ordered_tuples_.empty()) {
       return RC::RECORD_EOF;
     } else {
-      ordered_iter_++;
-      return ordered_iter_ != (*ordered_tuple).end() ? RC::SUCCESS : RC::RECORD_EOF;
+      iterator_++;
+      return iterator_ == ordered_tuples_.end() ? RC::RECORD_EOF : RC::SUCCESS;
     }
   }
-  // get inited
-  RC rc = get_inited();
-  if (RC::SUCCESS != rc) {
-    LOG_WARN("Error at get data and sort");
-    return RC::INTERNAL;
-  }
+  // Return Default Value
   return RC::SUCCESS;
 }
 
@@ -136,17 +121,21 @@ RC OrderPhysicalOperator::close()
 
 Tuple *OrderPhysicalOperator::current_tuple()
 {
-  // new a ValueListTuple
-  return &(*ordered_iter_);
+  if (ordered_tuples_.empty()) {
+    return nullptr;
+  }
+  return *iterator_;
 }
 
 void OrderPhysicalOperator::print_infor()
 {
-  for (auto valgrp : ori_data) {
-    std::string line;
-    for (auto &item : *valgrp) {
-      line += item.to_string();
+  for (auto tuple : ordered_tuples_) {
+    Value  temp;
+    string res;
+    for (int i{1}; i < tuple->cell_num(); i++) {
+      tuple->cell_at(i, temp);
+      res += temp.get_string();
     }
-    LOG_INFO("ORDERBY:%s", line.c_str());
+    LOG_DEBUG("%s", res.c_str());
   }
 }

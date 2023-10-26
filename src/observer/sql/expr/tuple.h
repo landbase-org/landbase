@@ -339,10 +339,15 @@ public:
   JoinedTuple()          = default;
   virtual ~JoinedTuple() = default;
 
+  JoinedTuple(const JoinedTuple &other)
+  {
+    this->left_  = other.left_;
+    this->right_ = other.right_;
+  }
+
   void set_left(Tuple *left) { left_ = left; }
   void set_right(Tuple *right) { right_ = right; }
-
-  int cell_num() const override { return left_->cell_num() + right_->cell_num(); }
+  int  cell_num() const override { return left_->cell_num() + right_->cell_num(); }
 
   RC cell_at(int index, Value &value) const override
   {

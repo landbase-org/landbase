@@ -67,7 +67,7 @@ RC TableScanPhysicalOperator::close() { return record_scanner_.close_scan(); }
 
 Tuple *TableScanPhysicalOperator::current_tuple()
 {
-  tuples_.back()->set_record(&current_record_);
+  // tuples_.back()->set_record(&current_record_);
   return tuples_.back();
 }
 

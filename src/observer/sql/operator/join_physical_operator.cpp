@@ -82,7 +82,12 @@ RC NestedLoopJoinPhysicalOperator::close()
   return rc;
 }
 
-Tuple *NestedLoopJoinPhysicalOperator::current_tuple() { return &joined_tuple_; }
+Tuple *NestedLoopJoinPhysicalOperator::current_tuple()
+{
+  JoinedTuple *newtup = new JoinedTuple(joined_tuple_);
+  joined_tuples_.emplace_back(newtup);
+  return joined_tuples_.back();
+}
 
 RC NestedLoopJoinPhysicalOperator::left_next()
 {
