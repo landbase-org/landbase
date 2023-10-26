@@ -141,13 +141,9 @@ public:
     this->owner_ = true;
   }
 
-  void set_value(int offset, const Value *value)
+  void set_value(const FieldMeta *field_meta, const Value *value)
   {
-    if (value->attr_type() == CHARS) {
-      memcpy(data_ + offset, value->data(), value->length() + 1);
-    } else {
-      memcpy(data_ + offset, value->data(), value->length());
-    }
+    memcpy(data_ + field_meta->offset(), value->data(), field_meta->len());
   }
 
   char       *data() { return this->data_; }
