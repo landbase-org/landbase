@@ -211,6 +211,29 @@ RC RecordPageHandler::insert_record(const char *data, RID *rid)
   return RC::SUCCESS;
 }
 
+RC RecordPageHandler::update_record(const char *data, const RID *rid)
+{
+  ASSERT(readonly_ == false, "cannot update record from page while the page is readonly");
+
+  if (rid->slot_num >= page_header_->record_capacity) {
+    LOG_ERROR("Invalid slot_num %d, exceed page's record capacity, page_num %d.", rid->slot_num, frame_->page_num());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  Bitmap bitmap(bitmap_, page_header_->record_capacity);
+  if (!bitmap.get_bit(rid->slot_num)) {
+    LOG_DEBUG("Invalid slot_num %d, slot is empty, page_num %d.", rid->slot_num, frame_->page_num());
+    return RC::RECORD_NOT_EXIST;
+  }
+
+  char *record_data = get_record_data(rid->slot_num);
+  memcpy(record_data, data, page_header_->record_real_size);
+
+  frame_->mark_dirty();
+
+  return RC::SUCCESS;
+}
+
 RC RecordPageHandler::recover_insert_record(const char *data, const RID &rid)
 {
   if (rid.slot_num >= page_header_->record_capacity) {
@@ -409,6 +432,23 @@ RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid)
 
   // 找到空闲位置
   return record_page_handler.insert_record(data, rid);
+}
+
+// TODO: 没有考虑并发，目前赛题中没有并发的场景
+RC RecordFileHandler::update_record(const char *data, const RID *rid)
+{
+  RC rc = RC::SUCCESS;
+
+  RecordPageHandler record_page_handler;
+
+  rc = record_page_handler.init(*disk_buffer_pool_, rid->page_num, false /*readonly*/);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to init record page handler. page num=%d, rc=%s", rid->page_num, strrc(rc));
+    return rc;
+  }
+  rc = record_page_handler.update_record(data, rid);
+
+  return rc;
 }
 
 RC RecordFileHandler::recover_insert_record(const char *data, int record_size, const RID &rid)

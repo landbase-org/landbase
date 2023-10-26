@@ -287,15 +287,19 @@ RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_me
 
   // 更新字段
   // 从parser阶段开始 field_metas 和 values 的数量一定一直是一致的
-  // TODO：我看其他人会改 record_handler 类，再实现一个函数，但其实这里直接 memcpy 就可以了，不知道有没有什么隐患。
   for (int i = 0; i < field_metas.size(); ++i) {
     int field_index = table_meta_.field_index(field_metas[i]);
     if (values[i]->is_null()) {
       bitmap.set_bit(field_index);
     } else {
       bitmap.clear_bit(field_index);
-      record.set_value(field_metas[i]->offset(), values[i]);
+      record.set_value(field_metas[i], values[i]);
     }
+  }
+  rc = record_handler_->update_record(record.data(), &record.rid());
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Update record failed. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
+    return rc;
   }
 
   // 插入新的索引
