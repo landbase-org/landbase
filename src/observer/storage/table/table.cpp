@@ -293,7 +293,7 @@ RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_me
       bitmap.set_bit(field_index);
     } else {
       bitmap.clear_bit(field_index);
-      record.set_value(field_metas[i]->offset(), values[i]);
+      record.set_value(field_metas[i], values[i]);
     }
   }
   rc = record_handler_->update_record(record.data(), &record.rid());
