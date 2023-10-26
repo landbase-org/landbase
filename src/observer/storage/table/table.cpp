@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include <limits.h>
 #include <string.h>
 #include <string>
+#include <unordered_set>
 
 #include "common/defs.h"
 #include "common/lang/string.h"
@@ -662,6 +663,31 @@ std::vector<Index *> Table::find_indexes_by_field(const char *field_name) const
     }
   }
   return res;
+}
+
+Index * Table::find_index_by_fields(std::vector<std::string> field_names) const
+{
+  // 因为给出的fields可能为乱顺序， 所以需要用set
+  std::unordered_set<std::string> set(field_names.begin(), field_names.end());
+  for (auto index : indexes_) {
+    if (index->field_metas().size() != set.size()) {
+      continue;
+    }
+
+    bool equa = true;
+    for (const auto &field_meta : index->field_metas()) {
+      if (!set.count(field_meta.name())) {
+        equa = false;
+        break;
+      }
+    }
+
+    if (equa) {
+      return index;
+    }
+  }
+
+  return nullptr;
 }
 
 RC Table::sync()

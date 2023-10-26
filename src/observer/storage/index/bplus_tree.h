@@ -75,17 +75,17 @@ public:
 
       switch (attr_type) {
         case INTS: {
-          return common::compare_int((void *)(v1 + pos), (void *)(v2 + pos));
+          res = common::compare_int((void *)(v1 + pos), (void *)(v2 + pos));
+        } break;
+        case DATES: {
+          res = common::compare_date((void *)(v1 + pos), (void *)(v2 + pos));
         } break;
         case FLOATS: {
-          return common::compare_float((void *)(v1 + pos), (void *)(v2 + pos));
-        }
+          res = common::compare_float((void *)(v1 + pos), (void *)(v2 + pos));
+        } break;
         case CHARS: {
-          return common::compare_string((void *)(v1 + pos), attr_length, (void *)(v2 + pos), attr_length);
-        }
-        case DATES: {
-          return common::compare_date((void *)(v1 + pos), (void *)(v2 + pos));
-        }
+          res = common::compare_string((void *)(v1 + pos), attr_length, (void *)(v2 + pos), attr_length);
+        } break;
         default: {
           ASSERT(false, "unknown attr type. %d", attr_type);
           return 0;
@@ -171,6 +171,7 @@ public:
           }
           return str;
         }
+        // TODO DATA print
         default: {
           ASSERT(false, "unknown attr type. %d", attr_type);
         }
