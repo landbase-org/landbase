@@ -26,8 +26,8 @@ class IndexScanPhysicalOperator : public PhysicalOperator
 {
 public:
   IndexScanPhysicalOperator(
-      Table *table, Index *index, bool readonly, const Value *left_value, bool left_inclusive, const Value *right_value,
-      bool right_inclusive
+      Table *table, Index *index, bool readonly, const char *left_value, size_t left_value_len, bool left_inclusive,
+      const char *right_value, size_t right_value_len, bool right_inclusive
   );
 
   virtual ~IndexScanPhysicalOperator() = default;
@@ -39,6 +39,9 @@ public:
   RC open(Trx *trx) override;
   RC next() override;
   RC close() override;
+
+  void set_idx_increase(bool flag) { idx_iterator_neet_increase = flag; }
+  bool get_idx_increase() { return idx_iterator_neet_increase; }
 
   Tuple *current_tuple() override;
 
@@ -60,10 +63,13 @@ private:
   Record            current_record_;
   RowTuple          tuple_;
 
-  Value left_value_;
-  Value right_value_;
-  bool  left_inclusive_  = false;
-  bool  right_inclusive_ = false;
+  const char *left_value_;
+  const char *right_value_;
+  size_t      left_value_len_;
+  size_t      right_value_len_;
+  bool        left_inclusive_            = false;
+  bool        right_inclusive_           = false;
+  bool        idx_iterator_neet_increase = true;
 
   std::vector<std::unique_ptr<Expression>> predicates_;
 };

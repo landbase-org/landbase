@@ -31,9 +31,11 @@ CREATE TABLE Drop_table_5(id int, t_name char);
 SELECT * FROM Drop_table_5;
 
 -- echo 6. Drop a table with index
-CREATE TABLE Drop_table_6(id int, t_name char);
+CREATE TABLE Drop_table_6(id int, name char(20), age int);
 CREATE INDEX index_id on Drop_table_6(id);
-INSERT INTO Drop_table_6 VALUES (1,'OB');
+INSERT INTO Drop_table_6 VALUES (1,'OB',12);
+INSERT INTO Drop_table_6 VALUES (2,'ODC',12);
+DELETE FROM Drop_table_6 WHERE id = 2;
 -- sort SELECT * FROM Drop_table_6;
 DROP TABLE Drop_table_6;
 SELECT * FROM Drop_table_6;

@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/delete_physical_operator.h"
 #include "common/log/log.h"
+#include "sql/operator/index_scan_physical_operator.h"
 #include "sql/stmt/delete_stmt.h"
 #include "storage/record/record.h"
 #include "storage/table/table.h"
@@ -58,6 +59,15 @@ RC DeletePhysicalOperator::next()
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to delete record: %s", strrc(rc));
       return rc;
+    }
+
+    // TODOH 之后如果更改了事务执行方法， 基地更改这里
+    if (auto x = dynamic_cast<IndexScanPhysicalOperator *>(child)) {
+      x->set_idx_increase(false);  // 当前事物已经删除了一个数据， index的指针以及在下一个数据上， 不需要更新迭代器
+    } else if (child->children().size()) {
+      if (auto x = dynamic_cast<IndexScanPhysicalOperator *>(child->children().front().get())) {
+        x->set_idx_increase(false);  // 当前事物已经删除了一个数据， index的指针以及在下一个数据上， 不需要更新迭代器
+      }
     }
   }
 

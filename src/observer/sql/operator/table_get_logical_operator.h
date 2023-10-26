@@ -29,8 +29,9 @@ public:
 
   LogicalOperatorType type() const override { return LogicalOperatorType::TABLE_GET; }
 
-  Table *table() const { return table_; }
-  bool   readonly() const { return readonly_; }
+  Table                    *table() const { return table_; }
+  const std::vector<Field> *fields() const { return &fields_; }
+  bool                      readonly() const { return readonly_; }
 
   void                                      set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs);
   std::vector<std::unique_ptr<Expression>> &predicates() { return predicates_; }
