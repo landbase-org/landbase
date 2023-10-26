@@ -42,6 +42,7 @@ RC TableScanPhysicalOperator::next()
       return rc;
     }
 
+    // 必须new出来，因为Tuple共享了 TupleSpecCell
     RowTuple *tuple_ = new RowTuple();
     tuple_->set_record(&current_record_);
     tuple_->set_schema(oper_meta.first, oper_meta.second);

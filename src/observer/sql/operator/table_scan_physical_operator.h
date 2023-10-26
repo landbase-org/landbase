@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "common/rc.h"
+#include "sql/expr/tuple.h"
 #include "sql/operator/physical_operator.h"
 #include "storage/record/record_manager.h"
 
@@ -31,8 +32,8 @@ public:
 
   virtual ~TableScanPhysicalOperator()
   {
-    for (auto ptr : tuples_)
-      delete ptr;
+    for (auto i : tuples_)
+      delete i;
     tuples_.clear();
   }
 
