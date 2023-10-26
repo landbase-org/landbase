@@ -15,6 +15,9 @@ RC IndexListPhysicalOperator::open(Trx *) { return RC::SUCCESS; }
 
 RC IndexListPhysicalOperator::next()
 {
+  if (indexes_.empty()) {
+    return RC::RECORD_EOF;
+  }
   if (!started_) {
     started_ = true;
   } else if (++cur_fields_idx_ == indexes_[cur_index_idx_]->field_metas().size()) {
