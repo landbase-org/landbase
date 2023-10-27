@@ -7,14 +7,12 @@
 #include "sql/parser/value.h"
 #include <bits/chrono.h>
 #include <bits/iterator_concepts.h>
-#include <chrono>
-#include <cstddef>
 #include <future>
-#include <vector>
 #define THRESHOULD 1000
 #define PARREL
+
 /**
- * @brief
+ * @brief 多线程排序
  *
  * @param begin
  * @param end
@@ -46,7 +44,6 @@ RC OrderPhysicalOperator::initialize()
 {
   // 取出数据
   bool got_rules = false;
-  auto get_st    = std::chrono::high_resolution_clock::now();
   while (RC::SUCCESS == children_[0]->next()) {
     Tuple *tup_ptr = children_[0]->current_tuple();
     if (tup_ptr == nullptr) {
@@ -55,16 +52,9 @@ RC OrderPhysicalOperator::initialize()
     }
     ordered_tuples_.emplace_back(tup_ptr);
   }
-  auto get_ed   = std::chrono::high_resolution_clock::now();
-  auto get_cost = std::chrono::duration_cast<chrono::milliseconds>(get_ed - get_st);
-  LOG_DEBUG("get cost:%d", get_cost.count());
-  
+
   // 排序
-  auto sort_st = std::chrono::high_resolution_clock::now();
   p_sort(ordered_tuples_.begin(), ordered_tuples_.end(), comprule);
-  auto sort_ed   = std::chrono::high_resolution_clock::now();
-  auto sort_cost = std::chrono::duration_cast<chrono::milliseconds>(sort_ed - sort_st);
-  LOG_DEBUG("sort cost:%d", sort_cost.count());
 
   iterator_  = ordered_tuples_.begin();
   is_inited_ = true;
