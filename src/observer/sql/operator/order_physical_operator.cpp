@@ -8,7 +8,7 @@
 #include <bits/iterator_concepts.h>
 #include <future>
 #define THRESHOULD 1000
-#define PARREL
+// #define PARREL
 
 /**
  * @brief 多线程排序
