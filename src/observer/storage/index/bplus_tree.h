@@ -17,8 +17,10 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <numeric>
 #include <sstream>
 #include <string.h>
 
@@ -29,6 +31,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/buffer/disk_buffer_pool.h"
 #include "storage/record/record_manager.h"
 #include "storage/trx/latch_memo.h"
+
+#define MAX_LEAF_SIZE 20
 
 /**
  * @brief B+树的实现
@@ -47,45 +51,59 @@ enum class BplusTreeOperationType
 };
 
 /**
- * @brief 属性比较(BplusTree)
+ * @brief 属性比较(BplusTree)， 之比较属性值
  * @ingroup BPlusTree
  */
 class AttrComparator
 {
 public:
-  void init(AttrType type, int length)
+  void init(std::vector<AttrType> types, std::vector<int> lengths)
   {
-    attr_type_   = type;
-    attr_length_ = length;
+    attr_types_   = types;
+    attr_lengths_ = lengths;
   }
 
-  int attr_length() const { return attr_length_; }
+  int attr_length() const { return accumulate(attr_lengths_.begin(), attr_lengths_.end(), 0); }
 
   int operator()(const char *v1, const char *v2) const
   {
-    switch (attr_type_) {
-      case INTS: {
-        return common::compare_int((void *)v1, (void *)v2);
-      } break;
-      case FLOATS: {
-        return common::compare_float((void *)v1, (void *)v2);
+    int res = 0;  // 比较的结果
+    int pos = 0;  // 当前比较的位置
+    for (size_t i = 0; i < attr_types_.size(); i++) {
+      auto attr_type   = attr_types_[i];
+      auto attr_length = attr_lengths_[i];
+
+      switch (attr_type) {
+        case INTS: {
+          res = common::compare_int((void *)(v1 + pos), (void *)(v2 + pos));
+        } break;
+        case DATES: {
+          res = common::compare_date((void *)(v1 + pos), (void *)(v2 + pos));
+        } break;
+        case FLOATS: {
+          res = common::compare_float((void *)(v1 + pos), (void *)(v2 + pos));
+        } break;
+        case CHARS: {
+          res = common::compare_string((void *)(v1 + pos), attr_length, (void *)(v2 + pos), attr_length);
+        } break;
+        default: {
+          ASSERT(false, "unknown attr type. %d", attr_type);
+          return 0;
+        }
       }
-      case CHARS: {
-        return common::compare_string((void *)v1, attr_length_, (void *)v2, attr_length_);
-      }
-      case DATES: {
-        return common::compare_date((void *)v1, (void *)v2);
-      }
-      default: {
-        ASSERT(false, "unknown attr type. %d", attr_type_);
-        return 0;
-      }
+
+      if (res != 0) {  // 如果当前比较的结果为不相等直接返回结果
+        return res;
+      }  // 如果相等， 则比较下一位
+      pos += attr_length;
     }
+
+    return res;  // 全部相等；
   }
 
 private:
-  AttrType attr_type_;
-  int      attr_length_;
+  std::vector<AttrType> attr_types_;
+  std::vector<int>      attr_lengths_;
 };
 
 /**
@@ -96,14 +114,14 @@ private:
 class KeyComparator
 {
 public:
-  void init(AttrType type, int length) { attr_comparator_.init(type, length); }
+  void init(std::vector<AttrType> types, std::vector<int> lengths) { attr_comparator_.init(types, lengths); }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
 
-  int operator()(const char *v1, const char *v2) const
+  int operator()(const char *v1, const char *v2) const  // v1, v2是key值 （attrs + rid）
   {
     int result = attr_comparator_(v1, v2);
-    if (result != 0) {
+    if (result != 0) {  // 如果attr不相等， 直接返回结果， 否则比较rid值
       return result;
     }
 
@@ -123,43 +141,48 @@ private:
 class AttrPrinter
 {
 public:
-  void init(AttrType type, int length)
+  void init(std::vector<AttrType> types, std::vector<int> lengths)
   {
-    attr_type_   = type;
-    attr_length_ = length;
+    attr_types_   = types;
+    attr_lengths_ = lengths;
   }
 
-  int attr_length() const { return attr_length_; }
+  int attr_length() const { return accumulate(attr_lengths_.begin(), attr_lengths_.end(), 0); }
 
   std::string operator()(const char *v) const
   {
-    switch (attr_type_) {
-      case INTS: {
-        return std::to_string(*(int *)v);
-      } break;
-      case FLOATS: {
-        return std::to_string(*(float *)v);
-      }
-      case CHARS: {
-        std::string str;
-        for (int i = 0; i < attr_length_; i++) {
-          if (v[i] == 0) {
-            break;
-          }
-          str.push_back(v[i]);
+    for (size_t i = 0; i < attr_types_.size(); i++) {
+      auto attr_type   = attr_types_[i];
+      auto attr_length = attr_lengths_[i];
+      switch (attr_type) {
+        case INTS: {
+          return std::to_string(*(int *)v);
+        } break;
+        case FLOATS: {
+          return std::to_string(*(float *)v);
         }
-        return str;
-      }
-      default: {
-        ASSERT(false, "unknown attr type. %d", attr_type_);
+        case CHARS: {
+          std::string str;
+          for (int i = 0; i < attr_length; i++) {
+            if (v[i] == 0) {
+              break;
+            }
+            str.push_back(v[i]);
+          }
+          return str;
+        }
+        // TODO DATA print
+        default: {
+          ASSERT(false, "unknown attr type. %d", attr_type);
+        }
       }
     }
     return std::string();
   }
 
 private:
-  AttrType attr_type_;
-  int      attr_length_;
+  std::vector<AttrType> attr_types_;
+  std::vector<int>      attr_lengths_;
 };
 
 /**
@@ -169,7 +192,7 @@ private:
 class KeyPrinter
 {
 public:
-  void init(AttrType type, int length) { attr_printer_.init(type, length); }
+  void init(std::vector<AttrType> types, std::vector<int> lengths) { attr_printer_.init(types, lengths); }
 
   const AttrPrinter &attr_printer() const { return attr_printer_; }
 
@@ -200,23 +223,36 @@ struct IndexFileHeader
     memset(this, 0, sizeof(IndexFileHeader));
     root_page = BP_INVALID_PAGE_NUM;
   }
-  PageNum  root_page;          ///< 根节点在磁盘中的页号
-  int32_t  internal_max_size;  ///< 内部节点最大的键值对数
-  int32_t  leaf_max_size;      ///< 叶子节点最大的键值对数
-  int32_t  attr_length;        ///< 键值的长度
-  int32_t  key_length;         ///< attr length + sizeof(RID)
-  AttrType attr_type;          ///< 键值的类型
+  PageNum root_page;          ///< 根节点在磁盘中的页号
+  int32_t internal_max_size;  ///< 内部节点最大的键值对数
+  int32_t leaf_max_size;      ///< 叶子节点最大的键值对数
+
+  int32_t  attr_size;                    ///< attr的数量
+  int32_t  key_length;                   ///< key的长度
+  int32_t  attr_offsets[MAX_LEAF_SIZE];  ///< 键值的长度
+  int32_t  attr_lengths[MAX_LEAF_SIZE];  ///< 键值的长度
+  AttrType attr_types[MAX_LEAF_SIZE];    ///< 键值的类型
 
   const std::string to_string()
   {
     std::stringstream ss;
-
-    ss << "attr_length:" << attr_length << ","
-       << "key_length:" << key_length << ","
-       << "attr_type:" << attr_type << ","
-       << "root_page:" << root_page << ","
+    ss << "root_page:" << root_page << ","
        << "internal_max_size:" << internal_max_size << ","
-       << "leaf_max_size:" << leaf_max_size << ";";
+       << "leaf_max_size:" << leaf_max_size << ","
+       << "key_length:" << key_length << ",";
+
+    ss << "attr_size:";
+    for (size_t i = 0; i < attr_size; i++) {
+      ss << "attr_length:" << attr_lengths[i] << ","
+         << "attr_offset::" << attr_offsets[i] << ","
+         << "attr_type:" << attr_types[i];
+
+      if (i != attr_size - 1) {
+        ss << '|';
+      } else {
+        ss << ';';
+      }
+    }
 
     return ss.str();
   }
@@ -447,7 +483,8 @@ public:
    * attrType描述被索引属性的类型，attrLength描述被索引属性的长度
    */
   RC create(
-      const char *file_name, AttrType attr_type, int attr_length, int internal_max_size = -1, int leaf_max_size = -1
+      const char *file_name, std::vector<AttrType> attr_types, std::vector<int> attr_lengths,
+      std::vector<int> attr_offsets, int internal_max_size = -1, int leaf_max_size = -1
   );
 
   /**
@@ -547,7 +584,7 @@ protected:
 
   RC adjust_root(LatchMemo &latch_memo, Frame *root_frame);
 
-private:
+public:
   common::MemPoolItem::unique_ptr make_key(const char *user_key, const RID &rid);
   void                            free_key(char *key);
 
@@ -595,6 +632,7 @@ public:
   );
 
   RC next_entry(RID &rid);
+  RC next_entry(RID &rid, bool need_increase);  // TODO 修改了事物执行之后修改这里
 
   RC close();
 

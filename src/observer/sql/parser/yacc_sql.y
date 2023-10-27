@@ -61,6 +61,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         TABLE
         TABLES
         INDEX
+        UNIQUE
         CALC
         SELECT
         INNER
@@ -132,6 +133,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
+  std::vector<std::string> *        id_list;
   std::pair<std::vector<std::string>, std::vector<Value>> * update_list;
   std::vector<ConditionSqlNode> *   condition_list;
   std::vector<RelAttrSqlNode> *     rel_attr_list;
@@ -175,6 +177,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <rel_attr_list>       selector
 %type <relation_list>       rel_list
 %type <relation_list>       attr_list
+%type <id_list>             id_list
 %type <aggre_attr_list>     aggre_attr_list
 %type <expression>          expression
 %type <expression_list>     expression_list
@@ -303,18 +306,34 @@ desc_table_stmt:
       free($2);
     }
     ;
-
+    
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE ID RBRACE
+     CREATE INDEX ID ON ID LBRACE id_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
       create_index.index_name = $3;
       create_index.relation_name = $5;
-      create_index.attribute_name = $7;
+      if ($7 != nullptr) {
+        create_index.attribute_names.swap(*$7); 
+        delete $7; 
+      }
       free($3);
       free($5);
-      free($7);
+    }
+    | CREATE UNIQUE INDEX ID ON ID LBRACE id_list RBRACE
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
+      CreateIndexSqlNode &create_index = $$->create_index;
+      create_index.unique = true;
+      create_index.index_name = $4;
+      create_index.relation_name = $6;
+      if ($8 != nullptr) {
+        create_index.attribute_names.swap(*$8); 
+        delete $8; 
+      }
+      free($4);
+      free($6);
     }
     ;
 
@@ -961,6 +980,19 @@ aggre_attr_name: // aggre_attr 可能有数字
     | AGGRE_ATTR // 数字 + 字母 可能没有, 先加上
     {
       $$ = $1; 
+    }
+    ;
+
+id_list:
+      ID
+    {
+      $$ = new std::vector<std::string>{$1}; 
+      free($1); 
+    }
+    | id_list COMMA ID
+    {
+      $$->emplace_back($3);
+      free($3);
     }
     ;
 

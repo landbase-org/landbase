@@ -12,6 +12,12 @@ See the Mulan PSL v2 for more details. */
 // Created by Wangyunlai on 2022/12/14.
 //
 
+#include <algorithm>
+#include <cstdint>
+#include <cstdlib>
+#include <iterator>
+#include <memory>
+#include <numeric>
 #include <utility>
 
 #include "common/log/log.h"
@@ -40,6 +46,9 @@ See the Mulan PSL v2 for more details. */
 #include "sql/optimizer/physical_plan_generator.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
+#include "storage/field/field.h"
+#include "storage/field/field_meta.h"
+#include "storage/index/index.h"
 
 using namespace std;
 
@@ -101,9 +110,13 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
   // 看看是否有可以用于索引查找的表达式
   Table *table = table_get_oper.table();
 
-  Index     *index      = nullptr;
-  ValueExpr *value_expr = nullptr;
+  ValueExpr               *value_expr = nullptr;
+  std::vector<ValueExpr>   value_exprs;
+  std::vector<std::string> field_names;
+
   // AttrType   idx_tree_type;
+
+  // 找条件为equa的
   for (auto &expr : predicates) {
     if (expr->type() == ExprType::COMPARISON) {
       auto comparison_expr = static_cast<ComparisonExpr *>(expr.get());
@@ -124,42 +137,62 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
         ASSERT(right_expr->type() == ExprType::VALUE, "right expr should be a value expr while left is field expr");
         field_expr = static_cast<FieldExpr *>(left_expr.get());
         value_expr = static_cast<ValueExpr *>(right_expr.get());
+        value_exprs.push_back(*value_expr);
       } else if (right_expr->type() == ExprType::FIELD) {
         ASSERT(left_expr->type() == ExprType::VALUE, "left expr should be a value expr while right is a field expr");
         field_expr = static_cast<FieldExpr *>(right_expr.get());
         value_expr = static_cast<ValueExpr *>(left_expr.get());
+        value_exprs.push_back(*value_expr);
       }
 
       if (field_expr == nullptr) {
         continue;
       }
 
-      const Field &field = field_expr->field();
-      // idx_tree_type      = field.attr_type();
-      index = table->find_index_by_field(field.field_name());
-      if (nullptr != index) {
-        break;
-      }
+      field_names.push_back(field_expr->field().field_name());
     }
   }
 
+  // 查询的方式， （索引查询还是查表）
+  Index *index = table->find_index_by_fields(field_names);
   if (index != nullptr) {
     ASSERT(value_expr != nullptr, "got an index but value expr is null ?");
-
     const Value &value = value_expr->get_value();
-    // Guess: in bplus tree must be same type, care for the type of value here
-    // for some value which type-dismatch better code for the idx select realize
-    // if (value.attr_type() != idx_tree_type) {
-    //   if (!const_cast<Value &>(value).type_cast(idx_tree_type)) {
-    //     LOG_WARN(
-    //         "Using %s data to init %s idx_scanner",
-    //         attr_type_to_string(value.attr_type()),
-    //         attr_type_to_string(idx_tree_type)
-    //     );
-    //   }
-    // }
+    /*Guess: in bplus tree must be same type, care for the type of value here
+    for some value which type-dismatch better code for the idx select realize
+    if (value.attr_type() != idx_tree_type) {
+      if (!const_cast<Value &>(value).type_cast(idx_tree_type)) {
+        LOG_WARN(
+            "Using %s data to init %s idx_scanner",
+            attr_type_to_string(value.attr_type()),
+            attr_type_to_string(idx_tree_type)
+        );
+      }
+    }
+
+    craete index
+    */
+
+    auto field_metas = index->field_metas();
+    int  len         = 0;  // 总的长度， 之后在插入的时候计算长度
+    std::for_each(table_get_oper.fields()->begin(), table_get_oper.fields()->end(), [&len](const Field &field) {
+      len += field.meta()->len();
+    });
+    char *ukey = new char[len];  // TODO 释放内存， 这里没有释放内存
+    for (size_t i = 0; i < field_names.size(); i++) {
+      auto field_name = field_names[i];
+      auto value      = value_exprs[i].get_value();
+      auto target     = std::find_if(field_metas.begin(), field_metas.end(), [field_name](const FieldMeta &field_meta) {
+        return field_meta.name() == field_name;
+      });
+
+      // 将当前字段复制到ukey中去
+      memcpy(ukey + target->offset(), value.data(), target->len());
+    }
+
+    // TODO 这里的value改成record的起始地址
     IndexScanPhysicalOperator *index_scan_oper = new IndexScanPhysicalOperator(
-        table, index, table_get_oper.readonly(), &value, true /*left_inclusive*/, &value, true /*right_inclusive*/
+        table, index, table_get_oper.readonly(), ukey, len, true /*left_inclusive*/, ukey, len, true /*right_inclusive*/
     );
 
     index_scan_oper->set_predicates(std::move(predicates));
