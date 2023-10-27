@@ -1630,7 +1630,6 @@ RC BplusTreeHandler::delete_entry(const char *user_key, const RID *rid)
   }
   char *key = static_cast<char *>(pkey.get());
 
-
   BplusTreeOperationType op = BplusTreeOperationType::DELETE;
   LatchMemo              latch_memo(disk_buffer_pool_);
 

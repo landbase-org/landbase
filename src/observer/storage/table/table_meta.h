@@ -50,8 +50,15 @@ public:
   const FieldMeta              *field(const char *name) const;
   const FieldMeta              *find_field_by_offset(int offset) const;
   const std::vector<FieldMeta> *field_metas() const { return &fields_; }
-  int                           field_index(const FieldMeta *field_meta) const;
-  auto                          trx_fields() const -> const std::pair<const FieldMeta *, int>;
+
+  /**
+   * @brief 返回字段在表中的位置
+   *
+   * @param field_meta
+   * @return int 字段在表中是第几个字段，如果不存在返回-1
+   */
+  int  field_index(const FieldMeta *field_meta) const;
+  auto trx_fields() const -> const std::pair<const FieldMeta *, int>;
 
   // Field: __trx_xid_begin | __trx_xid_end | __null | 其他字段...
   int field_num() const;      // 包括 sys_field
@@ -61,7 +68,7 @@ public:
 
   const IndexMeta *index(const char *name) const;
   const IndexMeta *find_index_by_field(const char *field) const;
-  const IndexMeta *find_index_by_fields(std::vector<std::string> fields) const;
+  const IndexMeta *find_index_by_fields(std::vector<std::string> &fields) const;
   const IndexMeta *index(int i) const;
   int              index_num() const;
 

@@ -630,14 +630,20 @@ RC Table::insert_entry_of_indexes(const Record &record)
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
     // 含有 null 值的字段不插入索引
-    bool has_null    = false;
-    auto field_meta  = index->field_meta();
-    int  field_index = table_meta_.field_index(&field_meta);
-    if (field_index == -1) {
-      LOG_ERROR("Failed to find field index. table=%s, field=%s", name(), field_meta.name());
-      return RC::INTERNAL;
+    bool has_null = false;
+
+    auto &field_metas = index->field_metas();
+    for (auto &field_meta : field_metas) {
+      int field_index = table_meta_.field_index(&field_meta);
+      if (field_index == -1) {
+        LOG_ERROR("Failed to find field index. table=%s, field=%s", name(), field_meta.name());
+        return RC::INTERNAL;
+      }
+      if (bitmap.get_bit(field_index)) {
+        has_null = true;
+        break;
+      }
     }
-    has_null = bitmap.get_bit(field_index);
 
     if (has_null) {
       continue;
@@ -659,14 +665,20 @@ RC Table::delete_entry_of_indexes(const Record &record, bool error_on_not_exists
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
     // 含有 null 值的字段不需要从索引里删除
-    bool has_null    = false;
-    auto field_meta  = index->field_meta();
-    int  field_index = table_meta_.field_index(&field_meta);
-    if (field_index == -1) {
-      LOG_ERROR("Failed to find field index. table=%s, field=%s", name(), field_meta.name());
-      return RC::INTERNAL;
+    bool has_null = false;
+
+    auto &field_metas = index->field_metas();
+    for (auto &field_meta : field_metas) {
+      int field_index = table_meta_.field_index(&field_meta);
+      if (field_index == -1) {
+        LOG_ERROR("Failed to find field index. table=%s, field=%s", name(), field_meta.name());
+        return RC::INTERNAL;
+      }
+      if (bitmap.get_bit(field_index)) {
+        has_null = true;
+        break;
+      }
     }
-    has_null = bitmap.get_bit(field_index);
 
     if (has_null) {
       continue;
@@ -712,7 +724,7 @@ std::vector<Index *> Table::find_indexes_by_field(const char *field_name) const
   return res;
 }
 
-Index * Table::find_index_by_fields(std::vector<std::string> field_names) const
+Index *Table::find_index_by_fields(std::vector<std::string> &field_names) const
 {
   // 因为给出的fields可能为乱顺序， 所以需要用set
   std::unordered_set<std::string> set(field_names.begin(), field_names.end());
@@ -723,7 +735,7 @@ Index * Table::find_index_by_fields(std::vector<std::string> field_names) const
 
     bool equa = true;
     for (const auto &field_meta : index->field_metas()) {
-      if (!set.count(field_meta.name())) {
+      if (!set.contains(field_meta.name())) {
         equa = false;
         break;
       }

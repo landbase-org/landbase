@@ -202,7 +202,7 @@ const IndexMeta *TableMeta::find_index_by_field(const char *field) const
   std::vector<std::string> fields{(std::string(field))};
   return find_index_by_fields(fields);
 }
-const IndexMeta *TableMeta::find_index_by_fields(std::vector<std::string> fields) const
+const IndexMeta *TableMeta::find_index_by_fields(std::vector<std::string> &fields) const
 {
   for (const auto &index : indexes_) {
     if (*index.fields() == fields) {

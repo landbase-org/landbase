@@ -53,6 +53,6 @@ public:
 
 protected:
   bool                     unique_{false};  // is unique
-  std::string              name_;          // index's name
-  std::vector<std::string> fields_;        // field's name
+  std::string              name_;           // index's name
+  std::vector<std::string> fields_;         // field's name
 };
