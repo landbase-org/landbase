@@ -18,10 +18,10 @@ See the Mulan PSL v2 for more details. */
 #include <vector>
 
 #include "sql/stmt/stmt.h"
+#include "storage/field/field_meta.h"
 
 struct CreateIndexSqlNode;
 class Table;
-class FieldMeta;
 
 /**
  * @brief 创建索引的语句
