@@ -59,7 +59,7 @@ RC IndexScanPhysicalOperator::open(Trx *trx)
   }
   index_scanner_ = index_scanner;
 
-  tuple_.set_schema(table_, table_->table_meta().field_metas());
+  inspector_.set_schema(table_, table_->table_meta().field_metas());
 
   trx_ = trx;
   return RC::SUCCESS;
@@ -75,14 +75,14 @@ RC IndexScanPhysicalOperator::next()
   bool filter_result = false;
   while (RC::SUCCESS == (rc = index_scanner_->next_entry(&rid, (get_idx_increase())))) {
     set_idx_increase(true);
-    
+
     rc = record_handler_->get_record(record_page_handler_, &rid, readonly_, &current_record_);
     if (rc != RC::SUCCESS) {
       return rc;
     }
 
-    tuple_.set_record(&current_record_);
-    rc = filter(tuple_, filter_result);
+    inspector_.set_record(&current_record_);
+    rc = filter(inspector_, filter_result);
     if (rc != RC::SUCCESS) {
       return rc;
     }
@@ -95,6 +95,10 @@ RC IndexScanPhysicalOperator::next()
     if (rc == RC::RECORD_INVISIBLE) {
       continue;
     } else {
+      RowTuple *new_tuple = new RowTuple();
+      new_tuple->set_record(&current_record_);
+      new_tuple->set_schema(table_, table_->table_meta().field_metas());
+      tuples_.emplace_back(new_tuple);
       return rc;
     }
   }
@@ -111,8 +115,7 @@ RC IndexScanPhysicalOperator::close()
 
 Tuple *IndexScanPhysicalOperator::current_tuple()
 {
-  tuple_.set_record(&current_record_);
-  return &tuple_;
+  return tuples_.back();
 }
 
 void IndexScanPhysicalOperator::set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs)
