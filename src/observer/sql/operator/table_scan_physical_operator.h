@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "common/rc.h"
+#include "sql/expr/tuple.h"
 #include "sql/operator/physical_operator.h"
 #include "storage/record/record_manager.h"
 
@@ -29,7 +30,12 @@ class TableScanPhysicalOperator : public PhysicalOperator
 public:
   TableScanPhysicalOperator(Table *table, bool readonly) : table_(table), readonly_(readonly) {}
 
-  virtual ~TableScanPhysicalOperator() = default;
+  virtual ~TableScanPhysicalOperator()
+  {
+    for (auto i : tuples_)
+      delete i;
+    tuples_.clear();
+  }
 
   std::string param() const override;
 
@@ -47,11 +53,13 @@ private:
   RC filter(RowTuple &tuple, bool &result);
 
 private:
-  Table                                   *table_    = nullptr;
-  Trx                                     *trx_      = nullptr;
-  bool                                     readonly_ = false;
-  RecordFileScanner                        record_scanner_;
-  Record                                   current_record_;
-  RowTuple                                 tuple_;
-  std::vector<std::unique_ptr<Expression>> predicates_;  // TODO chang predicate to table tuple filter
+  Table                                                   *table_    = nullptr;
+  Trx                                                     *trx_      = nullptr;
+  bool                                                     readonly_ = false;
+  RecordFileScanner                                        record_scanner_;
+  Record                                                   current_record_;
+  RowTuple                                                 inspector_;
+  std::pair<const Table *, const std::vector<FieldMeta> *> oper_meta;
+  std::vector<RowTuple *>                                  tuples_;
+  std::vector<std::unique_ptr<Expression>>                 predicates_;  // TODO chang predicate to table tuple filter
 };

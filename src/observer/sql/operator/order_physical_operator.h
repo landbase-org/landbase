@@ -5,8 +5,6 @@
 #include "sql/parser/value.h"
 #include "sql/stmt/order_by_stmt.h"
 #include "storage/trx/trx.h"
-#include <utility>
-#include <vector>
 
 class OrderByStmt;
 
@@ -19,7 +17,52 @@ class OrderByStmt;
 class OrderPhysicalOperator : public PhysicalOperator
 {
 public:
-  explicit OrderPhysicalOperator(std::vector<OrderByUnit *> order_units) : order_units_(order_units) {}
+  explicit OrderPhysicalOperator(std::vector<OrderByUnit *> order_units) : order_reqs(order_units)
+  {
+    // 拿到排序字段
+    for (auto unit : order_units) {
+      TupleCellSpec temp(unit->get_table()->name(), unit->get_fields()->name());
+      order_rules.emplace_back(temp, unit->get_asc());
+    }
+    // 拿到比较规则
+    comprule = [&](Tuple *const &left, Tuple *const &right) -> bool {
+      RC    rc = RC::SUCCESS;
+      Value vleft, vright;
+
+      for (auto [spec, asc] : order_rules) {
+        rc = left->find_cell(spec, vleft);
+        if (rc != RC::SUCCESS) {
+          LOG_ERROR("ORDER: get comp left value failed");
+        }
+        rc = right->find_cell(spec, vright);
+        if (rc != RC::SUCCESS) {
+          LOG_ERROR("ORDER: get comp right value failed");
+        }
+
+        auto comp_result = compare_value(vleft, vright);
+
+        switch (comp_result) {
+          case EQUAL_TO: {
+            continue;
+          } break;
+          case LESS_THAN: {
+            return asc;
+          } break;
+          case GREAT_THAN: {
+            return !asc;
+          } break;
+          default: {
+            LOG_ERROR(
+                "Error at compare value,left: %s, right: %s", vleft.to_string().c_str(), vright.to_string().c_str()
+            );
+            continue;
+          } break;
+        }
+      }
+      // return Default Value
+      return false;
+    };
+  }
 
   virtual ~OrderPhysicalOperator();
 
@@ -32,17 +75,24 @@ public:
   Tuple *current_tuple() override;
   void   print_infor();
 
-private:
-  RC get_inited();
+  /**
+   * @brief     // here is may a JoinTuple or a RowTuple
+      // the idea before: get its data here need tell whether is RowTuple
+      // now change the order of tuples here don't need to tell Tuple's type
+      // projecttuple -> childtuple
+      // if Rowtuple -> Rows(record)
+      // if Join     -> Joins(left ptr->Rowtuple(record), right ptr->Rowtuple(record))
+   *
+   */
 
-public:
-  using ValueGrp = std::vector<Value>;
+private:
+  RC initialize();
 
 private:
-  bool                                  is_inited_ = false;  // 是否已经初始化
-  std::vector<std::pair<int, bool>>     ord_idx_asc;         // 表示order的第idx个cell是否为ASC排序
-  std::vector<OrderByUnit *>            order_units_;
-  std::vector<ValueGrp *>               ori_data;
-  std::vector<ValueListTuple>::iterator ordered_iter_;
-  std::vector<ValueListTuple>          *ordered_tuple;
+  std::function<bool(Tuple *const &left, Tuple *const &right)> comprule;
+  bool                                                         is_inited_ = false;  // 是否已经初始化
+  std::vector<std::pair<TupleCellSpec, bool>> order_rules;  // 表示order的第idx个cell是否为ASC排序
+  std::vector<OrderByUnit *>                  order_reqs;
+  std::vector<Tuple *>::iterator              iterator_;
+  std::vector<Tuple *>                        ordered_tuples_;
 };

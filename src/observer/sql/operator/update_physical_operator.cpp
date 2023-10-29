@@ -35,7 +35,8 @@ RC UpdatePhysicalOperator::next()
       return rc;
     }
 
-    RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
+    RowTuple *row_tuple = dynamic_cast<RowTuple *>(tuple);
+    if (row_tuple == nullptr)return RC::INTERNAL;
     Record   &record    = row_tuple->record();
 
     trx_->update_record(table_, record, field_metas_, values_);

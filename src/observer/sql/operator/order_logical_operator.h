@@ -11,7 +11,7 @@ class OrderLogicalOperator : public LogicalOperator
 {
 public:
   OrderLogicalOperator(const std::vector<OrderByUnit *> &units) : order_units_(units) {}
-  ~OrderLogicalOperator() = default;
+  virtual ~OrderLogicalOperator() { order_units_.clear(); }
   LogicalOperatorType        type() const override { return LogicalOperatorType::ORDER_BY; }
   std::vector<OrderByUnit *> get_units() const { return order_units_; }
 

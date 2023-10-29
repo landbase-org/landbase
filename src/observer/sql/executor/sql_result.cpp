@@ -86,6 +86,8 @@ RC SqlResult::next_tuple(Tuple *&tuple)
     int  cell_num        = tuple->cell_num();
     auto tuple_cell_spec = x->get_tuple_cell_spec();
     do {
+      // UPDATE
+      tuple = operator_->current_tuple();
       if (aggre_calcs.size() == 0) {  // 初始化当前aggre_calcs
         for (size_t i = 0; i < cell_num; i++) {
           Value value;
