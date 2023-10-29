@@ -725,7 +725,7 @@ RC BplusTreeHandler::sync()
 
 RC BplusTreeHandler::create(
     const char *file_name, std::vector<AttrType> attr_types, std::vector<int> attr_lengths,
-    std::vector<int> attr_offsets, int internal_max_size /* = -1*/, int leaf_max_size /* = -1 */
+    std::vector<int> attr_offsets, bool unique, int internal_max_size /* = -1*/, int leaf_max_size /* = -1 */
 )
 {
   BufferPoolManager &bpm = BufferPoolManager::instance();
@@ -779,6 +779,7 @@ RC BplusTreeHandler::create(
 
   file_header->attr_size  = attr_types.size();
   file_header->key_length = attr_sum_length + sizeof(RID);
+  file_header->unique     = unique;
   for (int i = 0; i < file_header->attr_size; i++) {
     file_header->attr_lengths[i] = attr_lengths[i];
     file_header->attr_types[i]   = attr_types[i];
@@ -800,7 +801,7 @@ RC BplusTreeHandler::create(
     return RC::NOMEM;
   }
 
-  key_comparator_.init(attr_types, attr_lengths);
+  key_comparator_.init(attr_types, attr_lengths, unique);
   key_printer_.init(attr_types, attr_lengths);
 
   this->sync();
@@ -849,7 +850,7 @@ RC BplusTreeHandler::open(const char *file_name)
 
   std::vector<AttrType> attr_types(file_header_.attr_types, file_header_.attr_types + file_header_.attr_size);
   std::vector<int>      attr_lengths(file_header_.attr_lengths, file_header_.attr_lengths + file_header_.attr_size);
-  key_comparator_.init(attr_types, attr_lengths);
+  key_comparator_.init(attr_types, attr_lengths, unique());
   key_printer_.init(attr_types, attr_lengths);
   LOG_INFO("Successfully open index %s", file_name);
   return RC::SUCCESS;

@@ -508,7 +508,7 @@ RC Table::create_index(Trx *trx, bool unique, const std::vector<FieldMeta> *fiel
     return RC::INVALID_ARGUMENT;
   }
 
-  RC rc = new_index_meta.init(index_name, *field_metas);
+  RC rc = new_index_meta.init(index_name, *field_metas, unique);
   if (rc != RC::SUCCESS) {
     LOG_INFO(
         "Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s",

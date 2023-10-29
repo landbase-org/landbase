@@ -36,8 +36,8 @@ class IndexMeta
 public:
   IndexMeta() = default;
 
-  RC init(const char *name, const std::vector<std::string> &field_names);
-  RC init(const char *name, const std::vector<FieldMeta> &fields);
+  RC init(const char *name, const std::vector<std::string> &field_names, bool unique);
+  RC init(const char *name, const std::vector<FieldMeta> &fields, bool unique);
 
 public:
   const bool                      is_unique() const;

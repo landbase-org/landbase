@@ -17,6 +17,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/value.h"
 #include "storage/field/field.h"
 #include "storage/field/field_meta.h"
+#include "storage/index/index.h"
+#include <fcntl.h>
 #include <unistd.h>
 
 BplusTreeIndex::~BplusTreeIndex() noexcept { close(); }
@@ -44,7 +46,7 @@ RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, co
     field_offsets.emplace_back(field_metas[i].offset());
     field_types.emplace_back(field_metas[i].type());
   }
-  RC rc = index_handler_.create(file_name, field_types, field_lengths, field_offsets);
+  RC rc = index_handler_.create(file_name, field_types, field_lengths, field_offsets, index_meta.is_unique());
 
   if (RC::SUCCESS != rc) {
     LOG_WARN(
@@ -61,6 +63,7 @@ RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, co
   LOG_INFO(
       "Successfully create index, file_name:%s, index:%s, field:%s", file_name, index_meta.name(), index_meta.field()
   );
+
   return RC::SUCCESS;
 }
 

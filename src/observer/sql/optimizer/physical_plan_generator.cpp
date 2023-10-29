@@ -178,6 +178,7 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
     std::for_each(table_get_oper.fields()->begin(), table_get_oper.fields()->end(), [&len](const Field &field) {
       len += field.meta()->len();
     });
+
     char *ukey = new char[len];  // TODO 释放内存， 这里没有释放内存
     for (size_t i = 0; i < field_names.size(); i++) {
       auto field_name = field_names[i];

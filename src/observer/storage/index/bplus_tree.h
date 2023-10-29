@@ -114,13 +114,22 @@ private:
 class KeyComparator
 {
 public:
-  void init(std::vector<AttrType> types, std::vector<int> lengths) { attr_comparator_.init(types, lengths); }
+  void init(std::vector<AttrType> types, std::vector<int> lengths, bool unique)
+  {
+    attr_comparator_.init(types, lengths);
+    unique_ = unique;
+  }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
 
   int operator()(const char *v1, const char *v2) const  // v1, v2是key值 （attrs + rid）
   {
     int result = attr_comparator_(v1, v2);
+
+    if (unique_ && result == 0) {
+      return 0;
+    }
+
     if (result != 0) {  // 如果attr不相等， 直接返回结果， 否则比较rid值
       return result;
     }
@@ -132,6 +141,7 @@ public:
 
 private:
   AttrComparator attr_comparator_;
+  bool           unique_;
 };
 
 /**
@@ -227,6 +237,7 @@ struct IndexFileHeader
   int32_t internal_max_size;  ///< 内部节点最大的键值对数
   int32_t leaf_max_size;      ///< 叶子节点最大的键值对数
 
+  bool     unique;                       ///< unique
   int32_t  attr_size;                    ///< attr的数量
   int32_t  key_length;                   ///< key的长度
   int32_t  attr_offsets[MAX_LEAF_SIZE];  ///< 键值的长度
@@ -484,7 +495,7 @@ public:
    */
   RC create(
       const char *file_name, std::vector<AttrType> attr_types, std::vector<int> attr_lengths,
-      std::vector<int> attr_offsets, int internal_max_size = -1, int leaf_max_size = -1
+      std::vector<int> attr_offsets, bool unique, int internal_max_size = -1, int leaf_max_size = -1
   );
 
   /**
@@ -585,8 +596,9 @@ protected:
   RC adjust_root(LatchMemo &latch_memo, Frame *root_frame);
 
 public:
-  common::MemPoolItem::unique_ptr make_key(const char *user_key, const RID &rid);
+  common::MemPoolItem::unique_ptr make_key(const char *user_key, const RID &rid);  // TODO delete
   void                            free_key(char *key);
+  const bool                      unique() const { return file_header_.unique; }
 
 protected:
   DiskBufferPool *disk_buffer_pool_ = nullptr;
