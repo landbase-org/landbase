@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/table/table_meta.h"
 #include "storage/trx/trx.h"
 #include "json/json.h"
+#include <cstddef>
 
 using namespace std;
 
@@ -198,11 +199,17 @@ const IndexMeta *TableMeta::index(const char *name) const
 
 const IndexMeta *TableMeta::find_index_by_field(const char *field) const
 {
-  for (const IndexMeta &index : indexes_) {
-    if (0 == strcmp(index.field(), field)) {
+  std::vector<std::string> fields{(std::string(field))};
+  return find_index_by_fields(fields);
+}
+const IndexMeta *TableMeta::find_index_by_fields(std::vector<std::string> fields) const
+{
+  for (const auto &index : indexes_) {
+    if (*index.fields() == fields) {
       return &index;
     }
   }
+
   return nullptr;
 }
 

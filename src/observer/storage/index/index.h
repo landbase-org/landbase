@@ -40,8 +40,9 @@ public:
   Index()          = default;
   virtual ~Index() = default;
 
-  const IndexMeta &index_meta() const { return index_meta_; }
-  const FieldMeta &field_meta() const { return field_meta_; }
+  const IndexMeta              &index_meta() const { return index_meta_; }
+  const std::vector<FieldMeta> &field_metas() const { return field_metas_; }
+  const FieldMeta              &field_meta() const { return field_metas_[0]; }
 
   /**
    * @brief 插入一条数据
@@ -81,11 +82,11 @@ public:
   virtual RC sync() = 0;
 
 protected:
-  RC init(const IndexMeta &index_meta, const FieldMeta &field_meta);
+  RC init(const IndexMeta &index_meta, const std::vector<FieldMeta> &field_metas);
 
 protected:
-  IndexMeta index_meta_;  ///< 索引的元数据
-  FieldMeta field_meta_;  ///< 当前实现仅考虑一个字段的索引
+  IndexMeta              index_meta_;   ///< 索引的元数据
+  std::vector<FieldMeta> field_metas_;  ///< 当前实现仅考虑一个字段的索引
 };
 
 /**
@@ -102,6 +103,7 @@ public:
    * 遍历元素数据
    * 如果没有更多的元素，返回RECORD_EOF
    */
-  virtual RC next_entry(RID *rid) = 0;
-  virtual RC destroy()            = 0;
+  virtual RC next_entry(RID *rid)                     = 0;
+  virtual RC next_entry(RID *rid, bool need_increase) = 0;  // TODO 修改了事物执行之后修改这里
+  virtual RC destroy()                                = 0;
 };
