@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/table_scan_physical_operator.h"
 #include "event/sql_debug.h"
+#include "sql/expr/tuple.h"
 #include "storage/table/table.h"
 
 using namespace std;
@@ -42,17 +43,19 @@ RC TableScanPhysicalOperator::next()
       return rc;
     }
 
-    // 必须new出来，因为Tuple共享了 TupleSpecCell
-    RowTuple *tuple_ = new RowTuple();
-    tuple_->set_record(&current_record_);
-    tuple_->set_schema(oper_meta.first, oper_meta.second);
-    rc = filter(*tuple_, filter_result);
+    inspector_.set_record(&current_record_);
+    inspector_.set_schema(oper_meta.first, oper_meta.second);
+    rc = filter(inspector_, filter_result);
     if (rc != RC::SUCCESS) {
       return rc;
     }
 
     if (filter_result) {
       // sql_debug("get a tuple: %s", tuple_->to_string().c_str());
+      // 必须new出来，因为Tuple共享了 TupleSpecCell
+      RowTuple *tuple_ = new RowTuple();
+      tuple_->set_record(&current_record_);
+      tuple_->set_schema(oper_meta.first, oper_meta.second);
       tuples_.emplace_back(tuple_);
       break;
     } else {

@@ -58,6 +58,7 @@ private:
   bool                                                     readonly_ = false;
   RecordFileScanner                                        record_scanner_;
   Record                                                   current_record_;
+  RowTuple                                                 inspector_;
   std::pair<const Table *, const std::vector<FieldMeta> *> oper_meta;
   std::vector<RowTuple *>                                  tuples_;
   std::vector<std::unique_ptr<Expression>>                 predicates_;  // TODO chang predicate to table tuple filter
