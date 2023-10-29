@@ -2019,7 +2019,7 @@ yyreduce:
   case 42: /* nullable: %empty  */
 #line 417 "yacc_sql.y"
     {
-      (yyval.nullable) = false;
+      (yyval.nullable) = true; // 字段默认是可以为null的
     }
 #line 2025 "yacc_sql.cpp"
     break;

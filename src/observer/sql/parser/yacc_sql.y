@@ -415,7 +415,7 @@ attr_def:
 nullable:
     /* empty */
     {
-      $$ = false;
+      $$ = true; // 字段默认是可以为null的
     }
     | NOT NULL_T
     {
