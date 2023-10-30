@@ -290,10 +290,7 @@ RC Table::visit_record(const RID &rid, bool readonly, std::function<void(Record 
 
 RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<const Value *> &values)
 {
-  RC   rc                = RC::SUCCESS;
-  auto bitmap            = table_meta_.bitmap_of_null_field(record.data());
-  bool origin_have_null  = false;
-  bool updated_have_null = false;
+  RC rc = RC::SUCCESS;
   // 更改之后的数据
   int  len      = table_meta_.get_fields_data_len();
   auto new_data = new char[len];
@@ -301,6 +298,7 @@ RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_me
   Record new_record;
   new_record.set_data(new_data, len);
   new_record.set_rid(record.rid());
+  auto bitmap = table_meta_.bitmap_of_null_field(new_record.data());
 
   // 更新字段
   // 从parser阶段开始 field_metas 和 values 的数量一定一直是一致的
