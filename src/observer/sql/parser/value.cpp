@@ -296,7 +296,7 @@ std::string Value::to_string() const
     } break;
     case NULLS: {
       os << "NULL";
-    }
+    } break;
     default: {
       LOG_WARN("unsupported attr type: %d", attr_type_);
     } break;

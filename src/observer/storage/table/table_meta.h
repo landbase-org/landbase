@@ -50,6 +50,7 @@ public:
   const FieldMeta              *field(const char *name) const;
   const FieldMeta              *find_field_by_offset(int offset) const;
   const std::vector<FieldMeta> *field_metas() const { return &fields_; }
+  const int                     get_fields_data_len() const;
 
   /**
    * @brief 返回字段在表中的位置
