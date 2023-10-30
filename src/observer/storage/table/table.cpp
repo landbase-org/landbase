@@ -312,24 +312,29 @@ RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_me
     }
   }
 
-  /**
-   * 在这里需要索引能够插入之后才能更新record记录， 所以需要先判断索引
-   */
-  rc = delete_entry_of_indexes(record, false);  // 先把原來的索引刪除
-  rc = insert_entry_of_indexes(new_record);     // 如果插入失敗需要回滾；
-  if (rc != RC::SUCCESS) {                      // 可能出现了键值重复
-    RC rc2 = delete_entry_of_indexes(new_record, false /*error_on_not_exists*/);
-    if (rc2 != RC::SUCCESS) {
-      LOG_ERROR(
-          "Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
-          name(),
-          rc2,
-          strrc(rc2)
-      );
-    }
-    rc2 = insert_entry_of_indexes(record);  // 將刪除的索引重新插入
-    return rc;
+  delete_record(record);
+  rc = insert_record(new_record);
+  if (rc != RC::SUCCESS) {
+    insert_record(record);
   }
+  // /**
+  //  * 在这里需要索引能够插入之后才能更新record记录， 所以需要先判断索引
+  //  */
+  // rc = delete_entry_of_indexes(record, false);  // 先把原來的索引刪除
+  // rc = insert_entry_of_indexes(new_record);     // 如果插入失敗需要回滾；
+  // if (rc != RC::SUCCESS) {                      // 可能出现了键值重复
+  //   RC rc2 = delete_entry_of_indexes(new_record, false /*error_on_not_exists*/);
+  //   if (rc2 != RC::SUCCESS) {
+  //     LOG_ERROR(
+  //         "Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
+  //         name(),
+  //         rc2,
+  //         strrc(rc2)
+  //     );
+  //   }
+  //   rc2 = insert_entry_of_indexes(record);  // 將刪除的索引重新插入
+  //   return rc;
+  // }
 
   // 之前的没毛病之后就可以更新索引数据了
   rc = record_handler_->update_record(new_record.data(), &record.rid());
