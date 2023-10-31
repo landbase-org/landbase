@@ -37,9 +37,9 @@ class Expression;
  */
 enum OrderType
 {
-  NONE,  // 无ORDER要求
-  ORDER_ASC,   // 升序
-  ORDER_DESC   // 降序
+  NONE,       // 无ORDER要求
+  ORDER_ASC,  // 升序
+  ORDER_DESC  // 降序
 };
 
 /**
@@ -392,12 +392,13 @@ struct AttrInfoSqlNode
 /**
  * @brief 描述一个create table语句
  * @ingroup SQLParser
- * @details 这里也做了很多简化。
+ * @details 这里也做了很多简化。TODOX:目前select_expr是否会发生内存泄漏还不清楚，后面处理一下吧
  */
 struct CreateTableSqlNode
 {
   std::string                  relation_name;  ///< Relation name
   std::vector<AttrInfoSqlNode> attr_infos;     ///< attributes
+  std::vector<Expression *>    select_expr;    ///< create-select默认情况下只有一个子查询
 };
 
 /**

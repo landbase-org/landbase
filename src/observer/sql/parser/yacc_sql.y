@@ -69,6 +69,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         ORDER
         ASC
         BY
+        AS
         DESC
         SHOW
         SYNC
@@ -372,6 +373,18 @@ create_table_stmt:    /*create table 语句的语法解析树*/
       create_table.attr_infos.emplace_back(*$5);
       std::reverse(create_table.attr_infos.begin(), create_table.attr_infos.end());
       delete $5;
+    }
+    | CREATE TABLE ID AS select_stmt
+    {
+      // select_stmt is ParsedSqlNode*
+      $$ = new ParsedSqlNode(SCF_CREATE_TABLE);
+      CreateTableSqlNode &create_table = $$->create_table;
+      SubQueryExpression* sub_select = new SubQueryExpression;
+      sub_select->set_sub_select($5->selection);
+      create_table.relation_name = $3;
+      create_table.select_expr.emplace_back(sub_select);
+      free($3);
+      free($5);
     }
     ;
 attr_def_list:

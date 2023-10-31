@@ -93,6 +93,7 @@ TABLES                                  RETURN_TOKEN(TABLES);
 INDEX                                   RETURN_TOKEN(INDEX);
 UNIQUE                                  RETURN_TOKEN(UNIQUE);
 ON                                      RETURN_TOKEN(ON);
+AS                                      RETURN_TOKEN(AS);
 SHOW                                    RETURN_TOKEN(SHOW);
 SYNC                                    RETURN_TOKEN(SYNC);
 SELECT                                  RETURN_TOKEN(SELECT);

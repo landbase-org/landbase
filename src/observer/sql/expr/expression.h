@@ -23,6 +23,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/value.h"
 #include "storage/field/field.h"
 
+class LogicalOperator;
+
 class Tuple;
 
 /**
@@ -43,6 +45,7 @@ enum class ExprType
   CAST,         ///< 需要做类型转换的表达式
   COMPARISON,   ///< 需要做比较的表达式
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
+  SUBQUERY,     ///< 子查询
   ARITHMETIC,   ///< 算术运算
 };
 
@@ -301,4 +304,29 @@ private:
   Type                        arithmetic_type_;
   std::unique_ptr<Expression> left_;
   std::unique_ptr<Expression> right_;
+};
+
+/**
+ * @brief 子查寻表达式
+ * @ingroup Expression
+   @details 可用于子查寻和Update-Select和Create-Select等需要使用查询作为子句的情况
+ */
+class SubQueryExpression : public Expression
+{
+public:
+  SubQueryExpression()  = default;
+  ~SubQueryExpression() = default;
+  RC               get_value(const Tuple &tuple, Value &value) const override { return RC::UNIMPLENMENT; };
+  RC               try_get_value(Value &value) const override { return RC::UNIMPLENMENT; };
+  AttrType         value_type() const override { return AttrType::UNDEFINED; }
+  ExprType         type() const override { return ExprType::SUBQUERY; }
+  void             set_sub_select(SelectSqlNode const &select) { sub_select_ = select; }
+  void             set_father(LogicalOperator *par) { father_ = par; }
+  void             open_sub_query();
+  SelectSqlNode    get_sub_select() const { return sub_select_; }
+  LogicalOperator *get_father() { return father_; }
+
+private:
+  SelectSqlNode    sub_select_;
+  LogicalOperator *father_ = nullptr;  /// 目前需要我们自己清楚父节点的类型
 };

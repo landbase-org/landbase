@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include <string>
 #include <vector>
 
+#include "sql/parser/parse_defs.h"
 #include "sql/stmt/stmt.h"
 
 class Db;
@@ -29,9 +30,13 @@ class Db;
 class CreateTableStmt : public Stmt
 {
 public:
-  CreateTableStmt(const std::string &table_name, const std::vector<AttrInfoSqlNode> &attr_infos)
+  CreateTableStmt(
+      const std::string &table_name, const std::vector<AttrInfoSqlNode> &attr_infos,
+      std::vector<Expression *> const &selects
+  )
       : table_name_(table_name),
-        attr_infos_(attr_infos)
+        attr_infos_(attr_infos),
+        sub_selects_(selects)
   {}
   virtual ~CreateTableStmt() = default;
 
@@ -39,10 +44,12 @@ public:
 
   const std::string                  &table_name() const { return table_name_; }
   const std::vector<AttrInfoSqlNode> &attr_infos() const { return attr_infos_; }
+  const std::vector<Expression *>    &sub_select() const { return sub_selects_; }
 
   static RC create(Db *db, const CreateTableSqlNode &create_table, Stmt *&stmt);
 
 private:
   std::string                  table_name_;
   std::vector<AttrInfoSqlNode> attr_infos_;
+  std::vector<Expression *>    sub_selects_;
 };
