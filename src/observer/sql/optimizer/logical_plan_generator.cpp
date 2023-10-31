@@ -126,23 +126,31 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   }
 
   unique_ptr<LogicalOperator> project_oper(new ProjectLogicalOperator(all_fields));
-  if (predicate_oper) {
-    if (table_oper) {
-      predicate_oper->add_child(std::move(table_oper));
-    }
-    project_oper->add_child(std::move(predicate_oper));
-  } else {
-    if (table_oper) {
-      project_oper->add_child(std::move(table_oper));
-    }
-  }
-
+  // Project -> (Orderby) -> (predicate) -> table_scan
   if (orderby_oper) {
-    orderby_oper->add_child(std::move(project_oper));
-    logical_operator.swap(orderby_oper);
-    return RC::SUCCESS;
+    if (predicate_oper) {
+      if (table_oper) {
+        predicate_oper->add_child(std::move(table_oper));
+      }
+      orderby_oper->add_child(std::move(predicate_oper));
+    } else {
+      if (table_oper) {
+        orderby_oper->add_child(std::move(table_oper));
+      }
+    }
+    project_oper->add_child(std::move(orderby_oper));
+  } else {
+    if (predicate_oper) {
+      if (table_oper) {
+        predicate_oper->add_child(std::move(table_oper));
+      }
+      project_oper->add_child(std::move(predicate_oper));
+    } else {
+      if (table_oper) {
+        project_oper->add_child(std::move(table_oper));
+      }
+    }
   }
-
   logical_operator.swap(project_oper);
   return RC::SUCCESS;
 }

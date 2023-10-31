@@ -133,7 +133,7 @@ public:
     speces_.clear();
   }
 
-  void set_record(Record *record) { this->record_ = record; }
+  void set_record(Record *record) { this->record_ = *record; }
 
   void set_schema(const Table *table, const std::vector<FieldMeta> *fields)
   {
@@ -156,12 +156,12 @@ public:
 
     FieldExpr       *field_expr = speces_[index];
     const FieldMeta *field_meta = field_expr->field().meta();
-    bool             is_null    = field_expr->is_null(this->record_->data());
+    bool             is_null    = field_expr->is_null(const_cast<char *>(this->record_.data()));
     if (is_null) {
       cell.set_type(NULLS);
     } else {
       cell.set_type(field_meta->type());
-      cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+      cell.set_data(this->record_.data() + field_meta->offset(), field_meta->len());
     }
     return RC::SUCCESS;
   }
@@ -196,13 +196,13 @@ public:
   }
 #endif
 
-  Record &record() { return *record_; }
+  Record &record() { return record_; }
 
-  const Record &record() const { return *record_; }
+  const Record &record() const { return record_; }
 
 private:
-  Record                  *record_ = nullptr;
-  const Table             *table_  = nullptr;
+  Record                   record_;
+  const Table             *table_ = nullptr;
   std::vector<FieldExpr *> speces_;
 };
 
@@ -339,15 +339,20 @@ public:
   JoinedTuple()          = default;
   virtual ~JoinedTuple() = default;
 
+  JoinedTuple(const JoinedTuple &other)
+  {
+    this->left_  = other.left_;
+    this->right_ = other.right_;
+  }
+
   void set_left(Tuple *left) { left_ = left; }
   void set_right(Tuple *right) { right_ = right; }
-
-  int cell_num() const override { return left_->cell_num() + right_->cell_num(); }
+  int  cell_num() const override { return left_->cell_num() + right_->cell_num(); }
 
   RC cell_at(int index, Value &value) const override
   {
     const int left_cell_num = left_->cell_num();
-    if (index > 0 && index < left_cell_num) {
+    if (index >= 0 && index < left_cell_num) {
       return left_->cell_at(index, value);
     }
 

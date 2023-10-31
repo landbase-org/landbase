@@ -30,7 +30,12 @@ public:
       const char *right_value, size_t right_value_len, bool right_inclusive
   );
 
-  virtual ~IndexScanPhysicalOperator() = default;
+  virtual ~IndexScanPhysicalOperator()
+  {
+    for (auto tup_ptr : tuples_)
+      delete tup_ptr;
+    tuples_.clear();
+  }
 
   PhysicalOperatorType type() const override { return PhysicalOperatorType::INDEX_SCAN; }
 
@@ -59,9 +64,10 @@ private:
   IndexScanner      *index_scanner_  = nullptr;
   RecordFileHandler *record_handler_ = nullptr;
 
-  RecordPageHandler record_page_handler_;
-  Record            current_record_;
-  RowTuple          tuple_;
+  RecordPageHandler       record_page_handler_;
+  Record                  current_record_;
+  RowTuple                inspector_;
+  std::vector<RowTuple *> tuples_;
 
   const char *left_value_;
   const char *right_value_;
