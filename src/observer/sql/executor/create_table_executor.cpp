@@ -30,6 +30,15 @@ See the Mulan PSL v2 for more details. */
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
 
+/**
+ * @brief 处理Create-Select的函数
+ * @ingroup executor
+ * @param stmt 
+ * @param session 
+ * @return RC 
+ * @details 目前处理了两种模式，接下来需要等待expression的完成之后，支持expression
+ */
+
 RC CreateTableExecutor::execute_sub_select(Stmt *stmt, Session *session)
 {
   CreateTableStmt             *ct_stmt    = dynamic_cast<CreateTableStmt *>(stmt);
