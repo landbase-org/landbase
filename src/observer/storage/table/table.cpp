@@ -26,6 +26,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/defs.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/parser/parse_defs.h"
 #include "storage/buffer/disk_buffer_pool.h"
 #include "storage/common/condition_filter.h"
@@ -313,22 +314,24 @@ RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_me
     }
   }
 
-  rc = insert_entry_of_indexes(new_record);
+  rc = delete_entry_of_indexes(record, false);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to insert index entries. table=%s, rc=%d:%s", name(), rc, strrc(rc));
+    sql_debug("Failed to delete index entries. table=%s, rc=%d:%s", name(), rc, strrc(rc));
     return rc;
   }
 
-  rc = delete_entry_of_indexes(record, false);
+  rc = insert_entry_of_indexes(new_record);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to delete index entries. table=%s, rc=%d:%s", name(), rc, strrc(rc));
+    sql_debug("Failed to insert index entries. table=%s, rc=%d:%s", name(), rc, strrc(rc));
+    // 回滚
+    insert_entry_of_indexes(record);
     return rc;
   }
 
   // 之前的没毛病之后就可以更新索引数据了
   rc = record_handler_->update_record(new_record.data(), &record.rid());
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Update record failed. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
+    sql_debug("Update record failed. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
     return rc;
   }
   return rc;
