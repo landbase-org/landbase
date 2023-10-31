@@ -386,6 +386,31 @@ create_table_stmt:    /*create table 语句的语法解析树*/
       free($3);
       free($5);
     }
+    | CREATE TABLE ID LBRACE attr_def attr_def_list RBRACE select_stmt
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_TABLE);
+      CreateTableSqlNode &create_table = $$->create_table;
+      SubQueryExpression* sub_select = new SubQueryExpression;
+      sub_select->set_sub_select($8->selection);
+      create_table.relation_name = $3;
+      create_table.select_expr.emplace_back(sub_select);
+
+      std::vector<AttrInfoSqlNode>* src_attrs = $6;
+      if (src_attrs != nullptr) {
+        create_table.attr_infos.swap(*src_attrs);
+      }
+
+      create_table.attr_infos.emplace_back(*$5);
+      std::reverse(create_table.attr_infos.begin(), create_table.attr_infos.end());
+
+      // free($3);
+      delete $3;
+      delete $5;
+      delete $6;
+      delete $8;
+      // free($5);
+      // free($8);
+    }
     ;
 attr_def_list:
     /* empty */
