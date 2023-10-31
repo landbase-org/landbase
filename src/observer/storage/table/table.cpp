@@ -292,10 +292,11 @@ RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_me
 {
   RC rc = RC::SUCCESS;
   // 更改之后的数据
-  auto new_data = new char[record.len()];
-  memcpy(new_data, record.data(), record.len());  // 新的数据
+  int  len      = table_meta_.get_fields_data_len();
+  auto new_data = new char[len];
+  memcpy(new_data, record.data(), len);  // 新的数据
   Record new_record;
-  new_record.set_data_owner(new_data, record.len());
+  new_record.set_data_owner(new_data, len);
   new_record.set_rid(record.rid());
 
   auto bitmap = table_meta_.bitmap_of_null_field(new_record.data());
