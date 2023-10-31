@@ -292,12 +292,12 @@ RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_me
 {
   RC rc = RC::SUCCESS;
   // 更改之后的数据
-  int  len      = table_meta_.get_fields_data_len();
-  auto new_data = new char[len];
-  memcpy(new_data, record.data(), len);  // 新的数据
+  auto new_data = new char[record.len()];
+  memcpy(new_data, record.data(), record.len());  // 新的数据
   Record new_record;
-  new_record.set_data(new_data, len);
+  new_record.set_data_owner(new_data, record.len());
   new_record.set_rid(record.rid());
+
   auto bitmap = table_meta_.bitmap_of_null_field(new_record.data());
 
   // 更新字段
@@ -312,29 +312,17 @@ RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_me
     }
   }
 
-  delete_record(record);
-  rc = insert_record(new_record);
+  rc = insert_entry_of_indexes(new_record);
   if (rc != RC::SUCCESS) {
-    insert_record(record);
+    LOG_ERROR("Failed to insert index entries. table=%s, rc=%d:%s", name(), rc, strrc(rc));
+    return rc;
   }
-  // /**
-  //  * 在这里需要索引能够插入之后才能更新record记录， 所以需要先判断索引
-  //  */
-  // rc = delete_entry_of_indexes(record, false);  // 先把原來的索引刪除
-  // rc = insert_entry_of_indexes(new_record);     // 如果插入失敗需要回滾；
-  // if (rc != RC::SUCCESS) {                      // 可能出现了键值重复
-  //   RC rc2 = delete_entry_of_indexes(new_record, false /*error_on_not_exists*/);
-  //   if (rc2 != RC::SUCCESS) {
-  //     LOG_ERROR(
-  //         "Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
-  //         name(),
-  //         rc2,
-  //         strrc(rc2)
-  //     );
-  //   }
-  //   rc2 = insert_entry_of_indexes(record);  // 將刪除的索引重新插入
-  //   return rc;
-  // }
+
+  rc = delete_entry_of_indexes(record, false);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to delete index entries. table=%s, rc=%d:%s", name(), rc, strrc(rc));
+    return rc;
+  }
 
   // 之前的没毛病之后就可以更新索引数据了
   rc = record_handler_->update_record(new_record.data(), &record.rid());
