@@ -114,21 +114,13 @@ private:
 class KeyComparator
 {
 public:
-  void init(std::vector<AttrType> types, std::vector<int> lengths, bool unique)
-  {
-    attr_comparator_.init(types, lengths);
-    unique_ = unique;
-  }
+  void init(std::vector<AttrType> types, std::vector<int> lengths) { attr_comparator_.init(types, lengths); }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
 
   int operator()(const char *v1, const char *v2) const  // v1, v2是key值 （attrs + rid）
   {
     int result = attr_comparator_(v1, v2);
-
-    if (unique_ && result == 0) {
-      return 0;
-    }
 
     if (result != 0) {  // 如果attr不相等， 直接返回结果， 否则比较rid值
       return result;
@@ -141,7 +133,6 @@ public:
 
 private:
   AttrComparator attr_comparator_;
-  bool           unique_;
 };
 
 /**
@@ -392,6 +383,7 @@ public:
    * 如果key已经存在，会设置found的值。
    */
   int lookup(const KeyComparator &comparator, const char *key, bool *found = nullptr) const;
+  int lookup(const AttrComparator &comparator, const char *key, bool *found = nullptr) const;
 
   void insert(int index, const char *key, const char *value);
   void remove(int index);

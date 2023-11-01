@@ -181,6 +181,15 @@ int LeafIndexNodeHandler::lookup(const KeyComparator &comparator, const char *ke
   return iter - iter_begin;
 }
 
+int LeafIndexNodeHandler::lookup(const AttrComparator &comparator, const char *key, bool *found /* = nullptr */) const
+{
+  const int                    size = this->size();
+  common::BinaryIterator<char> iter_begin(item_size(), __key_at(0));
+  common::BinaryIterator<char> iter_end(item_size(), __key_at(size));
+  common::BinaryIterator<char> iter = lower_bound(iter_begin, iter_end, key, comparator, found);
+  return iter - iter_begin;
+}
+
 void LeafIndexNodeHandler::insert(int index, const char *key, const char *value)
 {
   if (index < size()) {
@@ -801,7 +810,7 @@ RC BplusTreeHandler::create(
     return RC::NOMEM;
   }
 
-  key_comparator_.init(attr_types, attr_lengths, unique);
+  key_comparator_.init(attr_types, attr_lengths);
   key_printer_.init(attr_types, attr_lengths);
 
   this->sync();
@@ -850,7 +859,7 @@ RC BplusTreeHandler::open(const char *file_name)
 
   std::vector<AttrType> attr_types(file_header_.attr_types, file_header_.attr_types + file_header_.attr_size);
   std::vector<int>      attr_lengths(file_header_.attr_lengths, file_header_.attr_lengths + file_header_.attr_size);
-  key_comparator_.init(attr_types, attr_lengths, unique());
+  key_comparator_.init(attr_types, attr_lengths);
   key_printer_.init(attr_types, attr_lengths);
   LOG_INFO("Successfully open index %s", file_name);
   return RC::SUCCESS;
@@ -1143,8 +1152,14 @@ RC BplusTreeHandler::crabing_protocal_fetch_page(
 RC BplusTreeHandler::insert_entry_into_leaf_node(LatchMemo &latch_memo, Frame *frame, const char *key, const RID *rid)
 {
   LeafIndexNodeHandler leaf_node(file_header_, frame);
-  bool                 exists          = false;  // 该数据是否已经存在指定的叶子节点中了
-  int                  insert_position = leaf_node.lookup(key_comparator_, key, &exists);
+  bool                 exists = false;  // 该数据是否已经存在指定的叶子节点中了
+  int                  insert_position;
+  if (unique()) {
+    insert_position = leaf_node.lookup(key_comparator_.attr_comparator(), key, &exists);
+  } else {
+    insert_position = leaf_node.lookup(key_comparator_, key, &exists);
+  }
+
   if (exists) {
     LOG_TRACE("entry exists");
     return RC::RECORD_DUPLICATE_KEY;
