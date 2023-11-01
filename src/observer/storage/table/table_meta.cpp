@@ -168,15 +168,6 @@ const FieldMeta *TableMeta::find_field_by_offset(int offset) const
   return nullptr;
 }
 
-const int TableMeta::get_fields_data_len() const
-{
-  int sum = 0;
-  for (auto field : fields_) {
-    sum += field.len();
-  }
-  return sum;
-}
-
 int TableMeta::field_num() const { return fields_.size(); }
 
 int TableMeta::sys_field_num() const
