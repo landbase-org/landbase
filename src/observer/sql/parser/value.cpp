@@ -253,7 +253,7 @@ void Value::set_value(const Value &value)
     } break;
     case NULLS: {
       set_null();
-    }
+    } break;
     case UNDEFINED: {
       ASSERT(false, "got an invalid value type");
     } break;
