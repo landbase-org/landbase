@@ -51,21 +51,20 @@ RC OrderByStmt::create(
 )
 {
   RC rc = RC::SUCCESS;
-  stmt  = nullptr;
 
-  OrderByStmt *tmp_stmt = new OrderByStmt();
+  stmt = new OrderByStmt();
   for (int i = 0; i < order_num; i++) {
-    OrderByUnit *orderby_unit = new OrderByUnit();
+    OrderByUnit *orderby_unit = nullptr;
     rc                        = create_orderby_unit(db, default_table, tables, orderbys[i], orderby_unit);
     if (rc != RC::SUCCESS) {
-      delete tmp_stmt;
+      delete stmt;
+      stmt = nullptr;
       LOG_WARN("failed to create orderby unit. orderby index=%d", i);
       return rc;
     }
-    tmp_stmt->order_units_.emplace_back(std::move(orderby_unit));
+    stmt->order_units_.emplace_back(orderby_unit);
   }
 
-  stmt = std::move(tmp_stmt);
   return rc;
 }
 
@@ -74,8 +73,6 @@ RC OrderByStmt::create_orderby_unit(
     OrderByUnit *&order_unit
 )
 {
-  OrderByUnit *temp = new OrderByUnit();
-
   Table           *table_tmp = nullptr;
   const FieldMeta *field_mt  = nullptr;
   RC               rc        = get_unit_info(db, default_table, tables, orderby.rel_attr, table_tmp, field_mt);
@@ -83,9 +80,10 @@ RC OrderByStmt::create_orderby_unit(
     LOG_WARN("Order field not found");
     return rc;
   }
-  temp->set_table(table_tmp);
-  temp->set_field_meta(field_mt);
-  temp->set_order(orderby.order_type);
-  order_unit = temp;
+
+  order_unit = new OrderByUnit();
+  order_unit->set_table(table_tmp);
+  order_unit->set_field_meta(field_mt);
+  order_unit->set_order(orderby.order_type);
   return RC::SUCCESS;
 }
