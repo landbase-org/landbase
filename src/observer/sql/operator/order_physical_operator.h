@@ -1,5 +1,6 @@
 #pragma once
 
+#include "event/sql_debug.h"
 #include "physical_operator.h"
 #include "sql/expr/tuple.h"
 #include "sql/parser/value.h"
@@ -32,14 +33,14 @@ public:
       for (auto [spec, asc] : order_rules) {
         rc = left->find_cell(spec, vleft);
         if (rc != RC::SUCCESS) {
-          LOG_ERROR("ORDER: get comp left value failed");
+          sql_debug("ORDER: get comp left value failed");
         }
         rc = right->find_cell(spec, vright);
         if (rc != RC::SUCCESS) {
-          LOG_ERROR("ORDER: get comp right value failed");
+          sql_debug("ORDER: get comp right value failed");
         }
 
-        auto comp_result = compare_value(vleft, vright);
+        auto comp_result = Value::compare_value(vleft, vright);
 
         switch (comp_result) {
           case EQUAL_TO: {
@@ -52,7 +53,7 @@ public:
             return !asc;
           } break;
           default: {
-            LOG_ERROR(
+            sql_debug(
                 "Error at compare value,left: %s, right: %s", vleft.to_string().c_str(), vright.to_string().c_str()
             );
             continue;

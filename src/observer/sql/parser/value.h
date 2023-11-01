@@ -72,6 +72,8 @@ public:
 
   bool compare(const CompOp &comp_op, const Value &other) const;
 
+  static CompOp compare_value(const Value &left, const Value &right);
+
   const char *data() const;
   int         length() const { return length_; }
 
@@ -102,5 +104,3 @@ private:
   } num_value_;
   std::string str_value_;
 };
-
-CompOp compare_value(const Value &left, const Value &right);

@@ -23,7 +23,14 @@ int compare_int(void *arg1, void *arg2)
 {
   int v1 = *(int *)arg1;
   int v2 = *(int *)arg2;
-  return v1 - v2;
+
+  if (v1 > v2) {
+    return 1;
+  } else if (v1 < v2) {
+    return -1;
+  } else {
+    return 0;
+  }
 }
 
 int compare_float(void *arg1, void *arg2)
@@ -103,11 +110,13 @@ int string_match(void *arg1, int arg1_max_length, void *arg2, int arg2_max_lengt
 
 int compare_date(void *arg1, void *arg2)
 {
-  int32_t *left  = static_cast<int32_t *>(arg1);
-  int32_t *right = static_cast<int32_t *>(arg2);
-  int32_t  diff  = *left - *right;
-  if (diff) {
-    return diff > 0 ? 1 : -1;
+  int32_t left  = *static_cast<int32_t *>(arg1);
+  int32_t right = *static_cast<int32_t *>(arg2);
+
+  if (left > right) {
+    return 1;
+  } else if (left < right) {
+    return -1;
   } else {
     return 0;
   }
