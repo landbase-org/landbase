@@ -29,6 +29,10 @@ SelectStmt::~SelectStmt()
     delete filter_stmt_;
     filter_stmt_ = nullptr;
   }
+  if (nullptr != order_stmt_) {
+    delete order_stmt_;
+    order_stmt_ = nullptr;
+  }
 }
 
 static void wildcard_fields(Table *table, std::vector<Field> &field_metas)
