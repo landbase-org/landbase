@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "storage/table/table_meta.h"
 #include <functional>
+#include <numeric>
 
 struct RID;
 class Record;
@@ -111,7 +112,7 @@ public:
   Index                      *find_index(const char *index_name) const;
   Index                      *find_index_by_field(const char *field_name) const;
   std::vector<Index *>        find_indexes_by_field(const char *field_name) const;
-  Index                      *find_index_by_fields(std::vector<std::string> field_names) const;
+  Index                      *find_index_by_fields(std::vector<std::string> &field_names) const;
   const std::vector<Index *> &get_indexes() const { return indexes_; }
 
 private:

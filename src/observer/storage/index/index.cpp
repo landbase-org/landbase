@@ -15,9 +15,9 @@ See the Mulan PSL v2 for more details. */
 #include "storage/index/index.h"
 #include "storage/field/field_meta.h"
 
-RC Index::init(const IndexMeta &index_meta,const  std::vector<FieldMeta> &field_metas)
+RC Index::init(const IndexMeta &index_meta, const std::vector<FieldMeta> &field_metas)
 {
-  index_meta_ = index_meta;
+  index_meta_  = index_meta;
   field_metas_ = field_metas;
   return RC::SUCCESS;
 }

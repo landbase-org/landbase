@@ -181,6 +181,15 @@ int LeafIndexNodeHandler::lookup(const KeyComparator &comparator, const char *ke
   return iter - iter_begin;
 }
 
+int LeafIndexNodeHandler::lookup(const AttrComparator &comparator, const char *key, bool *found /* = nullptr */) const
+{
+  const int                    size = this->size();
+  common::BinaryIterator<char> iter_begin(item_size(), __key_at(0));
+  common::BinaryIterator<char> iter_end(item_size(), __key_at(size));
+  common::BinaryIterator<char> iter = lower_bound(iter_begin, iter_end, key, comparator, found);
+  return iter - iter_begin;
+}
+
 void LeafIndexNodeHandler::insert(int index, const char *key, const char *value)
 {
   if (index < size()) {
@@ -725,7 +734,7 @@ RC BplusTreeHandler::sync()
 
 RC BplusTreeHandler::create(
     const char *file_name, std::vector<AttrType> attr_types, std::vector<int> attr_lengths,
-    std::vector<int> attr_offsets, int internal_max_size /* = -1*/, int leaf_max_size /* = -1 */
+    std::vector<int> attr_offsets, bool unique, int internal_max_size /* = -1*/, int leaf_max_size /* = -1 */
 )
 {
   BufferPoolManager &bpm = BufferPoolManager::instance();
@@ -779,6 +788,7 @@ RC BplusTreeHandler::create(
 
   file_header->attr_size  = attr_types.size();
   file_header->key_length = attr_sum_length + sizeof(RID);
+  file_header->unique     = unique;
   for (int i = 0; i < file_header->attr_size; i++) {
     file_header->attr_lengths[i] = attr_lengths[i];
     file_header->attr_types[i]   = attr_types[i];
@@ -1142,8 +1152,14 @@ RC BplusTreeHandler::crabing_protocal_fetch_page(
 RC BplusTreeHandler::insert_entry_into_leaf_node(LatchMemo &latch_memo, Frame *frame, const char *key, const RID *rid)
 {
   LeafIndexNodeHandler leaf_node(file_header_, frame);
-  bool                 exists          = false;  // 该数据是否已经存在指定的叶子节点中了
-  int                  insert_position = leaf_node.lookup(key_comparator_, key, &exists);
+  bool                 exists = false;  // 该数据是否已经存在指定的叶子节点中了
+  int                  insert_position;
+  if (unique()) {
+    insert_position = leaf_node.lookup(key_comparator_.attr_comparator(), key, &exists);
+  } else {
+    insert_position = leaf_node.lookup(key_comparator_, key, &exists);
+  }
+
   if (exists) {
     LOG_TRACE("entry exists");
     return RC::RECORD_DUPLICATE_KEY;
@@ -1629,7 +1645,6 @@ RC BplusTreeHandler::delete_entry(const char *user_key, const RID *rid)
     return RC::NOMEM;
   }
   char *key = static_cast<char *>(pkey.get());
-
 
   BplusTreeOperationType op = BplusTreeOperationType::DELETE;
   LatchMemo              latch_memo(disk_buffer_pool_);

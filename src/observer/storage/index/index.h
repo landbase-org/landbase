@@ -42,7 +42,7 @@ public:
 
   const IndexMeta              &index_meta() const { return index_meta_; }
   const std::vector<FieldMeta> &field_metas() const { return field_metas_; }
-  const FieldMeta              &field_meta() const { return field_metas_[0]; }
+  bool                          is_unique() const { return index_meta_.is_unique(); }
 
   /**
    * @brief 插入一条数据
@@ -86,7 +86,7 @@ protected:
 
 protected:
   IndexMeta              index_meta_;   ///< 索引的元数据
-  std::vector<FieldMeta> field_metas_;  ///< 当前实现仅考虑一个字段的索引
+  std::vector<FieldMeta> field_metas_;  ///< 索引的字段
 };
 
 /**

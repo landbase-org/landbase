@@ -32,5 +32,6 @@ private:
   Table                         *table_ = nullptr;
   std::vector<const FieldMeta *> field_metas_;
   std::vector<const Value *>     values_;
-  Trx                           *trx_ = nullptr;
+  Trx                           *trx_              = nullptr;
+  bool                           has_unique_index_ = false;
 };

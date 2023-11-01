@@ -16,13 +16,17 @@ See the Mulan PSL v2 for more details. */
 #include <cstddef>
 #include <cstdio>
 #include <limits.h>
+#include <memory>
+#include <numeric>
 #include <string.h>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 #include "common/defs.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/parser/parse_defs.h"
 #include "storage/buffer/disk_buffer_pool.h"
 #include "storage/common/condition_filter.h"
@@ -288,13 +292,15 @@ RC Table::visit_record(const RID &rid, bool readonly, std::function<void(Record 
 RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<const Value *> &values)
 {
   RC rc = RC::SUCCESS;
-  // 删除之前的索引
-  rc = delete_entry_of_indexes(record, true);
-  if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to delete index entries when update. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
-  }
+  // 更改之后的数据
+  int  len      = table_meta_.record_size();
+  auto new_data = new char[len];
+  memcpy(new_data, record.data(), len);  // 新的数据
+  Record new_record;
+  new_record.set_data_owner(new_data, len);
+  new_record.set_rid(record.rid());
 
-  auto bitmap = table_meta_.bitmap_of_null_field(record.data());
+  auto bitmap = table_meta_.bitmap_of_null_field(new_record.data());
 
   // 更新字段
   // 从parser阶段开始 field_metas 和 values 的数量一定一直是一致的
@@ -304,19 +310,29 @@ RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_me
       bitmap.set_bit(field_index);
     } else {
       bitmap.clear_bit(field_index);
-      record.set_value(field_metas[i], values[i]);
+      new_record.set_value(field_metas[i], values[i]);
     }
   }
-  rc = record_handler_->update_record(record.data(), &record.rid());
+
+  rc = delete_entry_of_indexes(record, false);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Update record failed. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
+    sql_debug("Failed to delete index entries. table=%s, rc=%d:%s", name(), rc, strrc(rc));
     return rc;
   }
 
-  // 插入新的索引
-  rc = insert_entry_of_indexes(record);
+  rc = insert_entry_of_indexes(new_record);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to insert index entries when update. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
+    sql_debug("Failed to insert index entries. table=%s, rc=%d:%s", name(), rc, strrc(rc));
+    // 回滚
+    insert_entry_of_indexes(record);
+    return rc;
+  }
+
+  // 之前的没毛病之后就可以更新索引数据了
+  rc = record_handler_->update_record(new_record.data(), &record.rid());
+  if (rc != RC::SUCCESS) {
+    sql_debug("Update record failed. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
+    return rc;
   }
   return rc;
 }
@@ -508,7 +524,7 @@ RC Table::create_index(Trx *trx, bool unique, const std::vector<FieldMeta> *fiel
     return RC::INVALID_ARGUMENT;
   }
 
-  RC rc = new_index_meta.init(index_name, *field_metas);
+  RC rc = new_index_meta.init(index_name, *field_metas, unique);
   if (rc != RC::SUCCESS) {
     LOG_INFO(
         "Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s",
@@ -630,14 +646,20 @@ RC Table::insert_entry_of_indexes(const Record &record)
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
     // 含有 null 值的字段不插入索引
-    bool has_null    = false;
-    auto field_meta  = index->field_meta();
-    int  field_index = table_meta_.field_index(&field_meta);
-    if (field_index == -1) {
-      LOG_ERROR("Failed to find field index. table=%s, field=%s", name(), field_meta.name());
-      return RC::INTERNAL;
+    bool has_null = false;
+
+    auto &field_metas = index->field_metas();
+    for (auto &field_meta : field_metas) {
+      int field_index = table_meta_.field_index(&field_meta);
+      if (field_index == -1) {
+        LOG_ERROR("Failed to find field index. table=%s, field=%s", name(), field_meta.name());
+        return RC::INTERNAL;
+      }
+      if (bitmap.get_bit(field_index)) {
+        has_null = true;
+        break;
+      }
     }
-    has_null = bitmap.get_bit(field_index);
 
     if (has_null) {
       continue;
@@ -659,14 +681,20 @@ RC Table::delete_entry_of_indexes(const Record &record, bool error_on_not_exists
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
     // 含有 null 值的字段不需要从索引里删除
-    bool has_null    = false;
-    auto field_meta  = index->field_meta();
-    int  field_index = table_meta_.field_index(&field_meta);
-    if (field_index == -1) {
-      LOG_ERROR("Failed to find field index. table=%s, field=%s", name(), field_meta.name());
-      return RC::INTERNAL;
+    bool has_null = false;
+
+    auto &field_metas = index->field_metas();
+    for (auto &field_meta : field_metas) {
+      int field_index = table_meta_.field_index(&field_meta);
+      if (field_index == -1) {
+        LOG_ERROR("Failed to find field index. table=%s, field=%s", name(), field_meta.name());
+        return RC::INTERNAL;
+      }
+      if (bitmap.get_bit(field_index)) {
+        has_null = true;
+        break;
+      }
     }
-    has_null = bitmap.get_bit(field_index);
 
     if (has_null) {
       continue;
@@ -712,7 +740,7 @@ std::vector<Index *> Table::find_indexes_by_field(const char *field_name) const
   return res;
 }
 
-Index * Table::find_index_by_fields(std::vector<std::string> field_names) const
+Index *Table::find_index_by_fields(std::vector<std::string> &field_names) const
 {
   // 因为给出的fields可能为乱顺序， 所以需要用set
   std::unordered_set<std::string> set(field_names.begin(), field_names.end());
@@ -723,7 +751,7 @@ Index * Table::find_index_by_fields(std::vector<std::string> field_names) const
 
     bool equa = true;
     for (const auto &field_meta : index->field_metas()) {
-      if (!set.count(field_meta.name())) {
+      if (!set.contains(field_meta.name())) {
         equa = false;
         break;
       }
