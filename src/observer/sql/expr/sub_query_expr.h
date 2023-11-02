@@ -31,38 +31,32 @@ public:
     OptimizeStage optimize_stage;
     auto          rc = optimize_stage.handle_expr(this);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to handle expr. rc=%s", strrc(rc));
+      sql_debug("failed to handle expr. rc=%s", strrc(rc));
       return rc;
     }
     rc = physical_operator_->open(trx);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to open physical operator. rc=%s", strrc(rc));
+      sql_debug("failed to open physical operator. rc=%s", strrc(rc));
       return rc;
     }
-    do {
-      rc = physical_operator_->next();
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("failed to next physical operator. rc=%s", strrc(rc));
-        return rc;
-      }
+
+    while (RC::SUCCESS == (rc = physical_operator_->next())) {
       Tuple *tuple = physical_operator_->current_tuple();
       // TODO: 现在报错其实是早了
       // update user set name = (select name from user where id = 1) where id = 2;
       // 如果where id = 2 没有返回值，即使子查询返回多个值也不报错。
       if (tuple->cell_num() != 1) {
-        LOG_WARN("invalid tuple cell num. cell_num=%d", tuple->cell_num());
+        sql_debug("invalid tuple cell num. cell_num=%d", tuple->cell_num());
         return RC::INTERNAL;
       }
       Value value;
       rc = tuple->cell_at(0, value);
       if (rc != RC::SUCCESS) {
-        LOG_WARN("failed to get cell. rc=%s", strrc(rc));
+        sql_debug("failed to get cell. rc=%s", strrc(rc));
         return rc;
       }
       value_list_.push_back(value);
-    } while (rc == RC::SUCCESS);
-
-    finished = true;
+    }
     return RC::SUCCESS;
   }
 
@@ -71,7 +65,6 @@ public:
 
 private:
   Trx                              *trx_;
-  bool                              finished = false;
   SelectStmt                       *stmt_;
   std::unique_ptr<PhysicalOperator> physical_operator_;
 };

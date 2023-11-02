@@ -179,9 +179,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
         left          = unique_ptr<Expression>(new ValueListExpr(tmp_expr->value_list()));
       } break;
       case ExprType::SUBQUERY: {
-        auto tmp_expr = static_cast<const SubQueryExpr *>(filter_unit_left);
-        auto new_stmt = new SelectStmt(*tmp_expr->stmt());
-        left          = unique_ptr<Expression>(new SubQueryExpr(new_stmt));
+        left = std::unique_ptr<Expression>(filter_unit_left);
       } break;
       default: {
         sql_debug("unimplement expr: %d", filter_unit_left->type());
@@ -203,9 +201,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
         right         = unique_ptr<Expression>(new ValueListExpr(tmp_expr->value_list()));
       } break;
       case ExprType::SUBQUERY: {
-        auto tmp_expr = static_cast<const SubQueryExpr *>(filter_unit_right);
-        auto new_stmt = new SelectStmt(*tmp_expr->stmt());
-        right         = unique_ptr<Expression>(new SubQueryExpr(new_stmt));
+        right = unique_ptr<Expression>(filter_unit_right);
       } break;
       default: {
         sql_debug("unimplement expr: %d", filter_unit_left->type());

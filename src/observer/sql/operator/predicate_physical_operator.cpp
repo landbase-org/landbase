@@ -51,7 +51,7 @@ RC PredicatePhysicalOperator::open(Trx *trx)
     } break;
     case ExprType::IN: {
       auto  in_expr    = static_cast<InExpr *>(expression_.get());
-      auto &left_expr  = in_expr->right();
+      auto &left_expr  = in_expr->left();
       auto &right_expr = in_expr->right();
       if (left_expr->type() == ExprType::SUBQUERY) {
         auto subquery_expr = static_cast<SubQueryExpr *>(left_expr.get());

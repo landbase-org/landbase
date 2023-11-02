@@ -28,13 +28,7 @@ class FilterUnit
 {
 public:
   FilterUnit() = default;
-  ~FilterUnit()
-  {
-    delete left_;
-    delete right_;
-    left_  = nullptr;
-    right_ = nullptr;
-  }
+  ~FilterUnit() {}
 
   void set_comp(CompOp comp) { comp_ = comp; }
 
