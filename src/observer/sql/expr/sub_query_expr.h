@@ -64,7 +64,7 @@ public:
   void set_operator(std::unique_ptr<PhysicalOperator> oper) { physical_operator_ = std::move(oper); }
 
 private:
-  Trx                              *trx_;
-  SelectStmt                       *stmt_;
-  std::unique_ptr<PhysicalOperator> physical_operator_;
+  Trx                              *trx_               = nullptr;
+  SelectStmt                       *stmt_              = nullptr;
+  std::unique_ptr<PhysicalOperator> physical_operator_ = nullptr;
 };

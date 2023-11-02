@@ -91,8 +91,17 @@ RC PredicatePhysicalOperator::open(Trx *trx)
         }
       }
     } break;
-    case ExprType::EXIST: {
-      sql_debug("uninplemented Exist");
+    case ExprType::EXISTS: {
+      auto  exists_expr    = static_cast<ExistsExpr *>(expression_.get());
+      auto &sub_query_expr = exists_expr->right();
+      if (sub_query_expr->type() == ExprType::SUBQUERY) {
+        auto subquery_expr = static_cast<SubQueryExpr *>(sub_query_expr.get());
+        rc                 = subquery_expr->executor(trx);
+        if (rc != RC::SUCCESS) {
+          sql_debug("failed to execute subquery expression");
+          return rc;
+        }
+      }
     } break;
     default: {
       sql_debug("uninplemented ExprType");

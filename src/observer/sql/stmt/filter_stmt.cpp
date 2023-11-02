@@ -245,6 +245,10 @@ RC FilterStmt::create_filter_unit(
     );
     // 左边值，右边字段
   } else {
+    //  where exists (select id from user);
+    if (right_expr->type() == ExprType::SUBQUERY) {
+      return RC::SUCCESS;
+    };
     sql_debug("Unimplemented");
   }
 

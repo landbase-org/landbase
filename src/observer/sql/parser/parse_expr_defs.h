@@ -14,12 +14,15 @@ enum class ParseExprType
 class ParseExpr
 {
 public:
+  ParseExpr()                       = default;
+  virtual ~ParseExpr()              = default;
   virtual ParseExprType expr_type() = 0;
 };
 
 class ParseValueExpr : public ParseExpr
 {
 public:
+  ParseValueExpr() = default;
   ParseValueExpr(Value &value) : value_(value) {}
   ParseExprType expr_type() { return ParseExprType::VALUE; }
 

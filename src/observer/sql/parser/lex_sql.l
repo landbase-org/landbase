@@ -136,7 +136,7 @@ LIKE                                    RETURN_TOKEN(LK);
 NULL                                    RETURN_TOKEN(NULL_T);
 NULLABLE                                RETURN_TOKEN(NULL_T);
 IN                                      RETURN_TOKEN(IN_OP);
-EXIST                                   RETURN_TOKEN(EXIST_OP);
+EXISTS                                  RETURN_TOKEN(EXISTS_OP);
 
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 {AGGRE_ATTR}                            yylval->string=strdup(yytext); RETURN_TOKEN(AGGRE_ATTR);

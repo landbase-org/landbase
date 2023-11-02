@@ -116,7 +116,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         NOT
         LK
         IN_OP
-        EXIST_OP
+        EXISTS_OP
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -166,7 +166,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <number>              number
 %type <comp>                comp_op
 %type <comp>                in_op
-%type <comp>                exist_op
+%type <comp>                exists_op
 %type <aggre_type>          aggre_type
 %type <order_type>          order_type
 %type <rel_attr>            rel_attr_aggre
@@ -795,13 +795,17 @@ where:
     {
       $$ = nullptr;
     }
-    | WHERE condition_list {
-      $$ = $2;
-    }
-    | WHERE exist_op parse_expr
+    | WHERE exists_op LBRACE select_stmt RBRACE
     {
       $$ = new std::vector<ConditionSqlNode>;
-      $$->emplace_back(ConditionSqlNode{nullptr,$2,$3});
+      //TODO: 这里糊了一下，其实左边是没有表达式的，但是为了方便，这里就先这样写了
+      ParseExpr * left = new ParseValueExpr();
+      ParseExpr *  right = new ParseSubQueryExpr($4->selection);
+      $$->emplace_back(ConditionSqlNode{left,$2,right});
+    }
+    | WHERE condition_list 
+    {
+      $$ = $2;
     }
     ;
 condition_list:
@@ -913,9 +917,10 @@ in_op:
     | NOT IN_OP {$$ = NOT_IN;}
     ;
 
-exist_op:
-      EXIST_OP {$$ = EXIST;}
-    | NOT EXIST_OP {$$ = NOT_EXIST;}
+exists_op:
+      EXISTS_OP {$$ = EXISTS;}
+    | NOT EXISTS_OP {$$ = NOT_EXISTS;}
+    ;
 
 aggre_type:
       SUM   { $$ = AGGRE_SUM; }
@@ -923,8 +928,7 @@ aggre_type:
     | COUNT { $$ = AGGRE_COUNT; }
     | MAX   { $$ = AGGRE_MAX; }
     | MIN   { $$ = AGGRE_MIN; }
-
-
+    ;
 
 load_data_stmt:
     LOAD DATA INFILE SSS INTO TABLE ID 

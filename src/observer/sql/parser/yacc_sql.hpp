@@ -114,7 +114,7 @@ extern int yydebug;
     NOT = 315,                     /* NOT  */
     LK = 316,                      /* LK  */
     IN_OP = 317,                   /* IN_OP  */
-    EXIST_OP = 318,                /* EXIST_OP  */
+    EXISTS_OP = 318,               /* EXISTS_OP  */
     NUMBER = 319,                  /* NUMBER  */
     FLOAT = 320,                   /* FLOAT  */
     ID = 321,                      /* ID  */

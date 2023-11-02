@@ -226,9 +226,9 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       case NOT_IN: {
         expr = new InExpr(std::move(left), filter_unit->comp(), std::move(right));
       } break;
-      case EXIST:
-      case NOT_EXIST: {
-        sql_debug("unimplement expr: exist expr");
+      case EXISTS:
+      case NOT_EXISTS: {
+        expr = new ExistsExpr(filter_unit->comp(), std::move(right));
       } break;
       case NO_OP: {
         sql_debug("no comp op where create plan");

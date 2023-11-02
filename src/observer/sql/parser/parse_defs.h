@@ -274,19 +274,19 @@ struct RelAttrSqlNode
   AggreTypeNode aggretion_node;
 };
 
+// TODO: 内存泄漏
 /**
  * @brief 表示一个条件比较
  * @ingroup SQLParser
  * @details 条件比较就是SQL查询中的 where a>b 这种。
  * 一个条件比较是有两部分组成的，称为左边和右边。
  * 左边和右边理论上都可以是任意的数据，比如是字段（属性，列），也可以是数值常量。
- * 这个结构中记录的仅仅支持字段和值。
  */
 struct ConditionSqlNode
 {
-  ParseExpr *left;
-  CompOp     comp;  ///< comparison operator
-  ParseExpr *right;
+  ParseExpr *left = nullptr;
+  CompOp     comp{CompOp::NO_OP};  ///< comparison operator
+  ParseExpr *right = nullptr;
 };
 
 /**

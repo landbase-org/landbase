@@ -47,7 +47,7 @@ enum class ExprType
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
   IN,
-  EXIST,
+  EXISTS,
   VALUELIST,
   SUBQUERY,
 };
@@ -331,6 +331,8 @@ public:
     return RC::FAILURE;
   }
 
+  bool has_values() { return !value_list_.empty(); }
+
 public:
   auto &value_list() const { return value_list_; }
   auto &value_list() { return value_list_; }
@@ -384,5 +386,35 @@ public:
 private:
   CompOp                      comp_;
   std::unique_ptr<Expression> left_;
+  std::unique_ptr<Expression> right_;
+};
+
+/**
+ * @brief Exists 表达式
+ * @ingroup Expression
+ * right_: SubQueryExpr
+ */
+class ExistsExpr : public Expression
+{
+public:
+  ExistsExpr(CompOp comp, std::unique_ptr<Expression> right) : comp_(comp), right_(std::move(right)) {}
+  ExprType type() const override { return ExprType::EXISTS; }
+  AttrType value_type() const override { return BOOLEANS; }
+  RC       get_value(const Tuple &tuple, Value &value) const override { return try_get_value(value); }
+  RC       try_get_value(Value &value) const override
+  {
+    // TODO: 还可以优化，比如将right_改为 ValueListExpr?
+    auto value_list_expr = static_cast<ValueListExpr *>(right_.get());
+
+    bool result = (value_list_expr->has_values()) ^ (comp_ == CompOp::NOT_EXISTS);
+    value.set_boolean(result);
+    return RC::SUCCESS;
+  }
+
+  auto &right() { return right_; }
+  auto &sub_expr() { return right_; }
+
+private:
+  CompOp                      comp_;
   std::unique_ptr<Expression> right_;
 };
