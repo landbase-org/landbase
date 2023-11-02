@@ -49,6 +49,27 @@ RC PredicatePhysicalOperator::open(Trx *trx)
         }
       }
     } break;
+    case ExprType::COMPARISON: {
+      auto  comp_expr  = static_cast<ComparisonExpr *>(expression_.get());
+      auto &left_expr  = comp_expr->left();
+      auto &right_expr = comp_expr->right();
+      if (left_expr->type() == ExprType::SUBQUERY) {
+        auto subquery_expr = static_cast<SubQueryExpr *>(left_expr.get());
+        rc                 = subquery_expr->executor(trx);
+        if (rc != RC::SUCCESS) {
+          sql_debug("failed to execute subquery expression");
+          return rc;
+        }
+      }
+      if (right_expr->type() == ExprType::SUBQUERY) {
+        auto subquery_expr = static_cast<SubQueryExpr *>(right_expr.get());
+        rc                 = subquery_expr->executor(trx);
+        if (rc != RC::SUCCESS) {
+          sql_debug("failed to execute subquery expression");
+          return rc;
+        }
+      }
+    } break;
     case ExprType::IN: {
       auto  in_expr    = static_cast<InExpr *>(expression_.get());
       auto &left_expr  = in_expr->left();

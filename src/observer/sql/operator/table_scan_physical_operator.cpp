@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/table_scan_physical_operator.h"
 #include "event/sql_debug.h"
+#include "sql/expr/sub_query_expr.h"
 #include "sql/expr/tuple.h"
 #include "storage/table/table.h"
 
@@ -26,6 +27,61 @@ RC TableScanPhysicalOperator::open(Trx *trx)
     oper_meta = make_pair(table_, table_->table_meta().field_metas());
   }
   trx_ = trx;
+
+  // 理论上此时只有 COMPARISON expr
+  for (auto &expr : predicates_) {
+    switch (expr->type()) {
+      case ExprType::COMPARISON: {
+        auto  comp_expr  = static_cast<ComparisonExpr *>(expr.get());
+        auto &left_expr  = comp_expr->left();
+        auto &right_expr = comp_expr->right();
+        if (left_expr->type() == ExprType::SUBQUERY) {
+          auto subquery_expr = static_cast<SubQueryExpr *>(left_expr.get());
+          rc                 = subquery_expr->executor(trx);
+          if (rc != RC::SUCCESS) {
+            sql_debug("failed to execute subquery expression");
+            return rc;
+          }
+        }
+        if (right_expr->type() == ExprType::SUBQUERY) {
+          auto subquery_expr = static_cast<SubQueryExpr *>(right_expr.get());
+          rc                 = subquery_expr->executor(trx);
+          if (rc != RC::SUCCESS) {
+            sql_debug("failed to execute subquery expression");
+            return rc;
+          }
+        }
+      } break;
+      case ExprType::IN: {
+        auto  in_expr    = static_cast<InExpr *>(expr.get());
+        auto &left_expr  = in_expr->left();
+        auto &right_expr = in_expr->right();
+        if (left_expr->type() == ExprType::SUBQUERY) {
+          auto subquery_expr = static_cast<SubQueryExpr *>(left_expr.get());
+          rc                 = subquery_expr->executor(trx);
+          if (rc != RC::SUCCESS) {
+            sql_debug("failed to execute subquery expression");
+            return rc;
+          }
+        }
+        if (right_expr->type() == ExprType::SUBQUERY) {
+          auto subquery_expr = static_cast<SubQueryExpr *>(right_expr.get());
+          rc                 = subquery_expr->executor(trx);
+          if (rc != RC::SUCCESS) {
+            sql_debug("failed to execute subquery expression");
+            return rc;
+          }
+        }
+      } break;
+      case ExprType::EXIST: {
+        sql_debug("uninplemented Exist");
+      } break;
+      default: {
+        sql_debug("unsupported expression type: %d", expr->type());
+      } break;
+    }
+  }
+
   return rc;
 }
 

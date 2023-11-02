@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/operator/index_scan_physical_operator.h"
+#include "sql/expr/sub_query_expr.h"
 #include "storage/index/index.h"
 #include "storage/trx/trx.h"
 #include <cstddef>
@@ -40,6 +41,8 @@ IndexScanPhysicalOperator::IndexScanPhysicalOperator(
 
 RC IndexScanPhysicalOperator::open(Trx *trx)
 {
+  RC rc = RC::SUCCESS;
+
   if (nullptr == table_ || nullptr == index_) {
     return RC::INTERNAL;
   }
@@ -62,7 +65,62 @@ RC IndexScanPhysicalOperator::open(Trx *trx)
   inspector_.set_schema(table_, table_->table_meta().field_metas());
 
   trx_ = trx;
-  return RC::SUCCESS;
+
+  // 理论上此时只有 COMPARISON expr
+  for (auto &expr : predicates_) {
+    switch (expr->type()) {
+      case ExprType::COMPARISON: {
+        auto  comp_expr  = static_cast<ComparisonExpr *>(expr.get());
+        auto &left_expr  = comp_expr->left();
+        auto &right_expr = comp_expr->right();
+        if (left_expr->type() == ExprType::SUBQUERY) {
+          auto subquery_expr = static_cast<SubQueryExpr *>(left_expr.get());
+          rc                 = subquery_expr->executor(trx);
+          if (rc != RC::SUCCESS) {
+            sql_debug("failed to execute subquery expression");
+            return rc;
+          }
+        }
+        if (right_expr->type() == ExprType::SUBQUERY) {
+          auto subquery_expr = static_cast<SubQueryExpr *>(right_expr.get());
+          rc                 = subquery_expr->executor(trx);
+          if (rc != RC::SUCCESS) {
+            sql_debug("failed to execute subquery expression");
+            return rc;
+          }
+        }
+      } break;
+      case ExprType::IN: {
+        auto  in_expr    = static_cast<InExpr *>(expr.get());
+        auto &left_expr  = in_expr->left();
+        auto &right_expr = in_expr->right();
+        if (left_expr->type() == ExprType::SUBQUERY) {
+          auto subquery_expr = static_cast<SubQueryExpr *>(left_expr.get());
+          rc                 = subquery_expr->executor(trx);
+          if (rc != RC::SUCCESS) {
+            sql_debug("failed to execute subquery expression");
+            return rc;
+          }
+        }
+        if (right_expr->type() == ExprType::SUBQUERY) {
+          auto subquery_expr = static_cast<SubQueryExpr *>(right_expr.get());
+          rc                 = subquery_expr->executor(trx);
+          if (rc != RC::SUCCESS) {
+            sql_debug("failed to execute subquery expression");
+            return rc;
+          }
+        }
+      } break;
+      case ExprType::EXIST: {
+        sql_debug("uninplemented Exist");
+      } break;
+      default: {
+        sql_debug("unsupported expression type: %d", expr->type());
+      } break;
+    }
+  }
+
+  return rc;
 }
 
 RC IndexScanPhysicalOperator::next()
@@ -113,10 +171,7 @@ RC IndexScanPhysicalOperator::close()
   return RC::SUCCESS;
 }
 
-Tuple *IndexScanPhysicalOperator::current_tuple()
-{
-  return tuples_.back();
-}
+Tuple *IndexScanPhysicalOperator::current_tuple() { return tuples_.back(); }
 
 void IndexScanPhysicalOperator::set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs)
 {
