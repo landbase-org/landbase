@@ -188,17 +188,18 @@ RC FilterStmt::create_filter_unit(
       }
       value.set_date(check);
       return RC::SUCCESS;
-      // 如果左侧为整数，右侧为字符串
-    } else if (left_expr->value_type() == INTS && right_expr->value_type() == CHARS) {
-      if (!value.type_cast(INTS)) {
-        return RC::FAILURE;
-      }
-      return RC::SUCCESS;
-    } else if (left_expr->value_type() == FLOATS && (right_expr->value_type() == INTS || right_expr->value_type() == CHARS)) {
+      // 如果左侧为字符串，转为 float
+    } else if (right_expr->value_type() == CHARS) {
       if (!value.type_cast(FLOATS)) {
         return RC::FAILURE;
       }
       return RC::SUCCESS;
+    } else {
+      sql_debug(
+          "Compared Fields type dismatch %s with %s",
+          attr_type_to_string(left_expr->value_type()),
+          attr_type_to_string(right_expr->value_type())
+      );
     }
     // 左侧值，右侧值
   } else if (left_expr->type() == ExprType::VALUE && right_expr->type() == ExprType::VALUE) {
