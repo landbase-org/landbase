@@ -153,8 +153,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // parse the tables;
   std::vector<Table *>                     tables;
   std::unordered_map<std::string, Table *> table_map;
-  std::vector<ConditionSqlNode>            conditions = select_sql.conditions;
-  std::vector<OrderSqlNode>                orderbys   = select_sql.orders;
+  std::vector<OrderSqlNode>                orderbys = select_sql.orders;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const char *table_name = select_sql.relations[i].c_str();
     if (nullptr == table_name) {
@@ -222,6 +221,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   }
 
   // add up the join's conditions
+  std::vector<ConditionSqlNode> conditions = select_sql.conditions;
   for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
     std::vector<ConditionSqlNode> const &tmp_vec_condi = select_sql.joinctions[i].join_conditions;
     for (auto j : tmp_vec_condi)

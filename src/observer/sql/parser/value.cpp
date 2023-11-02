@@ -525,6 +525,7 @@ bool Value::type_cast(const AttrType target)
 {
   if (attr_type_ == target)
     return true;
+
   std::stringstream ss;
   switch (target) {
     case INTS: {
@@ -542,7 +543,7 @@ bool Value::type_cast(const AttrType target)
         str_value_.clear();
         return true;
       }
-    }
+    } break;
     case FLOATS: {
       float temp{0.0f};
       if (attr_type_ == INTS) {
@@ -557,7 +558,7 @@ bool Value::type_cast(const AttrType target)
         set_float(temp);
         return true;
       }
-    }
+    } break;
     case CHARS: {
       std::string res;
       if (attr_type_ == INTS) {
@@ -572,10 +573,49 @@ bool Value::type_cast(const AttrType target)
         set_string(res.c_str());
         return true;
       }
-    }
+    } break;
     default: {
       LOG_WARN("Typecast Failed");
       return false;
-    }
+    } break;
   }
+  return false;
+}
+bool Value::operator==(const Value &other) const
+{
+  if (this->attr_type_ != other.attr_type_) {
+    return false;
+  };
+  switch (this->attr_type_) {
+    case CHARS: {
+      int cmp_result = common::compare_string(
+          (void *)this->str_value_.c_str(),
+          this->str_value_.length(),
+          (void *)other.str_value_.c_str(),
+          other.str_value_.length()
+      );
+      return cmp_result == 0;
+    } break;
+    case DATES: {
+      return this->num_value_.date_value_ == other.num_value_.date_value_;
+    } break;
+    case INTS: {
+      return this->num_value_.int_value_ == other.num_value_.int_value_;
+    } break;
+    case FLOATS: {
+      int cmp_result =
+          common::compare_float((void *)&this->num_value_.float_value_, (void *)&other.num_value_.float_value_);
+      return cmp_result == 0;
+    } break;
+    case BOOLEANS: {
+      return this->num_value_.bool_value_ == other.num_value_.bool_value_;
+    } break;
+    case NULLS: {
+      return true;
+    } break;
+    default: {
+      sql_debug("unknown data type. type=%s", attr_type_to_string(this->attr_type_));
+    } break;
+  }
+  return false;
 }

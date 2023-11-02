@@ -99,6 +99,8 @@ RC FilterStmt::create_filter_unit(
 
   filter_unit = new FilterUnit;
 
+  // 创建左边的表达式
+  Expression *left_expr = nullptr;
   switch (condition.left->expr_type()) {
     case ParseExprType::FIELD: {
       Table           *table      = nullptr;
@@ -109,24 +111,29 @@ RC FilterStmt::create_filter_unit(
         LOG_WARN("cannot find attr");
         return rc;
       }
-      FilterObj filter_obj;
-      filter_obj.init_attr(Field(table, field));
-      filter_unit->set_left(filter_obj);
+      left_expr = new FieldExpr(Field(table, field));
     } break;
     case ParseExprType::VALUE: {
-      FilterObj filter_obj;
-      auto      value_expr = static_cast<const ParseValueExpr *>(condition.left);
-      filter_obj.init_value(value_expr->value());
-      filter_unit->set_left(filter_obj);
+      auto value_expr = static_cast<const ParseValueExpr *>(condition.left);
+      left_expr       = new ValueExpr(value_expr->value());
     } break;
     case ParseExprType::VALUE_LIST: {
+      auto value_list_expr = static_cast<const ParseValueListExpr *>(condition.left);
+      left_expr            = new ValueListExpr(value_list_expr->value_list());
     } break;
     case ParseExprType::SUBQUERY: {
     } break;
     default: {
     } break;
   }
+  if (left_expr == nullptr) {
+    sql_debug("left_expr is nullptr");
+    return RC::UNIMPLENMENT;
+  }
+  filter_unit->set_left(left_expr);
 
+  // 创建右边的表达式
+  Expression *right_expr = nullptr;
   switch (condition.right->expr_type()) {
     case ParseExprType::FIELD: {
       Table           *table      = nullptr;
@@ -137,84 +144,88 @@ RC FilterStmt::create_filter_unit(
         LOG_WARN("cannot find attr");
         return rc;
       }
-      FilterObj filter_obj;
-      filter_obj.init_attr(Field(table, field));
-      filter_unit->set_right(filter_obj);
+      right_expr = new FieldExpr(Field(table, field));
     } break;
     case ParseExprType::VALUE: {
-      FilterObj filter_obj;
-      auto      value_expr = static_cast<const ParseValueExpr *>(condition.right);
-
-      filter_obj.init_value(value_expr->value());
-      filter_unit->set_right(filter_obj);
+      auto value_expr = static_cast<const ParseValueExpr *>(condition.right);
+      right_expr      = new ValueExpr(value_expr->value());
     } break;
     case ParseExprType::VALUE_LIST: {
+      auto value_list_expr = static_cast<const ParseValueListExpr *>(condition.right);
+      right_expr           = new ValueListExpr(value_list_expr->value_list());
     } break;
     case ParseExprType::SUBQUERY: {
     } break;
     default: {
     } break;
   }
-
+  if (right_expr == nullptr) {
+    sql_debug("right_expr is nullptr");
+    return RC::UNIMPLENMENT;
+  }
+  filter_unit->set_right(right_expr);
+  // 设置比较符
   filter_unit->set_comp(comp);
 
   // 检查两个类型是否能够比较
-
-  // 如果一边出现了 null, 则可比较
-  if (!filter_unit->left().is_attr && filter_unit->left().value.is_null() ||
-      (!filter_unit->right().is_attr && filter_unit->right().value.is_null())) {
+  // 如果类型相同肯定能比较
+  if (left_expr->value_type() == right_expr->value_type()) {
     return RC::SUCCESS;
   }
 
-  // 检测左侧为日期属性，右侧为日期字符串的情况 处理完直接return截断，不要影响别的类型的转换
-  if (filter_unit->left().is_attr && filter_unit->left().field.attr_type() == DATES &&
-      filter_unit->right().value.attr_type() == CHARS) {
-    int32_t check = convert_string_to_date(filter_unit->right().value.data());
-    if (check == -1)
-      return RC::FAILURE;
-    Value *change = const_cast<Value *>(&filter_unit->right().value);
-    change->set_date(check);
-    return rc;
-  }
-
-  // 如果左右均为值，有一个非CHARS就都转为FLOATS
-  if (!filter_unit->left().is_attr && !filter_unit->right().is_attr) {
-    Value &left_ref  = const_cast<Value &>(filter_unit->left().value);
-    Value &right_ref = const_cast<Value &>(filter_unit->right().value);
-    if (filter_unit->left().value.attr_type() != CHARS || filter_unit->right().value.attr_type() != CHARS) {
-      if (!left_ref.type_cast(FLOATS) || !right_ref.type_cast(FLOATS)) {
+  // 接下来分四种情况讨论
+  // 左侧字段，右侧值
+  // 字符串与整数比较时会转成整数类型，字符串/整数与浮点数比较时会转成浮点数类型
+  if (left_expr->type() == ExprType::FIELD && right_expr->type() == ExprType::VALUE) {
+    auto   tmp_expr = static_cast<ValueExpr *>(right_expr);
+    Value &value    = tmp_expr->get_value();
+    // 检测左侧为日期属性，右侧为日期字符串的情况 处理完直接return截断，不要影响别的类型的转换
+    if (left_expr->value_type() == DATES && right_expr->value_type() == CHARS) {
+      int32_t check = convert_string_to_date(value.data());
+      if (check == -1) {
+        sql_debug("convert_string_to_date failed");
+        return RC::FAILURE;
+      }
+      value.set_date(check);
+      return RC::SUCCESS;
+      // 如果左侧为整数，右侧为字符串
+    } else if (left_expr->value_type() == INTS && right_expr->value_type() == CHARS) {
+      if (!value.type_cast(INTS)) {
+        return RC::FAILURE;
+      }
+      return RC::SUCCESS;
+    } else if (left_expr->value_type() == FLOATS && (right_expr->value_type() == INTS || right_expr->value_type() == CHARS)) {
+      if (!value.type_cast(FLOATS)) {
+        return RC::FAILURE;
+      }
+      return RC::SUCCESS;
+    }
+    // 左侧值，右侧值
+  } else if (left_expr->type() == ExprType::VALUE && right_expr->type() == ExprType::VALUE) {
+    // 如果一边出现了 null, 则可比较
+    if (left_expr->value_type() == NULLS || right_expr->value_type() == NULLS) {
+      return RC::SUCCESS;
+      // 如果左右均为值，有一个非CHARS就都转为FLOATS
+    } else if (left_expr->value_type() != CHARS || right_expr->value_type() != CHARS) {
+      auto   left_value_expr  = static_cast<ValueExpr *>(left_expr);
+      auto   right_value_expr = static_cast<ValueExpr *>(right_expr);
+      Value &left_value       = left_value_expr->get_value();
+      Value &right_value      = right_value_expr->get_value();
+      if (!left_value.type_cast(FLOATS) || !right_value.type_cast(FLOATS)) {
         return RC::FAILURE;
       }
     }
+    // 左边字段，右边字段
+  } else if (left_expr->type() == ExprType::FIELD && right_expr->type() == ExprType::FIELD) {
+    sql_debug(
+        "Compared Fields type dismatch %s with %s",
+        attr_type_to_string(left_expr->value_type()),
+        attr_type_to_string(right_expr->value_type())
+    );
+    // 左边值，右边字段
   } else {
-    // 左侧为域，右侧为域
-    if (filter_unit->right().is_attr && filter_unit->right().is_attr) {
-      if (filter_unit->right().field.attr_type() != filter_unit->left().field.attr_type()) {
-        LOG_WARN(
-            "Compared Fields type dismatch %s with %s",
-            attr_type_to_string(filter_unit->left().field.attr_type()),
-            attr_type_to_string(filter_unit->right().field.attr_type())
-        );
-      }
-    }
-    // 左侧为域，右侧为值
-    else if (filter_unit->left().is_attr && !filter_unit->right().is_attr) {
-      // status:1
-      if (filter_unit->left().field.attr_type() != CHARS) {
-        Value   *right_chg = const_cast<Value *>(&filter_unit->right().value);
-        AttrType tar       = right_chg->attr_type() == INTS ? INTS : FLOATS;
-        if (!right_chg->type_cast(tar)) {
-          return RC::FAILURE;
-        }
-      }  // status:2
-      else if (filter_unit->right().value.attr_type() == FLOATS || filter_unit->right().value.attr_type() == INTS) {
-        Value *right_chg = const_cast<Value *>(&filter_unit->right().value);
-        // uniform to float for the higher precision
-        if (!right_chg->type_cast(FLOATS)) {
-          return RC::FAILURE;
-        }
-      }
-    }
+    sql_debug("Unimplemented");
   }
+
   return rc;
 }

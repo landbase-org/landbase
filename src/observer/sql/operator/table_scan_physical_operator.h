@@ -30,7 +30,7 @@ class TableScanPhysicalOperator : public PhysicalOperator
 public:
   TableScanPhysicalOperator(Table *table, bool readonly) : table_(table), readonly_(readonly) {}
 
-  virtual ~TableScanPhysicalOperator()
+  ~TableScanPhysicalOperator() override
   {
     for (auto i : tuples_)
       delete i;

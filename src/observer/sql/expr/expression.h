@@ -17,8 +17,10 @@ See the Mulan PSL v2 for more details. */
 #include <memory>
 #include <string.h>
 #include <string>
+#include <unordered_set>
 
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
 #include "storage/field/field.h"
@@ -44,6 +46,10 @@ enum class ExprType
   COMPARISON,   ///< 需要做比较的表达式
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
+  IN,
+  EXIST,
+  VALUELIST,
+  SUBQUERY,
 };
 
 /**
@@ -156,6 +162,10 @@ public:
   void get_value(Value &value) const { value = value_; }
 
   const Value &get_value() const { return value_; }
+
+  auto &get_value() { return value_; }
+
+  bool is_null() const { return value_.is_null(); }
 
 private:
   Value value_;
@@ -299,6 +309,71 @@ private:
 
 private:
   Type                        arithmetic_type_;
+  std::unique_ptr<Expression> left_;
+  std::unique_ptr<Expression> right_;
+};
+
+class ValueListExpr : public Expression
+{
+public:
+  ValueListExpr(const std::vector<Value> &value_list) : value_list_(value_list) {}
+  ExprType type() const override { return ExprType::VALUELIST; }
+  AttrType value_type() const override { return value_list_.front().attr_type(); }
+  RC       get_value(const Tuple &tuple, Value &value) const override { return try_get_value(value); }
+  RC       try_get_value(Value &value) const override
+  {
+    if (value_list_.size() == 1) {
+      value = value_list_.front();
+      return RC::SUCCESS;
+    }
+    sql_debug("ValueListExpr::value_list_ size is %d", value_list_.size());
+    return RC::FAILURE;
+  }
+
+public:
+  auto &value_list() const { return value_list_; }
+  auto &value_list() { return value_list_; }
+  bool  contains(const Value &value) const
+  {
+    return std::find(value_list_.begin(), value_list_.end(), value) != value_list_.end();
+  }
+
+protected:
+  std::vector<Value> value_list_;
+};
+
+/**
+ * @brief In 表达式
+ * @ingroup Expression
+ * left_ : FieldExpr, ValueExpr, 返回一个值的SubQueryExor, 和返回一个值的ValueListExpr
+ * right_: SubQueryExpr, ValueListExpr
+ */
+class InExpr : public Expression
+{
+public:
+  InExpr(std::unique_ptr<Expression> left, std::unique_ptr<Expression> right)
+      : left_(std::move(left)),
+        right_(std::move(right))
+  {}
+  ExprType type() const override { return ExprType::IN; }
+  AttrType value_type() const override { return BOOLEANS; }
+  RC       get_value(const Tuple &tuple, Value &value) const override
+  {
+    Value left_value;
+
+    RC rc = left_->get_value(tuple, left_value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+      return rc;
+    }
+
+    auto right_expr = static_cast<ValueListExpr *>(right_.get());
+    bool bool_value = right_expr->contains(left_value);
+    value.set_boolean(bool_value);
+    return rc;
+  }
+
+private:
   std::unique_ptr<Expression> left_;
   std::unique_ptr<Expression> right_;
 };

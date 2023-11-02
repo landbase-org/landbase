@@ -56,6 +56,7 @@ public:
 
   Value(const Value &other)            = default;
   Value &operator=(const Value &other) = default;
+  bool operator==(const Value &other) const;
 
   void        set_type(AttrType type) { this->attr_type_ = type; }
   void        set_data(char *data, int length);
