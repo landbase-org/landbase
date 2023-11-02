@@ -223,7 +223,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       } break;
       case IN:
       case NOT_IN: {
-        expr = new InExpr(std::move(left), std::move(right));
+        expr = new InExpr(std::move(left), filter_unit->comp(), std::move(right));
       } break;
       case EXIST:
       case NOT_EXIST: {

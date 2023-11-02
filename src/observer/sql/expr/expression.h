@@ -351,8 +351,9 @@ protected:
 class InExpr : public Expression
 {
 public:
-  InExpr(std::unique_ptr<Expression> left, std::unique_ptr<Expression> right)
+  InExpr(std::unique_ptr<Expression> left, CompOp comp, std::unique_ptr<Expression> right)
       : left_(std::move(left)),
+        comp_(comp),
         right_(std::move(right))
   {}
   ExprType type() const override { return ExprType::IN; }
@@ -369,11 +370,15 @@ public:
 
     auto right_expr = static_cast<ValueListExpr *>(right_.get());
     bool bool_value = right_expr->contains(left_value);
+    if (comp_ == CompOp::NOT_IN) {
+      bool_value = !bool_value;
+    }
     value.set_boolean(bool_value);
     return rc;
   }
 
 private:
+  CompOp                      comp_;
   std::unique_ptr<Expression> left_;
   std::unique_ptr<Expression> right_;
 };
