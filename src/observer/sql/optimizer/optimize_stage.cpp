@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "event/sql_event.h"
 #include "optimize_stage.h"
+#include "sql/expr/sub_query_expr.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/stmt/stmt.h"
 
@@ -55,6 +56,43 @@ RC OptimizeStage::handle_request(SQLStageEvent *sql_event)
 
   sql_event->set_operator(std::move(physical_operator));
 
+  return rc;
+}
+
+RC OptimizeStage::handle_expr(Expression *expr)
+{
+  ASSERT(expr->type() == ExprType::SUBQUERY, "only subquery expression is supported now.");
+  auto *subquery_expr = static_cast<SubQueryExpr *>(expr);
+
+  unique_ptr<LogicalOperator> logical_operator;
+
+  RC rc = logical_plan_generator_.create(subquery_expr->stmt(), logical_operator);
+  if (rc != RC::SUCCESS) {
+    if (rc != RC::UNIMPLENMENT) {
+      LOG_WARN("failed to create logical plan. rc=%s", strrc(rc));
+    }
+    return rc;
+  }
+
+  rc = rewrite(logical_operator);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to rewrite plan. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  rc = optimize(logical_operator);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to optimize plan. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  unique_ptr<PhysicalOperator> physical_operator;
+  rc = generate_physical_plan(logical_operator, physical_operator);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to generate physical plan. rc=%s", strrc(rc));
+    return rc;
+  }
+  subquery_expr->set_operator(std::move(physical_operator));
   return rc;
 }
 

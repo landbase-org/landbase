@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/predicate_physical_operator.h"
 #include "common/log/log.h"
+#include "sql/expr/sub_query_expr.h"
 #include "sql/stmt/filter_stmt.h"
 #include "storage/field/field.h"
 #include "storage/record/record.h"
@@ -30,7 +31,53 @@ RC PredicatePhysicalOperator::open(Trx *trx)
     return RC::INTERNAL;
   }
 
-  return children_[0]->open(trx);
+  RC rc = children_[0]->open(trx);
+
+  switch (expression_->type()) {
+    case ExprType::CONJUNCTION: {
+      // TODO: 假设CONJUNCTION的children内没有CONJUNCTION
+      auto  conjunction_expr = static_cast<ConjunctionExpr *>(expression_.get());
+      auto &children         = conjunction_expr->children();
+      for (auto &child : children) {
+        if (child->type() == ExprType::SUBQUERY) {
+          auto subquery_expr = static_cast<SubQueryExpr *>(child.get());
+          rc                 = subquery_expr->executor(trx);
+          if (rc != RC::SUCCESS) {
+            sql_debug("failed to execute subquery expression");
+            return rc;
+          }
+        }
+      }
+    } break;
+    case ExprType::IN: {
+      auto  in_expr    = static_cast<InExpr *>(expression_.get());
+      auto &left_expr  = in_expr->right();
+      auto &right_expr = in_expr->right();
+      if (left_expr->type() == ExprType::SUBQUERY) {
+        auto subquery_expr = static_cast<SubQueryExpr *>(left_expr.get());
+        rc                 = subquery_expr->executor(trx);
+        if (rc != RC::SUCCESS) {
+          sql_debug("failed to execute subquery expression");
+          return rc;
+        }
+      }
+      if (right_expr->type() == ExprType::SUBQUERY) {
+        auto subquery_expr = static_cast<SubQueryExpr *>(right_expr.get());
+        rc                 = subquery_expr->executor(trx);
+        if (rc != RC::SUCCESS) {
+          sql_debug("failed to execute subquery expression");
+          return rc;
+        }
+      }
+    } break;
+    case ExprType::EXIST: {
+      sql_debug("uninplemented Exist");
+    } break;
+    default: {
+      sql_debug("uninplemented ExprType");
+    } break;
+  }
+  return rc;
 }
 
 RC PredicatePhysicalOperator::next()

@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/optimizer/logical_plan_generator.h"
 
+#include "sql/expr/sub_query_expr.h"
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
 #include "sql/operator/explain_logical_operator.h"
@@ -178,7 +179,9 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
         left          = unique_ptr<Expression>(new ValueListExpr(tmp_expr->value_list()));
       } break;
       case ExprType::SUBQUERY: {
-        sql_debug("unimplement expr: subquery");
+        auto tmp_expr = static_cast<const SubQueryExpr *>(filter_unit_left);
+        auto new_stmt = new SelectStmt(*tmp_expr->stmt());
+        left          = unique_ptr<Expression>(new SubQueryExpr(new_stmt));
       } break;
       default: {
         sql_debug("unimplement expr: %d", filter_unit_left->type());
@@ -200,7 +203,9 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
         right         = unique_ptr<Expression>(new ValueListExpr(tmp_expr->value_list()));
       } break;
       case ExprType::SUBQUERY: {
-        sql_debug("unimplement expr: subquery");
+        auto tmp_expr = static_cast<const SubQueryExpr *>(filter_unit_right);
+        auto new_stmt = new SelectStmt(*tmp_expr->stmt());
+        right         = unique_ptr<Expression>(new SubQueryExpr(new_stmt));
       } break;
       default: {
         sql_debug("unimplement expr: %d", filter_unit_left->type());

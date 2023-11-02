@@ -335,7 +335,7 @@ public:
   ParseExprType expr_type() { return ParseExprType::SUBQUERY; }
 
 public:
-  auto &sub_query() { return sub_query_; }
+  auto &sub_query() const { return sub_query_; }
 
 private:
   std::unique_ptr<SelectSqlNode> sub_query_ = nullptr;

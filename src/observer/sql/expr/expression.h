@@ -316,6 +316,7 @@ private:
 class ValueListExpr : public Expression
 {
 public:
+  ValueListExpr() = default;
   ValueListExpr(const std::vector<Value> &value_list) : value_list_(value_list) {}
   ExprType type() const override { return ExprType::VALUELIST; }
   AttrType value_type() const override { return value_list_.front().attr_type(); }
@@ -376,6 +377,9 @@ public:
     value.set_boolean(bool_value);
     return rc;
   }
+
+  auto &left() { return left_; }
+  auto &right() { return right_; }
 
 private:
   CompOp                      comp_;

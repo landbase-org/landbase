@@ -17,8 +17,10 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "common/rc.h"
 #include "sql/expr/expression.h"
+#include "sql/expr/sub_query_expr.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
+#include "sql/stmt/select_stmt.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 
@@ -122,6 +124,15 @@ RC FilterStmt::create_filter_unit(
       left_expr            = new ValueListExpr(value_list_expr->value_list());
     } break;
     case ParseExprType::SUBQUERY: {
+      auto  sub_query_expr = static_cast<const ParseSubQueryExpr *>(condition.left);
+      Stmt *stmt           = nullptr;
+      rc                   = SelectStmt::create(db, *sub_query_expr->sub_query(), stmt);
+      if (rc != RC::SUCCESS) {
+        sql_debug("create sub query select stmt failed");
+        return rc;
+      }
+      auto select_stmt = static_cast<SelectStmt *>(stmt);
+      left_expr        = new SubQueryExpr(select_stmt);
     } break;
     default: {
     } break;
@@ -155,6 +166,15 @@ RC FilterStmt::create_filter_unit(
       right_expr           = new ValueListExpr(value_list_expr->value_list());
     } break;
     case ParseExprType::SUBQUERY: {
+      auto  sub_query_expr = static_cast<const ParseSubQueryExpr *>(condition.right);
+      Stmt *stmt           = nullptr;
+      rc                   = SelectStmt::create(db, *sub_query_expr->sub_query(), stmt);
+      if (rc != RC::SUCCESS) {
+        sql_debug("create sub query select stmt failed");
+        return rc;
+      }
+      auto select_stmt = static_cast<SelectStmt *>(stmt);
+      right_expr       = new SubQueryExpr(select_stmt);
     } break;
     default: {
     } break;

@@ -1,25 +1,77 @@
 #pragma once
 #include "sql/expr/expression.h"
 #include "sql/operator/physical_operator.h"
+#include "sql/optimizer/optimize_stage.h"
+#include "sql/stmt/select_stmt.h"
+#include "sql/stmt/stmt.h"
 
 class SubQueryExpr : public ValueListExpr
 {
 public:
-  ExprType type() const override { return ExprType::SUBQUERY; }
-  AttrType value_type() const override { return value_list_.front().attr_type(); }
-  RC       try_get_value(Value &value) const override
+  SubQueryExpr(SelectStmt *stmt) : stmt_(stmt) {}
+  ~SubQueryExpr() override
   {
-    if (value_list_.size() == 1) {
-      value = value_list_.front();
-      return RC::SUCCESS;
+    if (physical_operator_ != nullptr) {
+      physical_operator_->close();
     }
-    sql_debug("ValueListExpr::value_list_ size is %d", value_list_.size());
-    return RC::FAILURE;
+    if (stmt_ != nullptr) {
+      delete stmt_;
+      stmt_ = nullptr;
+    }
   }
-  RC executor(Trx *trx) { sql_debug("unimplemented"); }
+  AttrType value_type() const override
+  {
+    auto select_stmt = static_cast<const SelectStmt *>(stmt_);
+    return select_stmt->query_fields().front().attr_type();
+  }
+  ExprType type() const override { return ExprType::SUBQUERY; }
+  RC       executor(Trx *trx)
+  {
+    trx_ = trx;
+    OptimizeStage optimize_stage;
+    auto          rc = optimize_stage.handle_expr(this);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to handle expr. rc=%s", strrc(rc));
+      return rc;
+    }
+    rc = physical_operator_->open(trx);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to open physical operator. rc=%s", strrc(rc));
+      return rc;
+    }
+    do {
+      rc = physical_operator_->next();
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to next physical operator. rc=%s", strrc(rc));
+        return rc;
+      }
+      Tuple *tuple = physical_operator_->current_tuple();
+      // TODO: 现在报错其实是早了
+      // update user set name = (select name from user where id = 1) where id = 2;
+      // 如果where id = 2 没有返回值，即使子查询返回多个值也不报错。
+      if (tuple->cell_num() != 1) {
+        LOG_WARN("invalid tuple cell num. cell_num=%d", tuple->cell_num());
+        return RC::INTERNAL;
+      }
+      Value value;
+      rc = tuple->cell_at(0, value);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to get cell. rc=%s", strrc(rc));
+        return rc;
+      }
+      value_list_.push_back(value);
+    } while (rc == RC::SUCCESS);
+
+    finished = true;
+    return RC::SUCCESS;
+  }
+
+  auto stmt() const { return stmt_; }
+  void set_operator(std::unique_ptr<PhysicalOperator> oper) { physical_operator_ = std::move(oper); }
 
 private:
   Trx                              *trx_;
   bool                              finished = false;
+  SelectStmt                       *stmt_;
   std::unique_ptr<PhysicalOperator> physical_operator_;
 };
