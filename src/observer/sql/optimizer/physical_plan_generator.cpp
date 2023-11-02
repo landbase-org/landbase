@@ -200,7 +200,6 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
     oper = unique_ptr<PhysicalOperator>(index_scan_oper);
     LOG_TRACE("use index scan");
   } else {
-    // TODO AGGREGATION算子实现
     auto table_scan_oper = new TableScanPhysicalOperator(table, table_get_oper.readonly());
     table_scan_oper->set_predicates(std::move(predicates));
     oper = unique_ptr<PhysicalOperator>(table_scan_oper);
@@ -404,8 +403,9 @@ RC PhysicalPlanGenerator::create_plan(OrderLogicalOperator &orderby_oper, std::u
       LOG_WARN("failed to create order physical operator's child physical operator. rc=%s", strrc(rc));
       return rc;
     }
-    if (child_phy_oper)
+    if (child_phy_oper) {
       order_phy_oper->add_child(std::move(child_phy_oper));
+    }
   }
 
   oper = std::move(order_phy_oper);

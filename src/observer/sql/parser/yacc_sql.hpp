@@ -116,9 +116,8 @@ extern int yydebug;
     NUMBER = 317,                  /* NUMBER  */
     FLOAT = 318,                   /* FLOAT  */
     ID = 319,                      /* ID  */
-    AGGRE_ATTR = 320,              /* AGGRE_ATTR  */
-    SSS = 321,                     /* SSS  */
-    UMINUS = 322                   /* UMINUS  */
+    SSS = 320,                     /* SSS  */
+    UMINUS = 321                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -135,8 +134,11 @@ union YYSTYPE
   enum CompOp                       comp;
   enum AggreType                    aggre_type;
   enum OrderType                    order_type;
-  AggreTypeNode *                   aggre_node;
+  AggreSqlNode *                    aggre_node;
+  std::vector<AggreSqlNode> *       aggre_node_list;
+  std::vector<AggreSqlNode> *       aggre_node_list_opt;  // opt表示可以选择，可以有也可以没有
   RelAttrSqlNode *                  rel_attr;
+  std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
@@ -148,7 +150,6 @@ union YYSTYPE
   std::vector<std::string> *        id_list;
   std::pair<std::vector<std::string>, std::vector<Value>> * update_list;
   std::vector<ConditionSqlNode> *   condition_list;
-  std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<std::string> *        relation_list;
   std::vector<std::string> *        aggre_attr_list;
   std::vector<JoinSqlNode> *        join_list;
@@ -158,7 +159,7 @@ union YYSTYPE
   float                             floats;
   bool                              nullable;
 
-#line 162 "yacc_sql.hpp"
+#line 163 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

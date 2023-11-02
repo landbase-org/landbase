@@ -17,11 +17,16 @@ See the Mulan PSL v2 for more details. */
 #include <memory>
 #include <string.h>
 #include <string>
+#include <unordered_map>
 
+#include "common/lang/string.h"
 #include "common/log/log.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
+#include "storage/db/db.h"
 #include "storage/field/field.h"
+#include "storage/field/field_meta.h"
+#include "storage/table/table.h"
 
 class Tuple;
 
@@ -29,22 +34,6 @@ class Tuple;
  * @defgroup Expression
  * @brief 表达式
  */
-
-/**
- * @brief 表达式类型
- * @ingroup Expression
- */
-enum class ExprType
-{
-  NONE,
-  STAR,         ///< 星号，表示所有字段
-  FIELD,        ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
-  VALUE,        ///< 常量值
-  CAST,         ///< 需要做类型转换的表达式
-  COMPARISON,   ///< 需要做比较的表达式
-  CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
-  ARITHMETIC,   ///< 算术运算
-};
 
 /**
  * @brief 表达式的抽象描述
@@ -89,8 +78,18 @@ public:
   /**
    * @brief 表达式的名字，比如是字段名称，或者用户在执行SQL语句时输入的内容
    */
-  virtual std::string name() const { return name_; }
+  virtual std::string name() const { return name_; }  // 这里是输出结果显示的table_name
   virtual void        set_name(std::string name) { name_ = name; }
+
+  /**
+   * @brief 创建表达式
+   * @details 根据sql_node的类型选择（aggregation, ...) 创建不同的expresson
+   * 此处的sql_node可能为 RelAttrSqlNode， AggreSqlNode ...
+   */
+  static RC create(
+      const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map,
+      const std::vector<Table *> &tables, Expression *&res_expr, Db *db
+  );
 
 private:
   std::string name_;
@@ -125,6 +124,22 @@ public:
   RC get_value(const Tuple &tuple, Value &value) const override;
 
   bool is_null(char *data) const;
+
+  /**
+   * 用于初始化field_meta的时候， 例如rel.attr, rel.*, *, attr的情况
+   */
+  static RC create(
+      const std::vector<RelAttrSqlNode> &nodes, const std::unordered_map<std::string, Table *> &table_map,
+      const std::vector<Table *> &tables, std::vector<Expression *> &res_expr, Db *db
+  );
+
+  /**
+   * 用于知道rel_attr的情况下构建对应的FieldExpr;
+   */
+  static RC create(
+      const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map,
+      const std::vector<Table *> &tables, Expression *&res_expr
+  );
 
 private:
   Field field_;
@@ -301,4 +316,44 @@ private:
   Type                        arithmetic_type_;
   std::unique_ptr<Expression> left_;
   std::unique_ptr<Expression> right_;
+};
+
+class AggreExpression : public Expression
+{
+public:
+  AggreExpression() = default;
+  AggreExpression(AggreType type, const FieldExpr *field) : type_(type), field_(field) {}
+  virtual ~AggreExpression() = default;
+
+public:
+  // 关于ValueExpr 和 FieldExpr的获取的复制
+  void             set_param_value(const ValueExpr *value) { value_ = value; }
+  const ValueExpr *get_param_value() const { return value_; }
+  bool             has_param_value() const { return nullptr != value_; }
+
+  const Field     &field() const { return field_->field(); }
+  const FieldExpr &fieldexpr() const { return *field_; }
+
+  const char *table_name() const { return field_->table_name(); }
+  const char *field_name() const { return field_->field_name(); }
+  AggreType   get_aggre_type() const { return type_; }
+  std::string get_aggre_type_str() const { return aggreType2str(type_); };
+  AttrType    get_return_value_type() const;
+
+public:
+  AttrType value_type() const override { return value_->value_type(); };
+  ExprType type() const override { return ExprType::AGGREGATION; }
+  RC       get_value(const Tuple &tuple, Value &value) const override { return RC::SUCCESS; }
+
+public:
+  static void get_aggre_expression(Expression *expr, std::vector<AggreExpression *> &aggrfunc_exprs);
+  static RC   create(
+        const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map,
+        const std::vector<Table *> &tables, Expression *&res_expr, Db *db = nullptr
+    );
+
+private:
+  AggreType        type_;
+  const FieldExpr *field_ = nullptr;
+  const ValueExpr *value_ = nullptr;  // 用来存储COUNT（attr）的值
 };

@@ -26,6 +26,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/comp_op.h"
 #include "sql/parser/value.h"
 
+class ExprNode;
 class Expression;
 
 /**
@@ -37,9 +38,9 @@ class Expression;
  */
 enum OrderType
 {
-  NONE,  // 无ORDER要求
-  ORDER_ASC,   // 升序
-  ORDER_DESC   // 降序
+  NONE,       // 无ORDER要求
+  ORDER_ASC,  // 升序
+  ORDER_DESC  // 降序
 };
 
 /**
@@ -250,14 +251,6 @@ private:
   float  f_max{FLT_MIN};
   float  f_min{FLT_MAX};
 };
-/**
- * @description: aggretion 节点
- */
-struct AggreTypeNode
-{
-  std::vector<std::string> attribute_names;         ///< 可能是多个字段
-  AggreType                aggre_type{AGGRE_NONE};  ///< 聚合类型
-};
 
 /**
  * @brief 描述一个属性
@@ -268,9 +261,17 @@ struct AggreTypeNode
  */
 struct RelAttrSqlNode
 {
-  std::string   relation_name;   ///< relation name (may be NULL) 表名
-  std::string   attribute_name;  ///< attribute name              属性名
-  AggreTypeNode aggretion_node;
+  std::string relation_name;   ///< relation name (may be NULL) 表名
+  std::string attribute_name;  ///< attribute name              属性名
+};
+
+/**
+ * @description: aggretion 节点
+ */
+struct AggreSqlNode
+{
+  RelAttrSqlNode attribute_name;          ///< 查询的字段
+  AggreType      aggre_type{AGGRE_NONE};  ///< 聚合类型
 };
 
 /**
@@ -323,11 +324,12 @@ struct OrderSqlNode
 
 struct SelectSqlNode
 {
-  std::vector<RelAttrSqlNode>   attributes;  ///< attributes in select clause
-  std::vector<std::string>      relations;   ///< 查询的表
-  std::vector<ConditionSqlNode> conditions;  ///< 查询条件，使用AND串联起来多个条件
-  std::vector<JoinSqlNode>      joinctions;  ///< Join-list
-  std::vector<OrderSqlNode>     orders;      ///< Order-requirements
+  std::vector<RelAttrSqlNode>   attributes;    ///< attributes in select clause
+  std::vector<AggreSqlNode>     aggregations;  ///< aggregations
+  std::vector<std::string>      relations;     ///< 查询的表
+  std::vector<ConditionSqlNode> conditions;    ///< 查询条件，使用AND串联起来多个条件
+  std::vector<JoinSqlNode>      joinctions;    ///< Join-list
+  std::vector<OrderSqlNode>     orders;        ///< Order-requirements
 };
 
 /**
@@ -499,6 +501,33 @@ struct ErrorSqlNode
   std::string error_msg;
   int         line;
   int         column;
+};
+
+////////////////////// !expresion///
+/**
+ * @brief 表达式类型
+ * @ingroup Expression
+ */
+enum class ExprType
+{
+  NONE,
+  STAR,         ///< 星号，表示所有字段
+  FIELD,        ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
+  VALUE,        ///< 常量值
+  CAST,         ///< 需要做类型转换的表达式
+  COMPARISON,   ///< 需要做比较的表达式
+  CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
+  ARITHMETIC,   ///< 算术运算
+  AGGREGATION,  ///< 聚合运算
+};
+struct ExprNode
+{
+  explicit ExprNode() = default;
+  ExprNode(AggreSqlNode aggre) : aggre_(aggre), type_(ExprType::AGGREGATION) {}
+  ExprNode(RelAttrSqlNode rel_attr) : rel_attr_(rel_attr), type_(ExprType::FIELD) {}
+  AggreSqlNode   aggre_;
+  RelAttrSqlNode rel_attr_;
+  ExprType       type_;
 };
 
 /**

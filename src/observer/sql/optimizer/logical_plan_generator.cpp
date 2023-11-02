@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/optimizer/logical_plan_generator.h"
 
+#include "sql/expr/expression.h"
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
 #include "sql/operator/explain_logical_operator.h"
@@ -34,6 +35,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/stmt.h"
 #include "sql/stmt/update_stmt.h"
+#include "storage/field/field.h"
+#include <utility>
 
 using std::unique_ptr;
 
@@ -86,10 +89,20 @@ RC LogicalPlanGenerator::create_plan(CalcStmt *calc_stmt, std::unique_ptr<Logica
 // select stmt的逻辑计划生成器
 RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  unique_ptr<LogicalOperator> table_oper(nullptr);
+  // Project -> (Orderby) -> (predicate) -> table_scan
+  // 因为是从根节点开始执行， 所以执行的顺序是从table_scan开始
+  unique_ptr<LogicalOperator> root_oper(nullptr);  // 根
 
-  const std::vector<Table *> &tables     = select_stmt->tables();
-  const std::vector<Field>   &all_fields = select_stmt->query_fields();
+  // 创建table_scan算子
+  unique_ptr<LogicalOperator> table_oper(nullptr);
+  const std::vector<Table *> &tables      = select_stmt->tables();
+  auto                        expressions = select_stmt->expressions();
+  std::vector<Field>          all_fields;
+  std::for_each(expressions.begin(), expressions.end(), [&all_fields](const Expression *expr) {
+    if (auto x = dynamic_cast<const FieldExpr *>(expr)) {
+      all_fields.push_back(x->field());
+    }
+  });
 
   for (Table *table : tables) {
     // 找到当前table所对应的列
@@ -100,6 +113,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
       }
     }
 
+    // 从表中获取数据的算子
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, true /*readonly*/));
     if (table_oper == nullptr) {
       table_oper = std::move(table_get_oper);
@@ -110,47 +124,36 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
       table_oper = unique_ptr<LogicalOperator>(join_oper);
     }
   }
+  root_oper = std::move(table_oper);
 
+  // 创建filter算子
   unique_ptr<LogicalOperator> predicate_oper;
   RC                          rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
     return rc;
   }
+  if (predicate_oper) {  // 将(root_oper)table_oper插入作为predicate_oper的子结点然后再更新root_oper
+    predicate_oper->add_child(std::move(root_oper));
+    root_oper = std::move(predicate_oper);
+  }
 
+  // 创建order算子
   unique_ptr<LogicalOperator> orderby_oper;
   rc = create_plan(select_stmt->order_by_stmt(), orderby_oper);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create order logical plan. rc=%s", strrc(rc));
     return rc;
   }
-
-  unique_ptr<LogicalOperator> project_oper(new ProjectLogicalOperator(all_fields));
-  // Project -> (Orderby) -> (predicate) -> table_scan
   if (orderby_oper) {
-    if (predicate_oper) {
-      if (table_oper) {
-        predicate_oper->add_child(std::move(table_oper));
-      }
-      orderby_oper->add_child(std::move(predicate_oper));
-    } else {
-      if (table_oper) {
-        orderby_oper->add_child(std::move(table_oper));
-      }
-    }
-    project_oper->add_child(std::move(orderby_oper));
-  } else {
-    if (predicate_oper) {
-      if (table_oper) {
-        predicate_oper->add_child(std::move(table_oper));
-      }
-      project_oper->add_child(std::move(predicate_oper));
-    } else {
-      if (table_oper) {
-        project_oper->add_child(std::move(table_oper));
-      }
-    }
+    orderby_oper->add_child(std::move(root_oper));
+    root_oper = std::move(orderby_oper);
   }
+
+  // 生成project算子
+  unique_ptr<LogicalOperator> project_oper(new ProjectLogicalOperator(all_fields));
+  project_oper->add_child(std::move(root_oper));
+
   logical_operator.swap(project_oper);
   return RC::SUCCESS;
 }
