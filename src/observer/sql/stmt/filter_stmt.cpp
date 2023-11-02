@@ -55,28 +55,28 @@ RC FilterStmt::create(
 }
 
 RC get_table_and_field(
-    Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables, const RelAttrSqlNode &attr,
+    Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables, const ParseFieldExpr *field_expr,
     Table *&table, const FieldMeta *&field
 )
 {
-  if (common::is_blank(attr.relation_name.c_str())) {
+  if (common::is_blank(field_expr->table_name().c_str())) {
     table = default_table;
   } else if (nullptr != tables) {
-    auto iter = tables->find(attr.relation_name);
+    auto iter = tables->find(field_expr->table_name().c_str());
     if (iter != tables->end()) {
       table = iter->second;
     }
   } else {
-    table = db->find_table(attr.relation_name.c_str());
+    table = db->find_table(field_expr->table_name().c_str());
   }
   if (nullptr == table) {
-    LOG_WARN("No such table: attr.relation_name: %s", attr.relation_name.c_str());
+    LOG_WARN("No such table: attr.relation_name: %s", field_expr->table_name().c_str());
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  field = table->table_meta().field(attr.attribute_name.c_str());
+  field = table->table_meta().field(field_expr->field_name().c_str());
   if (nullptr == field) {
-    LOG_WARN("no such field in table: table %s, field %s", table->name(), attr.attribute_name.c_str());
+    LOG_WARN("no such field in table: table %s, field %s", table->name(), field_expr->field_name().c_str());
     table = nullptr;
     return RC::SCHEMA_FIELD_NOT_EXIST;
   }
@@ -99,38 +99,61 @@ RC FilterStmt::create_filter_unit(
 
   filter_unit = new FilterUnit;
 
-  if (condition.left_is_attr) {
-    Table           *table = nullptr;
-    const FieldMeta *field = nullptr;
-    rc                     = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("cannot find attr");
-      return rc;
-    }
-    FilterObj filter_obj;
-    filter_obj.init_attr(Field(table, field));
-    filter_unit->set_left(filter_obj);
-  } else {
-    FilterObj filter_obj;
-    filter_obj.init_value(condition.left_value);
-    filter_unit->set_left(filter_obj);
+  switch (condition.left->expr_type()) {
+    case ParseExprType::FIELD: {
+      Table           *table      = nullptr;
+      const FieldMeta *field      = nullptr;
+      auto             field_expr = static_cast<const ParseFieldExpr *>(condition.left);
+      rc                          = get_table_and_field(db, default_table, tables, field_expr, table, field);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot find attr");
+        return rc;
+      }
+      FilterObj filter_obj;
+      filter_obj.init_attr(Field(table, field));
+      filter_unit->set_left(filter_obj);
+    } break;
+    case ParseExprType::VALUE: {
+      FilterObj filter_obj;
+      auto      value_expr = static_cast<const ParseValueExpr *>(condition.left);
+      filter_obj.init_value(value_expr->value());
+      filter_unit->set_left(filter_obj);
+    } break;
+    case ParseExprType::VALUE_LIST: {
+    } break;
+    case ParseExprType::SUBQUERY: {
+    } break;
+    default: {
+    } break;
   }
 
-  if (condition.right_is_attr) {
-    Table           *table = nullptr;
-    const FieldMeta *field = nullptr;
-    rc                     = get_table_and_field(db, default_table, tables, condition.right_attr, table, field);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("cannot find attr");
-      return rc;
-    }
-    FilterObj filter_obj;
-    filter_obj.init_attr(Field(table, field));
-    filter_unit->set_right(filter_obj);
-  } else {
-    FilterObj filter_obj;
-    filter_obj.init_value(condition.right_value);
-    filter_unit->set_right(filter_obj);
+  switch (condition.right->expr_type()) {
+    case ParseExprType::FIELD: {
+      Table           *table      = nullptr;
+      const FieldMeta *field      = nullptr;
+      auto             field_expr = static_cast<const ParseFieldExpr *>(condition.right);
+      rc                          = get_table_and_field(db, default_table, tables, field_expr, table, field);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot find attr");
+        return rc;
+      }
+      FilterObj filter_obj;
+      filter_obj.init_attr(Field(table, field));
+      filter_unit->set_right(filter_obj);
+    } break;
+    case ParseExprType::VALUE: {
+      FilterObj filter_obj;
+      auto      value_expr = static_cast<const ParseValueExpr *>(condition.right);
+
+      filter_obj.init_value(value_expr->value());
+      filter_unit->set_right(filter_obj);
+    } break;
+    case ParseExprType::VALUE_LIST: {
+    } break;
+    case ParseExprType::SUBQUERY: {
+    } break;
+    default: {
+    } break;
   }
 
   filter_unit->set_comp(comp);

@@ -13,6 +13,7 @@
 #include "sql/parser/yacc_sql.hpp"
 #include "sql/parser/lex_sql.h"
 #include "sql/expr/expression.h"
+#include "sql/parser/parse_expr_defs.h"
 
 using namespace std;
 
@@ -114,6 +115,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         IS_ // 加 _ 是为了防止和comp_op冲突
         NOT
         LK
+        IN_OP
+        EXIST_OP
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -128,6 +131,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
+  ParseExpr *                       parse_expr;
   JoinSqlNode *                     join_node;
   OrderSqlNode *                    order_node;
   std::vector<Expression *> *       expression_list;
@@ -161,6 +165,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <value>               value
 %type <number>              number
 %type <comp>                comp_op
+%type <comp>                in_op
+%type <comp>                exist_op
 %type <aggre_type>          aggre_type
 %type <order_type>          order_type
 %type <rel_attr>            rel_attr_aggre
@@ -181,6 +187,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <aggre_attr_list>     aggre_attr_list
 %type <expression>          expression
 %type <expression_list>     expression_list
+%type <parse_expr>          parse_expr;
 %type <join_node>           join_node
 %type <join_list>           join_list
 %type <order_node>          order_node
@@ -760,6 +767,29 @@ rel_list:
     }
     ;
 
+parse_expr: 
+    value
+    {
+      $$ = new ParseValueExpr(*$1);
+      delete $1;
+    }
+    | rel_attr
+    {
+      std::string &table_name = $1->relation_name;
+      std::string &field_name = $1->attribute_name;
+      $$ = new ParseFieldExpr(table_name,field_name);
+      delete $1;
+    }
+    | LBRACE select_stmt RBRACE
+    {
+      $$ = new ParseSubQueryExpr($2->selection);
+    }
+    | LBRACE value_list RBRACE 
+    {
+      $$ = new ParseValueListExpr(*$2);
+      delete $2;
+    }
+
 where:
     /* empty */
     {
@@ -767,6 +797,11 @@ where:
     }
     | WHERE condition_list {
       $$ = $2;
+    }
+    | WHERE exist_op parse_expr
+    {
+      $$ = new std::vector<ConditionSqlNode>;
+      $$->emplace_back(ConditionSqlNode{nullptr,$2,$3});
     }
     ;
 condition_list:
@@ -786,53 +821,23 @@ condition_list:
     }
     ;
 condition:
-    rel_attr comp_op value
+    parse_expr comp_op parse_expr
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
+      $$->left = $1;
+
       $$->comp = $2;
 
-      delete $1;
-      delete $3;
+      $$->right = $3;
     }
-    | value comp_op value 
+    | parse_expr in_op parse_expr
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
+      $$->left = $1;
+
       $$->comp = $2;
 
-      delete $1;
-      delete $3;
-    }
-    | rel_attr comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | value comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
+      $$->right = $3;
     }
     ;
 
@@ -902,6 +907,15 @@ comp_op:
     | IS_ { $$ = IS;}
     | IS_ NOT { $$ = IS_NOT;}
     ;
+
+in_op:
+      IN_OP {$$ = IN;}
+    | NOT IN_OP {$$ = NOT_IN;}
+    ;
+
+exist_op:
+      EXIST_OP {$$ = EXIST;}
+    | NOT EXIST_OP {$$ = NOT_EXIST;}
 
 aggre_type:
       SUM   { $$ = AGGRE_SUM; }
