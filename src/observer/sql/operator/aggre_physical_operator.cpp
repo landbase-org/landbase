@@ -29,9 +29,9 @@ RC AggrePhysicalOperator::next()
 
   while (RC::SUCCESS == (rc = oper->next())) {
     tuple_.set_tuple(oper->current_tuple());  // 将当前列放在tuple_中
-    if (is_start_) {
+    if (!is_started_) {
       tuple_.do_aggregation_begin();
-      is_start_ = false;
+      is_started_ = true;
     }
 
     // 做聚合运算
@@ -40,7 +40,9 @@ RC AggrePhysicalOperator::next()
 
   if (RC::RECORD_EOF == rc) {
     is_record_eof = true;
-    tuple_.do_aggregation_end();
+    if (is_started_) {  // 如果没有开始则表名当前表为空表
+      tuple_.do_aggregation_end();
+    }
     return RC::SUCCESS;
   }
 

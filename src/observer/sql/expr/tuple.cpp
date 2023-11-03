@@ -20,7 +20,8 @@ RC AggregationTuple::cell_at(int index, Value &cell) const  // 在expressions_�
 RC AggregationTuple::find_cell(const TupleCellSpec &spec, Value &cell) const
 {
   if (nullptr == tuple_) {
-    return RC::TUPLE_NOT_EXIST;
+    LOG_INFO("empty table");
+    // return RC::TUPLE_NOT_EXIST;
   }
 
   // 当前只可能在aggre中找到

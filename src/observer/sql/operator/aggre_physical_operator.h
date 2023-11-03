@@ -34,7 +34,7 @@ public:
   Tuple               *current_tuple() override;
 
 private:
-  bool                                          is_start_{true};
+  bool                                          is_started_{false};
   bool                                          is_record_eof{false};
   std::vector<std::unique_ptr<AggreExpression>> aggre_exprs_;
   AggregationTuple                              tuple_;
