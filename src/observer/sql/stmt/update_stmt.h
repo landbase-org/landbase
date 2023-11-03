@@ -30,7 +30,7 @@ public:
   UpdateStmt() = default;
   UpdateStmt(
       Table *table, FilterStmt *filter_stmt, std::vector<const FieldMeta *> &field_meta,
-      std::vector<const Value *> &values
+      std::vector<std::unique_ptr<Expression>> &expr_list
   );
   ~UpdateStmt() override;
 
@@ -41,12 +41,13 @@ public:
   Table      *table() const { return table_; }
   FilterStmt *filter_stmt() { return filter_stmt_; }
   const auto &field_metas() const { return field_metas_; }
-  const auto &values() const { return values_; }
+  const auto &expr_list() const { return expr_list_; }
+  auto       &expr_list() { return expr_list_; }
   StmtType    type() const override { return StmtType::UPDATE; }
 
 private:
-  Table                         *table_ = nullptr;
-  std::vector<const FieldMeta *> field_metas_;
-  std::vector<const Value *>     values_;
-  FilterStmt                    *filter_stmt_ = nullptr;
+  Table                                   *table_ = nullptr;
+  std::vector<const FieldMeta *>           field_metas_;
+  std::vector<std::unique_ptr<Expression>> expr_list_;
+  FilterStmt                              *filter_stmt_ = nullptr;
 };

@@ -138,7 +138,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
   std::vector<std::string> *        id_list;
-  std::pair<std::vector<std::string>, std::vector<Value>> * update_list;
+  std::pair<std::vector<std::string>, std::vector<ParseExpr *>> * update_list;
   std::vector<ConditionSqlNode> *   condition_list;
   std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<std::string> *        relation_list;
@@ -518,7 +518,7 @@ update_stmt:      /*  update 语句的语法解析树*/
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
       $$->update.attr_list = $4->first;
-      $$->update.value_list = $4->second;
+      $$->update.expr_list = $4->second;
 
       if ($5 != nullptr) {
         $$->update.conditions.swap(*$5);
@@ -530,22 +530,20 @@ update_stmt:      /*  update 语句的语法解析树*/
     ;
 
 update_list:
-    ID EQ value
+    ID EQ parse_expr
     {
-      $$ = new std::pair<std::vector<std::string>, std::vector<Value>>;
+      $$ = new std::pair<std::vector<std::string>, std::vector<ParseExpr *>>;
       $$->first.emplace_back($1);
-      $$->second.emplace_back(*$3);
+      $$->second.emplace_back($3);
 
       delete $1;
-      delete $3;
     }
-    | update_list COMMA ID EQ value
+    | update_list COMMA ID EQ parse_expr
     {
       $$ = $1;
       $$->first.emplace_back($3);
-      $$->second.emplace_back(*$5);
+      $$->second.emplace_back($5);
       delete $3;
-      delete $5;
     }
     ;
 

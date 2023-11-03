@@ -13,16 +13,17 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/update_stmt.h"
+#include "sql/expr/sub_query_expr.h"
 #include "storage/db/db.h"
 
 UpdateStmt::UpdateStmt(
     Table *table, FilterStmt *filter_stmt, std::vector<const FieldMeta *> &field_meta,
-    std::vector<const Value *> &values
+    std::vector<std::unique_ptr<Expression>> &expr_list
 )
     : table_(table),
       filter_stmt_(filter_stmt),
       field_metas_(std::move(field_meta)),
-      values_(std::move(values))
+      expr_list_(std::move(expr_list))
 {}
 
 UpdateStmt::~UpdateStmt()
@@ -30,9 +31,6 @@ UpdateStmt::~UpdateStmt()
   if (filter_stmt_ != nullptr) {
     delete filter_stmt_;
     filter_stmt_ = nullptr;
-  }
-  for (auto &value : values_) {
-    delete value;
   }
 }
 
@@ -64,8 +62,13 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
   }
 
   // 检查字段和值的类型是否匹配
-  for (int i = 0; i < field_metas.size(); i++) {
-    if (update.value_list[i].is_null()) {
+  const auto size = field_metas.size();
+  for (int i = 0; i < size; i++) {
+    if (update.expr_list[i]->expr_type() != ParseExprType::VALUE) {
+      continue;
+    }
+    auto value_expr = static_cast<ParseValueExpr *>(update.expr_list[i]);
+    if (value_expr->is_null()) {
       if (field_metas[i]->nullable()) {
         continue;
       } else {
@@ -74,27 +77,51 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
       }
     }
 
-    if (field_metas[i]->type() != update.value_list[i].attr_type()) {
+    if (field_metas[i]->type() != value_expr->value_type()) {
       // 日期格式特殊处理
-      if (field_metas[i]->type() == DATES && update.value_list[i].attr_type() == CHARS) {
-        int32_t dataval = convert_string_to_date(update.value_list[i].data());
-        update.value_list[i].set_date(dataval);
+      if (field_metas[i]->type() == DATES && value_expr->value_type() == CHARS) {
+        auto   &value   = value_expr->value();
+        int32_t dateval = convert_string_to_date(value.data());
+        value.set_date(dateval);
         continue;
       }
       LOG_ERROR(
           "Fail to update %s, field type(%d) and value type(%d) mismatch",
           table->name(),
           field_metas[i]->type(),
-          update.value_list[i].attr_type()
+          value_expr->value_type()
       );
       return RC::INVALID_ARGUMENT;
     }
   }
 
-  // 新建 Value
-  std::vector<const Value *> values;
-  for (auto &attr : update.value_list) {
-    values.emplace_back(new Value(attr));
+  // 新建 expr_list
+  std::vector<std::unique_ptr<Expression>> expr_list;
+  for (auto &expr : update.expr_list) {
+    switch (expr->expr_type()) {
+      case ParseExprType::VALUE: {
+        auto value_expr = static_cast<ParseValueExpr *>(expr);
+        expr_list.emplace_back(new ValueExpr(value_expr->value()));
+      } break;
+      case ParseExprType::VALUE_LIST: {
+        auto value_list_expr = static_cast<ParseValueListExpr *>(expr);
+        expr_list.emplace_back(new ValueListExpr(value_list_expr->value_list()));
+      } break;
+      case ParseExprType::SUBQUERY: {
+        auto  sub_query_expr = static_cast<ParseSubQueryExpr *>(expr);
+        Stmt *stmt           = nullptr;
+        RC    rc             = SelectStmt::create(db, *sub_query_expr->sub_query(), stmt);
+        if (rc != RC::SUCCESS) {
+          sql_debug("create sub query select stmt failed");
+          return rc;
+        }
+        auto select_stmt = static_cast<SelectStmt *>(stmt);
+        expr_list.emplace_back(new SubQueryExpr(select_stmt));
+      } break;
+      default: {
+        sql_debug("invalid expr type: %d", expr->expr_type());
+      } break;
+    }
   }
 
   // 设置过滤条件
@@ -111,6 +138,6 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
   }
 
   // 新建 Stmt
-  stmt = new UpdateStmt(table, filter_stmt, field_metas, values);
+  stmt = new UpdateStmt(table, filter_stmt, field_metas, expr_list);
   return RC::SUCCESS;
 }
