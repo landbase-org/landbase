@@ -48,13 +48,12 @@ RC UpdatePhysicalOperator::open(Trx *trx)
         auto value_list_expr = static_cast<ValueListExpr *>(expr.get());
         auto value_list      = value_list_expr->value_list();
         if (value_list.empty()) {
-          invalid_sub_query_ = true;
-          value_list.emplace_back(Value());
+          this->value_list_.emplace_back(Value());
         } else if (value_list.size() != 1) {
           invalid_sub_query_ = true;
-          value_list_.emplace_back(value_list.front());
+          this->value_list_.emplace_back(value_list.front());
         } else {
-          value_list_.emplace_back(value_list.front());
+          this->value_list_.emplace_back(value_list.front());
         }
       } break;
       default: {
