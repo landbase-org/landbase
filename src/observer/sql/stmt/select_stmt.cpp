@@ -48,6 +48,7 @@ static RC get_expressions(
 {
   // TODO: 目前不支持 select count(1) from user;， 不过这个sql语法的意义到底是啥，没啥用
   // 如果只是普通的查询列表数据
+  RC rc = RC::SUCCESS;
   if (sql_node.attributes.size()) {
     return FieldExpr::create(sql_node.attributes, table_map, tables, res_expressions, db);
   }
@@ -60,11 +61,14 @@ static RC get_expressions(
 
   for (auto &expr_node : expr_nodes) {
     Expression *tmp_expression;
-    Expression::create(expr_node, table_map, tables, tmp_expression, db);
+    rc = Expression::create(expr_node, table_map, tables, tmp_expression, db);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("create expression err");
+      return rc;
+    }
     res_expressions.push_back(tmp_expression);
   }
-
-  return RC::SUCCESS;
+  return rc;
 }
 
 RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
@@ -117,11 +121,15 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // get the expression 聚合函数, 和查询的列在这里转化
   std::vector<Expression *> expressions;
   auto                      rc = get_expressions(select_sql, expressions, table_map, tables, db);
+
+  for (auto expr : expressions) {
+    if (auto x = dynamic_cast<AggreExpression *>(expr)) {
+      std::cout << x->field_name();
+    }
+  }
   if (rc != RC::SUCCESS) {
-    LOG_WARN("cannot construct filter stmt");
+    LOG_WARN("cannot parse express");
     return rc;
-  } else {
-    LOG_INFO("got %d tables in from stmt and %d fields in query stmt", tables.size(), expressions.size());
   }
 
   // ---------

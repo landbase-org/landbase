@@ -14,6 +14,8 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/project_physical_operator.h"
 #include "common/log/log.h"
+#include "sql/expr/expression.h"
+#include "storage/field/field_meta.h"
 #include "storage/record/record.h"
 #include "storage/table/table.h"
 
@@ -62,15 +64,17 @@ void ProjectPhysicalOperator::add_projection(const Table *table, const FieldMeta
   tuple_.add_cell_spec(spec);
 }
 
-void ProjectPhysicalOperator::add_projection(const Field &field)
+void ProjectPhysicalOperator::add_projection(const Expression *expr)
 {
   // 对单表来说，展示的(alias) 字段总是字段名称，
   // 对多表查询来说，展示的alias 需要带表名字
   TupleCellSpec *spec = nullptr;
-  if (field.aggre_type() == AGGRE_NONE) {
-    spec = new TupleCellSpec(field.table_name(), field.meta()->name());
-  } else {
-    spec = new TupleCellSpec(field.table_name(), field.meta()->name(), field.alias().c_str(), field.aggre_type());
+
+  if (auto x = dynamic_cast<const FieldExpr *>(expr)) {
+    spec = new TupleCellSpec(x->table_name(), x->field_name());
+  } else if (auto x = dynamic_cast<const AggreExpression *>(expr)) {
+    spec = new TupleCellSpec(x->table_name(), x->field_name());
   }
+
   tuple_.add_cell_spec(spec);
 }
