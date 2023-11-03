@@ -46,7 +46,6 @@ static RC get_expressions(
     const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables, Db *db
 )
 {
-  // TODO: 目前不支持 select count(1) from user;， 不过这个sql语法的意义到底是啥，没啥用
   // 如果只是普通的查询列表数据
   RC rc = RC::SUCCESS;
   if (sql_node.attributes.size()) {
@@ -121,12 +120,6 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // get the expression 聚合函数, 和查询的列在这里转化
   std::vector<Expression *> expressions;
   auto                      rc = get_expressions(select_sql, expressions, table_map, tables, db);
-
-  for (auto expr : expressions) {
-    if (auto x = dynamic_cast<AggreExpression *>(expr)) {
-      std::cout << x->field_name();
-    }
-  }
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot parse express");
     return rc;

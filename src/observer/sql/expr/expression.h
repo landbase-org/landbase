@@ -323,26 +323,9 @@ class AggreExpression : public Expression
 {
 public:
   AggreExpression() = default;
-  AggreExpression(AggreExpression &expr)
-  {
-    type_ = expr.type_;
-    if (expr.field_ != nullptr) {
-      field_ = new FieldExpr(expr.field_->field());
-    }
-    if (expr.value_ != nullptr) {
-      value_ = new ValueExpr(expr.value_->get_value());
-    }
-  }
+  AggreExpression(AggreExpression &expr);
   AggreExpression(AggreType type, const FieldExpr *field) : type_(type), field_(field) {}
-  virtual ~AggreExpression()
-  {
-    if (value_ != nullptr) {
-      delete value_;
-    }
-    if (field_ != nullptr) {
-      delete field_;
-    }
-  };
+  virtual ~AggreExpression();
 
 public:
   // 关于ValueExpr 和 FieldExpr的获取的复制
@@ -360,10 +343,14 @@ public:
   AttrType    get_return_value_type() const;
 
 public:
-  AttrType    value_type() const override { return value_->value_type(); };
-  ExprType    type() const override { return ExprType::AGGREGATION; }
-  RC          get_value(const Tuple &tuple, Value &value) const override { return RC::SUCCESS; }
-  std::string name() const override;  // 表名
+  AttrType value_type() const override { return value_->value_type(); };
+  ExprType type() const override { return ExprType::AGGREGATION; }
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+  /**
+   * @brief 返回列表的名字
+   * @example MAX(id), COUNT(*) 等字段
+   */
+  std::string name() const override;
 
 public:
   static void get_aggre_expression(Expression *expr, std::vector<std::unique_ptr<AggreExpression>> &aggrfunc_exprs);

@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "common/log/log.h"
 #include "sql/expr/tuple.h"
+#include "sql/expr/tuple_cell.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
 #include "storage/field/field.h"
@@ -469,6 +470,38 @@ RC ArithmeticExpr::try_get_value(Value &value) const
 ////////////////////////////////////////////////////////////////////////////////
 //////!aggregation/////////
 ////////////////////////////////////////////////////////////////////////////////
+AggreExpression::AggreExpression(AggreExpression &expr)
+{
+  type_ = expr.type_;
+  if (expr.field_ != nullptr) {
+    field_ = new FieldExpr(expr.field_->field());
+  }
+  if (expr.value_ != nullptr) {
+    value_ = new ValueExpr(expr.value_->get_value());
+  }
+}
+
+AggreExpression::~AggreExpression()
+{
+  if (value_ != nullptr) {
+    delete value_;
+  }
+  if (field_ != nullptr) {
+    delete field_;
+  }
+};
+
+/**
+ * tuple 这里的tuple是AggregationTuple
+ */
+RC AggreExpression::get_value(const Tuple &tuple, Value &value) const
+{
+  TupleCellSpec spec(table_name(), field_name());
+  spec.set_aggre_type(type_);
+
+  return tuple.find_cell(spec, value);
+}
+
 std::string AggreExpression::name() const
 {
   std::string name_str = get_aggre_type_str() + "(";
@@ -528,20 +561,31 @@ RC AggreExpression::create(
     auto &change = const_cast<AggreType &>(aggre_type);
     change       = AGGRE_COUNT_ALL;
 
-    aggre_expr      = new AggreExpression(aggre_type, new FieldExpr(tables[0], tables[0]->table_meta().field(1)));
-    auto value_expr = new ValueExpr(Value(attr.c_str()));
-    aggre_expr->set_param_value(value_expr);
-    // 创建value字段存储
-  } else {
-    // aggre_type 为其他
-    rc = Expression::create(ExprNode(aggre_node.attribute_name), table_map, tables, field_expr, db);
-    if (rc != RC::SUCCESS) {
-      LOG_ERROR("AggreExpression Create Param Expression Failed. RC = %d:%s", rc, strrc(rc));
+    if (attr == "*") {
+      aggre_expr      = new AggreExpression(aggre_type, new FieldExpr(tables[0], tables[0]->table_meta().field(1)));
+      auto value_expr = new ValueExpr(Value(attr.c_str()));
+      aggre_expr->set_param_value(value_expr);
+      res_expr = aggre_expr;
+      return rc;
+    }
+
+    // attr 字段不为“*”
+    if (RC::SUCCESS != (rc = Expression::create(ExprNode(rel_attr), table_map, tables, field_expr, db))) {
+      LOG_ERROR("Aggregation attr name:%s not created succ.", attr.c_str());
       return rc;
     }
     aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr));
+    res_expr   = aggre_expr;
+    return rc;
   }
 
-  res_expr = aggre_expr;
+  // aggre_type 为其他
+  rc = Expression::create(ExprNode(aggre_node.attribute_name), table_map, tables, field_expr, db);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("AggreExpression Create Param Expression Failed. RC = %d:%s", rc, strrc(rc));
+    return rc;
+  }
+  aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr));
+  res_expr   = aggre_expr;
   return rc;
 }

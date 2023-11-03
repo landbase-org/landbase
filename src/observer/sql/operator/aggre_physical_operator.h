@@ -17,9 +17,13 @@
 class AggrePhysicalOperator : public PhysicalOperator
 {
 public:
-  AggrePhysicalOperator(std::vector<std::unique_ptr<AggreExpression>> &&expressions)
-      : expressions_(std::move(expressions))
-  {}
+  AggrePhysicalOperator(std::vector<std::unique_ptr<AggreExpression>> &&aggre_exprs)
+      : aggre_exprs_(std::move(aggre_exprs))
+  {
+    // 初始化aggre_tuple
+    // 这里传递的是aggre_exprs的指针（真的是绝）
+    tuple_.init(&aggre_exprs_);
+  }
 
   virtual ~AggrePhysicalOperator() = default;
 
@@ -30,6 +34,9 @@ public:
   Tuple               *current_tuple() override;
 
 private:
-  std::vector<std::unique_ptr<AggreExpression>> expressions_;
-  // AggregationTuple                              tuple_;
+  bool                                          is_start_{true};
+  bool                                          is_record_eof{false};
+  std::vector<std::unique_ptr<AggreExpression>> aggre_exprs_;
+  AggregationTuple                              tuple_;
+  std::vector<Value>                            values_;  // 答案存储的结果
 };

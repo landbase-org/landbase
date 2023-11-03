@@ -10,8 +10,8 @@
 
 RC AggrePhysicalOperator::open(Trx *trx)
 {
-  if (children_.size() > 1) {
-    LOG_WARN("Order should only have one child -> TableScan/Join");
+  if (children_.size() != 1) {
+    LOG_WARN("predicate operator must has one child");
     return RC::INTERNAL;
   }
 
@@ -20,10 +20,31 @@ RC AggrePhysicalOperator::open(Trx *trx)
 
 RC AggrePhysicalOperator::next()
 {
+  if (is_record_eof) {
+    return RC::RECORD_EOF;
+  }
+
   RC                rc   = RC::SUCCESS;
   PhysicalOperator *oper = children_.front().get();
 
-  return oper->next();
+  while (RC::SUCCESS == (rc = oper->next())) {
+    tuple_.set_tuple(oper->current_tuple());  // 将当前列放在tuple_中
+    if (is_start_) {
+      tuple_.do_aggregation_begin();
+      is_start_ = false;
+    }
+
+    // 做聚合运算
+    tuple_.do_aggregation();
+  }
+
+  if (RC::RECORD_EOF == rc) {
+    is_record_eof = true;
+    tuple_.do_aggregation_end();
+    return RC::SUCCESS;
+  }
+
+  return rc;
 }
 
 RC AggrePhysicalOperator::close()
@@ -32,4 +53,4 @@ RC AggrePhysicalOperator::close()
   return RC::SUCCESS;
 }
 
-Tuple *AggrePhysicalOperator::current_tuple() { return children_[0]->current_tuple(); }
+Tuple *AggrePhysicalOperator::current_tuple() { return &tuple_; }

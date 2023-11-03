@@ -300,34 +300,38 @@ private:
 class AggregationTuple : public Tuple
 {
 public:
-  AggregationTuple(std::vector<std::unique_ptr<AggreExpression>> &expressions) : expressions_(expressions) {}
-
+  AggregationTuple() = default;
+  AggregationTuple(std::vector<std::unique_ptr<AggreExpression>> &aggre_exprs) : aggre_exprs_(&aggre_exprs) {}
   virtual ~AggregationTuple() {}
 
-  int cell_num() const override { return expressions_.size(); }
+public:
+  int cell_num() const override { return tuple_->cell_num(); }
+  RC  cell_at(int index, Value &cell) const override;
+  RC  find_cell(const TupleCellSpec &spec, Value &cell) const override;
 
-  RC cell_at(int index, Value &cell) const override
-  {
-    if (index < 0 || index >= static_cast<int>(expressions_.size())) {
-      return RC::INTERNAL;
-    }
+public:
+  void        set_tuple(Tuple *tuple) { this->tuple_ = tuple; }
+  const auto &get_aggre_exprs() const { return aggre_exprs_; }
+  const auto &get_field_exprs() const { return field_exprs_; }
 
-    const Expression *expr = expressions_[index].get();
-    return expr->try_get_value(cell);
-  }
-
-  RC find_cell(const TupleCellSpec &spec, Value &cell) const override
-  {
-    for (const std::unique_ptr<AggreExpression> &expr : expressions_) {
-      if (0 == strcmp(spec.alias(), expr->name().c_str())) {
-        return expr->try_get_value(cell);
-      }
-    }
-    return RC::NOTFOUND;
-  }
+public:
+  void init(std::vector<std::unique_ptr<AggreExpression>> *aggre_exprs);  // 默认构造的必须调用这个init
+  void do_aggregation_begin();
+  void do_aggregation();
+  void do_aggregation_end();
 
 private:
-  const std::vector<std::unique_ptr<AggreExpression>> &expressions_;
+  int                 count_{0};  // COUNT(*)的时候使用， 返回所有的数据，包括NULL
+  int                 size_{0};   // aggre_exprs的长度
+  std::vector<bool>   all_null_;  // true表示当前列中所有数据都是null
+  std::vector<size_t> counts_;    // 不为null的个数
+  std::vector<Value>  aggre_resluts_;
+  std::vector<Value>  field_results_;
+
+private:
+  std::vector<FieldExpr>                         field_exprs_;
+  Tuple                                         *tuple_ = nullptr;  // 从子算子中获取的tuple
+  std::vector<std::unique_ptr<AggreExpression>> *aggre_exprs_;      // 查询的所有tuple
 };
 
 /**

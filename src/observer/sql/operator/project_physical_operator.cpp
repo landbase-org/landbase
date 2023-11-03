@@ -68,12 +68,13 @@ void ProjectPhysicalOperator::add_projection(const Expression *expr)
 {
   // 对单表来说，展示的(alias) 字段总是字段名称，
   // 对多表查询来说，展示的alias 需要带表名字
+  // 对于聚合查询来说， 需要有aggre_type
   TupleCellSpec *spec = nullptr;
 
   if (auto x = dynamic_cast<const FieldExpr *>(expr)) {
     spec = new TupleCellSpec(x->table_name(), x->field_name());
   } else if (auto x = dynamic_cast<const AggreExpression *>(expr)) {
-    spec = new TupleCellSpec(x->table_name(), x->field_name());
+    spec = new TupleCellSpec(x->table_name(), x->field_name(), x->get_aggre_type());
   }
 
   tuple_.add_cell_spec(spec);
