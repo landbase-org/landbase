@@ -324,7 +324,11 @@ class AggreExpression : public Expression
 public:
   AggreExpression() = default;
   AggreExpression(AggreExpression &expr);
-  AggreExpression(AggreType type, const FieldExpr *field) : type_(type), field_(field) {}
+  AggreExpression(AggreType type, const FieldExpr *field, bool full_table_name = false)
+      : type_(type),
+        full_table_name_(full_table_name),
+        field_(field)
+  {}
   virtual ~AggreExpression();
 
 public:
@@ -341,6 +345,8 @@ public:
   AggreType   get_aggre_type() const { return type_; }
   std::string get_aggre_type_str() const { return aggreType2str(type_); };
   AttrType    get_return_value_type() const;
+  void        set_full_table_name(bool flag) { full_table_name_ = flag; }
+  bool        is_full_table_name() { return full_table_name_; }
 
 public:
   AttrType value_type() const override { return value_->value_type(); };
@@ -360,7 +366,8 @@ public:
     );
 
 private:
-  AggreType        type_;
+  AggreType        type_{AggreType::AGGRE_NONE};
+  bool             full_table_name_{false};  // 是否需要显示完整的表名， 用于子查询
   const FieldExpr *field_ = nullptr;
   const ValueExpr *value_ = nullptr;  // 用来存储COUNT（attr）的值
 };

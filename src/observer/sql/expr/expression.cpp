@@ -504,11 +504,21 @@ RC AggreExpression::get_value(const Tuple &tuple, Value &value) const
 
 std::string AggreExpression::name() const
 {
-  std::string name_str = get_aggre_type_str() + "(";
-  name_str += has_param_value() ? value_->get_value().to_string() : field_->field_name();
-  name_str += ')';
+  // 之后的alias在这里修改
+  std::string name_str = "";
+  if (full_table_name_) {
+    name_str += get_aggre_type_str() + "(";
+    name_str += table_name();
+    name_str += ".";
+    name_str += field_name();
+    name_str += ')';
+  } else {
+    name_str += get_aggre_type_str() + "(";
+    name_str += has_param_value() ? value_->get_value().to_string() : field_->field_name();
+    name_str += ')';
+  }
   return name_str;
-}  // 表名
+}
 
 AttrType AggreExpression::get_return_value_type() const
 {
@@ -543,12 +553,13 @@ RC AggreExpression::create(
   Table      *table      = tables.front();
   const auto &aggre_node = node.aggre_;
 
-  const auto &rel_attr        = aggre_node.attribute_name;
-  const auto &[rel, attr]     = rel_attr;
-  const auto      &aggre_type = aggre_node.aggre_type;
-  auto             field_meta = table->table_meta().field(attr.c_str());
-  Expression      *field_expr = nullptr;  // FieldExpr 表达式
-  AggreExpression *aggre_expr = nullptr;
+  const auto &rel_attr             = aggre_node.attribute_name;
+  const auto &[rel, attr]          = rel_attr;
+  const auto      &aggre_type      = aggre_node.aggre_type;
+  auto             field_meta      = table->table_meta().field(attr.c_str());
+  Expression      *field_expr      = nullptr;  // FieldExpr 表达式
+  AggreExpression *aggre_expr      = nullptr;
+  bool             full_table_name = tables.size() > 1;  // 当前默认是两张表及以上显示rel.attr
 
   // attr为“*”但是attr_type不为COUNT
   if (attr == "*" && aggre_type != AGGRE_COUNT) {
@@ -561,8 +572,9 @@ RC AggreExpression::create(
     auto &change = const_cast<AggreType &>(aggre_type);
 
     if (attr == "*") {  // 如果是COUNT（*）那么是查询所有包括空的表， 否则之查询当前列
-      change          = AGGRE_COUNT_ALL;
-      aggre_expr      = new AggreExpression(aggre_type, new FieldExpr(tables[0], tables[0]->table_meta().field(1)));
+      change = AGGRE_COUNT_ALL;
+      aggre_expr =
+          new AggreExpression(aggre_type, new FieldExpr(tables[0], tables[0]->table_meta().field(1)), full_table_name);
       auto value_expr = new ValueExpr(Value(attr.c_str()));
       aggre_expr->set_param_value(value_expr);
       res_expr = aggre_expr;
@@ -574,7 +586,7 @@ RC AggreExpression::create(
       LOG_ERROR("Aggregation attr name:%s not created succ.", attr.c_str());
       return rc;
     }
-    aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr));
+    aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr), full_table_name);
     res_expr   = aggre_expr;
     return rc;
   }
@@ -585,7 +597,7 @@ RC AggreExpression::create(
     LOG_ERROR("AggreExpression Create Param Expression Failed. RC = %d:%s", rc, strrc(rc));
     return rc;
   }
-  aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr));
+  aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr), full_table_name);
   res_expr   = aggre_expr;
   return rc;
 }
