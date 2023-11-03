@@ -559,9 +559,9 @@ RC AggreExpression::create(
   // aggre_type 为COUNT 需要特判
   if (aggre_type == AGGRE_COUNT) {  // 如果是COUNT的情况， 那么COUNT（attr)可以为任何字符，使用Value存储该字符
     auto &change = const_cast<AggreType &>(aggre_type);
-    change       = AGGRE_COUNT_ALL;
 
-    if (attr == "*") {
+    if (attr == "*") {  // 如果是COUNT（*）那么是查询所有包括空的表， 否则之查询当前列
+      change          = AGGRE_COUNT_ALL;
       aggre_expr      = new AggreExpression(aggre_type, new FieldExpr(tables[0], tables[0]->table_meta().field(1)));
       auto value_expr = new ValueExpr(Value(attr.c_str()));
       aggre_expr->set_param_value(value_expr);

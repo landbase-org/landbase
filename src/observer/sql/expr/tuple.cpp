@@ -79,19 +79,21 @@ void AggregationTuple::do_aggregation()
   for (size_t i = 0; i < size_; i++) {
     const auto &expr = (*aggre_exprs_)[i];
     expr->get_value(*tuple_, cur_value);
+    AggreType aggre_type = expr->get_aggre_type();
 
     if (cur_value.is_null()) {
       continue;
     }
     // 不为null
     counts_[i]++;
-    if (AggreType::AGGRE_COUNT_ALL == expr->get_aggre_type() || AggreType::AGGRE_COUNT == expr->get_aggre_type()) {
+    if (AggreType::AGGRE_COUNT_ALL == aggre_type || AggreType::AGGRE_COUNT == aggre_type) {
       continue;
     }
 
     all_null_[i] = false;
     if (aggre_resluts_[i].is_null()) {
-      if (AggreType::AGGRE_AVG == expr->get_aggre_type()) {  // 如果是AGGRE_AVG的话，应该初始话为0
+      if (AggreType::AGGRE_AVG == aggre_type ||
+          AggreType::AGGRE_SUM == aggre_type) {  // 如果是AGGRE_AVG或者AGGRE_SUM的话，应该初始话为0
         Value tmp_value;
         if (cur_value.attr_type() == INTS) {
           tmp_value.set_int(0);
@@ -120,15 +122,17 @@ void AggregationTuple::do_aggregation()
 void AggregationTuple::do_aggregation_end()
 {
   for (size_t i = 0; i < size_; i++) {
-    const auto &expr = (*aggre_exprs_)[i];
-    Value      &res  = aggre_resluts_[i];  // 最后处理结果
+    const auto &expr       = (*aggre_exprs_)[i];
+    Value      &res        = aggre_resluts_[i];  // 最后处理结果
+    AggreType   aggre_type = expr->get_aggre_type();
 
     // 如果这列的所有数据都是NULL且不为COUNT, 那么当前列的结果为NULL
-    if (all_null_[i] && AggreType::AGGRE_COUNT_ALL != expr->get_aggre_type()) {
+    if (all_null_[i] && AggreType::AGGRE_COUNT_ALL != aggre_type && AggreType::AGGRE_COUNT != aggre_type) {
       res.set_null();
+      continue;
     }
 
-    switch (expr->get_aggre_type()) {
+    switch (aggre_type) {
       case AGGRE_COUNT: res.set_int(counts_[i]); break;
       case AGGRE_COUNT_ALL: res.set_int(count_); break;  // 包含为空的数据
       case AGGRE_AVG: {
