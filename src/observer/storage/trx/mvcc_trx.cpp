@@ -249,51 +249,42 @@ RC MvccTrx::update_record(Table *table, Record &record, Record &new_record)
   Field end_field;
   trx_fields(table, begin_field, end_field);
 
+  // 设置旧的record
+  end_field.set_int(record, -trx_id_);
   // 设置新的record
-  begin_field.set_int(new_record, -trx_id_);
-  end_field.set_int(new_record, trx_kit_.max_trx_id());
+  const auto record_size = table->table_meta().record_size();
+  char      *new_data    = new char[record_size];
+  memcpy(new_data, new_record.data(), record_size);
+  new_record.set_data(new_data, record_size);
+  Record *updated_record = new Record();
+  updated_record->set_data(new_data, record_size);
+  updated_record->set_rid(record.rid());
+  begin_field.set_int(*updated_record, -trx_id_);
+  end_field.set_int(*updated_record, trx_kit_.max_trx_id());
 
-  // 更新数据
-  rc = table->insert_record(new_record);
-  if (rc != RC::SUCCESS) {
-    sql_debug("failed to insert record into table. rc=%s", strrc(rc));
-    sql_debug("maybe because of unique index");
-    return rc;
-  }
   // 加到clog里面
   rc = log_manager_->append_log(
-      CLogType::INSERT, trx_id_, table->table_id(), new_record.rid(), new_record.len(), 0 /*offset*/, new_record.data()
-  );
-  ASSERT(
-      rc == RC::SUCCESS,
-      "failed to append delete record log. trx id=%d, table id=%d, rid=%s, record len=%d, rc=%s",
+      CLogType::UPDATE,
       trx_id_,
       table->table_id(),
-      record.rid().to_string().c_str(),
-      record.len(),
-      strrc(rc)
-  );
-  rc = log_manager_->append_log(
-      CLogType::DELETE, trx_id_, table->table_id(), record.rid(), record.len(), 0 /*offset*/, record.data()
+      record.rid(),
+      updated_record->len(),
+      0 /*offset*/,
+      updated_record->data()
   );
   ASSERT(
       rc == RC::SUCCESS,
       "failed to append update record log. trx id=%d, table id=%d, rid=%s, record len=%d, rc=%s",
       trx_id_,
       table->table_id(),
-      new_record.rid().to_string().c_str(),
-      new_record.len(),
+      record.rid().to_string().c_str(),
+      record.len(),
       strrc(rc)
   );
 
   // 加到操作集合里面
   pair<OperationSet::iterator, bool> ret =
-      operations_.insert(Operation(Operation::Type::INSERT, table, new_record.rid()));
-  if (!ret.second) {
-    rc = RC::INTERNAL;
-    LOG_WARN("failed to insert operation(insertion) into operation set: duplicate");
-  }
-  ret = operations_.insert(Operation(Operation::Type::DELETE, table, record.rid()));
+      operations_.insert(Operation(Operation::Type::UPDATE, table, record.rid(), updated_record));
   if (!ret.second) {
     rc = RC::INTERNAL;
     LOG_WARN("failed to delete operation(insertion) into operation set: duplicate");
@@ -343,7 +334,8 @@ RC MvccTrx::commit()
 RC MvccTrx::commit_with_trx_id(int32_t commit_xid)
 {
   // TODO 这里存在一个很大的问题，不能让其他事务一次性看到当前事务更新到的数据或同时看不到
-  RC rc    = RC::SUCCESS;
+  RC rc = RC::SUCCESS;
+
   started_ = false;
 
   for (const Operation &operation : operations_) {
@@ -358,12 +350,12 @@ RC MvccTrx::commit_with_trx_id(int32_t commit_xid)
 
         // 之前将begin_xid设置为了-trx_id_，这里将其设置为commit_xid
         auto record_updater = [this, &begin_xid_field, commit_xid](Record &record) {
-          LOG_DEBUG(
+          sql_debug(
               "before commit insert record. trx id=%d, begin xid=%d, commit xid=%d, lbt=%s",
               trx_id_,
               begin_xid_field.get_int(record),
               commit_xid,
-              lbt()
+              common::lbt()
           );
           ASSERT(
               begin_xid_field.get_int(record) == -this->trx_id_,
@@ -412,6 +404,42 @@ RC MvccTrx::commit_with_trx_id(int32_t commit_xid)
             strrc(rc)
         );
       } break;
+      case Operation::Type::UPDATE: {
+        auto table      = operation.table();
+        auto new_record = operation.new_record();
+        auto rid        = RID(operation.page_num(), operation.slot_num());
+        // 取出begin_xid和end_xid字段
+        Field begin_xid_field, end_xid_field;
+        trx_fields(table, begin_xid_field, end_xid_field);
+        auto record_updater =
+            [this, &begin_xid_field, &end_xid_field, &commit_xid, &table, new_record, &rc](Record &record) {
+              ASSERT(
+                  end_xid_field.get_int(record) == -this->trx_id_,
+                  "got an invalid record while committing. begin xid=%d, this trx id=%d",
+                  end_xid_field.get_int(record),
+                  trx_id_
+              );
+              end_xid_field.set_int(record, commit_xid);
+              begin_xid_field.set_int(*new_record, commit_xid);
+              rc = table->update_record(record, *new_record);
+              if (rc != RC::SUCCESS) {
+                sql_debug("failed to update record. rc=%s", strrc(rc));
+                sql_debug("maybe because unique index");
+                end_xid_field.set_int(record, trx_kit_.max_trx_id());
+                begin_xid_field.set_int(*new_record, -trx_id_);
+              }
+            };
+        RC ret = operation.table()->visit_record(rid, false /*readonly*/, record_updater);
+        if (rc == RC::SUCCESS && ret != RC::SUCCESS) {
+          rc = ret;
+        }
+        ASSERT(
+            rc == RC::SUCCESS,
+            "failed to update record while committing. rid=%s, rc=%s",
+            rid.to_string().c_str(),
+            strrc(rc)
+        );
+      } break;
       default: {
         ASSERT(false, "unsupported operation. type=%d", static_cast<int>(operation.type()));
       }
@@ -419,7 +447,9 @@ RC MvccTrx::commit_with_trx_id(int32_t commit_xid)
   }
 
   operations_.clear();
-
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
   if (!recovering_) {
     rc = log_manager_->commit_trx(trx_id_, commit_xid);
   }
@@ -455,6 +485,7 @@ RC MvccTrx::rollback()
         );
       } break;
 
+      case Operation::Type::UPDATE:
       case Operation::Type::DELETE: {
         Table *table = operation.table();
         RID    rid(operation.page_num(), operation.slot_num());
@@ -579,7 +610,15 @@ RC MvccTrx::redo(Db *db, const CLogRecord &log_record)
     } break;
 
     case CLogType::UPDATE: {
-      sql_debug("unimplenment clog type");
+      const CLogRecordData &data_record = log_record.data_record();
+      Field                 begin_field;
+      Field                 end_field;
+      trx_fields(table, begin_field, end_field);
+      Record *record = new Record();
+      record->set_data(const_cast<char *>(data_record.data_), data_record.data_len_);
+      record->set_rid(data_record.rid_);
+      begin_field.set_int(*record, -trx_id_);
+      operations_.insert(Operation(Operation::Type::UPDATE, table, record->rid(), record));
     } break;
 
     case CLogType::MTR_COMMIT: {

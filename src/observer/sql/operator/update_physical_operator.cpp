@@ -124,7 +124,7 @@ RC UpdatePhysicalOperator::next()
     auto  new_data    = new char[record_size];
     memcpy(new_data, record.data(), record_size);  // 新的数据
     Record new_record;
-    new_record.set_data_owner(new_data, record_size);
+    new_record.set_data(new_data, record_size);
     new_record.set_rid(record.rid());
 
     // 更新字段

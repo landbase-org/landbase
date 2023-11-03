@@ -289,7 +289,7 @@ RC Table::visit_record(const RID &rid, bool readonly, std::function<void(Record 
   return record_handler_->visit_record(rid, readonly, visitor);
 }
 
-RC Table::update_record(Record &record, Record &new_record)
+RC Table::update_record(const Record &record, const Record &new_record)
 {
   RC rc = RC::SUCCESS;
   rc    = delete_entry_of_indexes(record, false);
