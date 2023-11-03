@@ -248,7 +248,6 @@ public:
 
 public:
   const std::vector<TupleCellSpec *> &get_tuple_cell_spec() const { return speces_; }
-  const bool is_aggregation() { return speces_.size() && speces_.front()->aggre_type() != AGGRE_NONE; }
 
 #if 0
   RC cell_spec_at(int index, const TupleCellSpec *&spec) const override
