@@ -185,6 +185,8 @@ RC MvccTrx::delete_record(Table *table, Record &record)
 
   // 设置end_xid < 0，表示正在删除
   end_field.set_int(record, -trx_id_);
+  // 我赌它不会走索引，所以可以删掉，不然如果是unique index，就会有问题
+  table->delete_entry_of_indexes(record, false);
   // 加到clog里面
   RC rc = log_manager_->append_log(CLogType::DELETE, trx_id_, table->table_id(), record.rid(), 0, 0, nullptr);
   ASSERT(
@@ -244,6 +246,13 @@ RC MvccTrx::visit_record(Table *table, Record &record, bool readonly)
 RC MvccTrx::update_record(Table *table, Record &record, Record &new_record)
 {
   RC rc = RC::SUCCESS;
+
+  // 查看是否访问冲突
+  rc = this->visit_record(table, record, false /*readonly*/);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
   // 首先拿出begin和end字段
   Field begin_field;
   Field end_field;
@@ -252,25 +261,29 @@ RC MvccTrx::update_record(Table *table, Record &record, Record &new_record)
   // 设置旧的record
   end_field.set_int(record, -trx_id_);
   // 设置新的record
-  const auto record_size = table->table_meta().record_size();
-  char      *new_data    = new char[record_size];
-  memcpy(new_data, new_record.data(), record_size);
-  new_record.set_data(new_data, record_size);
-  Record *updated_record = new Record();
-  updated_record->set_data(new_data, record_size);
-  updated_record->set_rid(record.rid());
-  begin_field.set_int(*updated_record, -trx_id_);
-  end_field.set_int(*updated_record, trx_kit_.max_trx_id());
+  begin_field.set_int(new_record, -trx_id_);
+  end_field.set_int(new_record, trx_kit_.max_trx_id());
+  table->delete_entry_of_indexes(record, false);
+  rc = table->insert_record(new_record);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to update record rc=%s", strrc(rc));
+    table->insert_entry_of_indexes(record);
+    return rc;
+  }
 
   // 加到clog里面
-  rc = log_manager_->append_log(
-      CLogType::UPDATE,
+  rc = log_manager_->append_log(CLogType::DELETE, trx_id_, table->table_id(), record.rid(), 0, 0 /*offset*/, 0);
+  ASSERT(
+      rc == RC::SUCCESS,
+      "failed to append update record log. trx id=%d, table id=%d, rid=%s, record len=%d, rc=%s",
       trx_id_,
       table->table_id(),
-      record.rid(),
-      updated_record->len(),
-      0 /*offset*/,
-      updated_record->data()
+      record.rid().to_string().c_str(),
+      record.len(),
+      strrc(rc)
+  );
+  rc = log_manager_->append_log(
+      CLogType::INSERT, trx_id_, table->table_id(), new_record.rid(), new_record.len(), 0 /*offset*/, new_record.data()
   );
   ASSERT(
       rc == RC::SUCCESS,
@@ -283,8 +296,12 @@ RC MvccTrx::update_record(Table *table, Record &record, Record &new_record)
   );
 
   // 加到操作集合里面
-  pair<OperationSet::iterator, bool> ret =
-      operations_.insert(Operation(Operation::Type::UPDATE, table, record.rid(), updated_record));
+  pair<OperationSet::iterator, bool> ret = operations_.insert(Operation(Operation::Type::DELETE, table, record.rid()));
+  if (!ret.second) {
+    rc = RC::INTERNAL;
+    LOG_WARN("failed to delete operation(insertion) into operation set: duplicate");
+  }
+  ret = operations_.insert(Operation(Operation::Type::INSERT, table, new_record.rid()));
   if (!ret.second) {
     rc = RC::INTERNAL;
     LOG_WARN("failed to delete operation(insertion) into operation set: duplicate");
@@ -400,42 +417,6 @@ RC MvccTrx::commit_with_trx_id(int32_t commit_xid)
         ASSERT(
             rc == RC::SUCCESS,
             "failed to get record while committing. rid=%s, rc=%s",
-            rid.to_string().c_str(),
-            strrc(rc)
-        );
-      } break;
-      case Operation::Type::UPDATE: {
-        auto table      = operation.table();
-        auto new_record = operation.new_record();
-        auto rid        = RID(operation.page_num(), operation.slot_num());
-        // 取出begin_xid和end_xid字段
-        Field begin_xid_field, end_xid_field;
-        trx_fields(table, begin_xid_field, end_xid_field);
-        auto record_updater =
-            [this, &begin_xid_field, &end_xid_field, &commit_xid, &table, new_record, &rc](Record &record) {
-              ASSERT(
-                  end_xid_field.get_int(record) == -this->trx_id_,
-                  "got an invalid record while committing. begin xid=%d, this trx id=%d",
-                  end_xid_field.get_int(record),
-                  trx_id_
-              );
-              end_xid_field.set_int(record, commit_xid);
-              begin_xid_field.set_int(*new_record, commit_xid);
-              rc = table->update_record(record, *new_record);
-              if (rc != RC::SUCCESS) {
-                sql_debug("failed to update record. rc=%s", strrc(rc));
-                sql_debug("maybe because unique index");
-                end_xid_field.set_int(record, trx_kit_.max_trx_id());
-                begin_xid_field.set_int(*new_record, -trx_id_);
-              }
-            };
-        RC ret = operation.table()->visit_record(rid, false /*readonly*/, record_updater);
-        if (rc == RC::SUCCESS && ret != RC::SUCCESS) {
-          rc = ret;
-        }
-        ASSERT(
-            rc == RC::SUCCESS,
-            "failed to update record while committing. rid=%s, rc=%s",
             rid.to_string().c_str(),
             strrc(rc)
         );
@@ -607,18 +588,6 @@ RC MvccTrx::redo(Db *db, const CLogRecord &log_record)
       );
 
       operations_.insert(Operation(Operation::Type::DELETE, table, data_record.rid_));
-    } break;
-
-    case CLogType::UPDATE: {
-      const CLogRecordData &data_record = log_record.data_record();
-      Field                 begin_field;
-      Field                 end_field;
-      trx_fields(table, begin_field, end_field);
-      Record *record = new Record();
-      record->set_data(const_cast<char *>(data_record.data_), data_record.data_len_);
-      record->set_rid(data_record.rid_);
-      begin_field.set_int(*record, -trx_id_);
-      operations_.insert(Operation(Operation::Type::UPDATE, table, record->rid(), record));
     } break;
 
     case CLogType::MTR_COMMIT: {

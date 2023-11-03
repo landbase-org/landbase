@@ -144,6 +144,8 @@ RC UpdatePhysicalOperator::next()
 
     rc = trx_->update_record(table_, record, new_record);
 
+    delete[] new_data;
+
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to update record: %s", strrc(rc));
       return rc;
