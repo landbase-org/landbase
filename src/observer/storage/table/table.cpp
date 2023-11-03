@@ -289,32 +289,10 @@ RC Table::visit_record(const RID &rid, bool readonly, std::function<void(Record 
   return record_handler_->visit_record(rid, readonly, visitor);
 }
 
-RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<Value> &values)
+RC Table::update_record(Record &record, Record &new_record)
 {
   RC rc = RC::SUCCESS;
-  // 更改之后的数据
-  int  len      = table_meta_.record_size();
-  auto new_data = new char[len];
-  memcpy(new_data, record.data(), len);  // 新的数据
-  Record new_record;
-  new_record.set_data_owner(new_data, len);
-  new_record.set_rid(record.rid());
-
-  auto bitmap = table_meta_.bitmap_of_null_field(new_record.data());
-
-  // 更新字段
-  // 从parser阶段开始 field_metas 和 values 的数量一定一直是一致的
-  for (int i = 0; i < field_metas.size(); ++i) {
-    int field_index = table_meta_.field_index(field_metas[i]);
-    if (values[i].is_null()) {
-      bitmap.set_bit(field_index);
-    } else {
-      bitmap.clear_bit(field_index);
-      new_record.set_value(field_metas[i], &values[i]);
-    }
-  }
-
-  rc = delete_entry_of_indexes(record, false);
+  rc    = delete_entry_of_indexes(record, false);
   if (rc != RC::SUCCESS) {
     sql_debug("Failed to delete index entries. table=%s, rc=%d:%s", name(), rc, strrc(rc));
     return rc;
