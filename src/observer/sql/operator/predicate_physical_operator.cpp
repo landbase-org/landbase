@@ -115,7 +115,6 @@ RC PredicatePhysicalOperator::next()
   RC                rc   = RC::SUCCESS;
   PhysicalOperator *oper = children_.front().get();
 
-  // TODOH 在此过滤, 看是否符合where条件
   while (RC::SUCCESS == (rc = oper->next())) {
     Tuple *tuple = oper->current_tuple();
 

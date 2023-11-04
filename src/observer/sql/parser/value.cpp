@@ -581,41 +581,17 @@ bool Value::type_cast(const AttrType target)
   }
   return false;
 }
-bool Value::operator==(const Value &other) const
+
+Value Value::operator+(const Value &other) const
 {
-  if (this->attr_type_ != other.attr_type_) {
-    return false;
-  };
-  switch (this->attr_type_) {
-    case CHARS: {
-      int cmp_result = common::compare_string(
-          (void *)this->str_value_.c_str(),
-          this->str_value_.length(),
-          (void *)other.str_value_.c_str(),
-          other.str_value_.length()
-      );
-      return cmp_result == 0;
-    } break;
-    case DATES: {
-      return this->num_value_.date_value_ == other.num_value_.date_value_;
-    } break;
-    case INTS: {
-      return this->num_value_.int_value_ == other.num_value_.int_value_;
-    } break;
-    case FLOATS: {
-      int cmp_result =
-          common::compare_float((void *)&this->num_value_.float_value_, (void *)&other.num_value_.float_value_);
-      return cmp_result == 0;
-    } break;
-    case BOOLEANS: {
-      return this->num_value_.bool_value_ == other.num_value_.bool_value_;
-    } break;
-    case NULLS: {
-      return true;
-    } break;
-    default: {
-      sql_debug("unknown data type. type=%s", attr_type_to_string(this->attr_type_));
-    } break;
+  if (this->is_null() || other.is_null()) {
+    return Value();
   }
-  return false;
+  // 只有INT和FLOAT可以加减
+  assert(this->attr_type_ == INTS || this->attr_type_ == FLOATS);
+  assert(other.attr_type_ == INTS || other.attr_type_ == FLOATS);
+  if (this->attr_type_ == INTS && other.attr_type() == INTS) {
+    return Value(this->get_int() + other.get_int());
+  }
+  return Value(this->get_float() + other.get_float());
 }

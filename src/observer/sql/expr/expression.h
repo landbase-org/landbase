@@ -14,16 +14,22 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string.h>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 
+#include "common/lang/string.h"
 #include "common/log/log.h"
 #include "event/sql_debug.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
+#include "storage/db/db.h"
 #include "storage/field/field.h"
+#include "storage/field/field_meta.h"
+#include "storage/table/table.h"
 
 class Tuple;
 
@@ -50,6 +56,7 @@ enum class ExprType
   EXISTS,
   VALUELIST,
   SUBQUERY,
+  AGGREGATION,  ///< 聚合运算
 };
 
 /**
@@ -95,7 +102,7 @@ public:
   /**
    * @brief 表达式的名字，比如是字段名称，或者用户在执行SQL语句时输入的内容
    */
-  virtual std::string name() const { return name_; }
+  virtual std::string name() const { return name_; }  // 这里是输出结果显示的table_name
   virtual void        set_name(std::string name) { name_ = name; }
 
 private:
@@ -131,6 +138,22 @@ public:
   RC get_value(const Tuple &tuple, Value &value) const override;
 
   bool is_null(char *data) const;
+
+  /**
+   * 用于初始化field_meta的时候， 例如rel.attr, rel.*, *, attr的情况
+   */
+  static RC create(
+      const std::vector<RelAttrSqlNode> &nodes, const std::unordered_map<std::string, Table *> &table_map,
+      const std::vector<Table *> &tables, std::vector<Expression *> &res_expr, Db *db
+  );
+
+  /**
+   * 用于知道rel_attr的情况下构建对应的FieldExpr;
+   */
+  static RC create(
+      const RelAttrSqlNode &node, const std::unordered_map<std::string, Table *> &table_map,
+      const std::vector<Table *> &tables, Expression *&res_expr
+  );
 
 private:
   Field field_;
@@ -417,4 +440,70 @@ public:
 private:
   CompOp                      comp_;
   std::unique_ptr<Expression> right_;
+};
+
+class AggreExpression : public Expression
+{
+public:
+  AggreExpression() = default;
+  AggreExpression(AggreExpression &expr);
+  AggreExpression(AggreType type, const FieldExpr *field, bool full_table_name = false)
+      : type_(type),
+        full_table_name_(full_table_name),
+        field_(field)
+  {}
+  virtual ~AggreExpression();
+
+public:
+  // 关于ValueExpr 和 FieldExpr的获取的复制
+  void             set_param_value(const ValueExpr *value) { value_ = value; }
+  const ValueExpr *get_param_value() const { return value_; }
+  bool             has_param_value() const { return nullptr != value_; }
+
+  const Field     &field() const { return field_->field(); }
+  const FieldExpr &fieldexpr() const { return *field_; }
+
+  const char *table_name() const { return field_->table_name(); }
+  const char *field_name() const { return field_->field_name(); }
+  AggreType   get_aggre_type() const { return type_; }
+  std::string get_aggre_type_str() const { return aggreType2str(type_); };
+  void        set_full_table_name(bool flag) { full_table_name_ = flag; }
+  bool        is_full_table_name() { return full_table_name_; }
+
+public:
+  AttrType value_type() const override
+  {
+    switch (type_) {
+      case AGGRE_MAX: return field_->value_type();
+      case AGGRE_MIN: return field_->value_type();
+      case AGGRE_SUM: return field_->value_type();
+      case AGGRE_AVG: return FLOATS;
+      case AGGRE_COUNT: return INTS;
+      case AGGRE_COUNT_ALL: return INTS;
+      default: {
+        sql_debug("invalid aggre type. aggre_type=%d", type_);
+      } break;
+    }
+    return UNDEFINED;
+  };
+  ExprType type() const override { return ExprType::AGGREGATION; }
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+  /**
+   * @brief 返回列表的名字
+   * @example MAX(id), COUNT(*) 等字段
+   */
+  std::string name() const override;
+
+public:
+  static void get_aggre_expression(Expression *expr, std::vector<std::unique_ptr<AggreExpression>> &aggrfunc_exprs);
+  static RC   create(
+        const AggreSqlNode &node, const std::unordered_map<std::string, Table *> &table_map,
+        const std::vector<Table *> &tables, Expression *&res_expr, Db *db = nullptr
+    );
+
+private:
+  AggreType        type_{AggreType::AGGRE_NONE};
+  bool             full_table_name_{false};  // 是否需要显示完整的表名， 用于子查询
+  const FieldExpr *field_ = nullptr;
+  const ValueExpr *value_ = nullptr;  // 用来存储COUNT（attr）的值
 };

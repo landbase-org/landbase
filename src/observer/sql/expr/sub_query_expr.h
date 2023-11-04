@@ -22,7 +22,8 @@ public:
   AttrType value_type() const override
   {
     auto select_stmt = static_cast<const SelectStmt *>(stmt_);
-    return select_stmt->query_fields().front().attr_type();
+    auto expr        = select_stmt->expressions().at(0);
+    return expr->value_type();
   }
   ExprType type() const override { return ExprType::SUBQUERY; }
   RC       executor(Trx *trx)

@@ -22,6 +22,8 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
+#include "sql/operator/aggre_logical_operator.h"
+#include "sql/operator/aggre_physical_operator.h"
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/calc_physical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
@@ -33,6 +35,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/insert_physical_operator.h"
 #include "sql/operator/join_logical_operator.h"
 #include "sql/operator/join_physical_operator.h"
+#include "sql/operator/logical_operator.h"
 #include "sql/operator/order_logical_operator.h"
 #include "sql/operator/order_physical_operator.h"
 #include "sql/operator/predicate_logical_operator.h"
@@ -95,7 +98,11 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
 
     case LogicalOperatorType::ORDER_BY: {
       return create_plan(static_cast<OrderLogicalOperator &>(logical_operator), oper);
-    }
+    } break;
+
+    case LogicalOperatorType::AGGREGATION: {
+      return create_plan(static_cast<AggreLogicalOperator &>(logical_operator), oper);
+    } break;
 
     default: {
       return RC::INVALID_ARGUMENT;
@@ -175,9 +182,13 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
 
     auto field_metas = index->field_metas();
     int  len         = 0;  // 总的长度， 之后在插入的时候计算长度
-    std::for_each(table_get_oper.fields()->begin(), table_get_oper.fields()->end(), [&len](const Field &field) {
-      len += field.meta()->len();
-    });
+    for (auto field_meta : field_metas) {
+      len = max(len, field_meta.offset() + field_meta.len());
+    }
+
+    // std::for_each(table_get_oper.fields()->begin(), table_get_oper.fields()->end(), [&len](const Field &field) {
+    //   len += field.meta()->len();
+    // });
 
     char *ukey = new char[len];  // TODO 释放内存， 这里没有释放内存
     for (size_t i = 0; i < field_names.size(); i++) {
@@ -200,7 +211,6 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
     oper = unique_ptr<PhysicalOperator>(index_scan_oper);
     LOG_TRACE("use index scan");
   } else {
-    // TODO AGGREGATION算子实现
     auto table_scan_oper = new TableScanPhysicalOperator(table, table_get_oper.readonly());
     table_scan_oper->set_predicates(std::move(predicates));
     oper = unique_ptr<PhysicalOperator>(table_scan_oper);
@@ -250,9 +260,9 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
   }
 
   ProjectPhysicalOperator *project_operator = new ProjectPhysicalOperator;
-  const vector<Field>     &project_fields   = project_oper.fields();
-  for (const Field &field : project_fields) {
-    project_operator->add_projection(field);
+  auto                    &project_exprs    = project_oper.expres();
+  for (const auto &expr : project_exprs) {
+    project_operator->add_projection(expr);
   }
 
   if (child_phy_oper) {
@@ -404,12 +414,40 @@ RC PhysicalPlanGenerator::create_plan(OrderLogicalOperator &orderby_oper, std::u
       LOG_WARN("failed to create order physical operator's child physical operator. rc=%s", strrc(rc));
       return rc;
     }
-    if (child_phy_oper)
+    if (child_phy_oper) {
       order_phy_oper->add_child(std::move(child_phy_oper));
+    }
   }
 
   oper = std::move(order_phy_oper);
 
   LOG_TRACE("create a Orderby physical operator");
+  return rc;
+}
+
+RC PhysicalPlanGenerator::create_plan(AggreLogicalOperator &aggre_oper, std::unique_ptr<PhysicalOperator> &oper)
+{
+  RC                                   rc          = RC::SUCCESS;
+  vector<unique_ptr<LogicalOperator>> &child_opers = aggre_oper.children();
+  assert(child_opers.size() == 1);
+
+  unique_ptr<AggrePhysicalOperator> aggre_phy_oper(new AggrePhysicalOperator(std::move(aggre_oper.get_aggre_exprs())));
+  unique_ptr<PhysicalOperator>      child_phy_oper;
+
+  if (!child_opers.empty()) {
+    LogicalOperator *child_oper = child_opers.front().get();
+    rc                          = create(*child_oper, child_phy_oper);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create order physical operator's child physical operator. rc=%s", strrc(rc));
+      return rc;
+    }
+    if (child_phy_oper) {
+      aggre_phy_oper->add_child(std::move(child_phy_oper));
+    }
+  }
+
+  oper = std::move(aggre_phy_oper);
+
+  LOG_TRACE("create a aggregation function physical operator");
   return rc;
 }
