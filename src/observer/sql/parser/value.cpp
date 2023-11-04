@@ -113,7 +113,7 @@ void Value::set_data(char *data, int length)
       attr_type_ = NULLS;
     } break;
     default: {
-      sql_debug("unsupported attr type: %d", attr_type_);
+      sql_debug("[Value::set_data] unsupported attr type: %d", attr_type_);
     } break;
   }
 }
@@ -224,7 +224,8 @@ const char *Value::data() const
     case BOOLEANS:
     case NULLS: break;
   }
-  sql_debug("unsupported attr type: %d", attr_type_);
+  sql_debug("[Value::data] unsupported attr type: %d", attr_type_);
+  return (const char *)&num_value_;
 }
 
 std::string Value::to_string() const
@@ -251,7 +252,7 @@ std::string Value::to_string() const
       os << "NULL";
     } break;
     default: {
-      sql_debug("unsupported attr type: %d", attr_type_);
+      sql_debug("[Value::to_string] unsupported attr type: %d", attr_type_);
     } break;
   }
   return os.str();
@@ -509,7 +510,6 @@ float Value::get_float() const
     } break;
   }
   sql_debug("unknown data type. type=%d", attr_type_);
-  return 0;
   return 0;
 }
 

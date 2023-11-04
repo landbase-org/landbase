@@ -95,6 +95,16 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
         // 如果可以转换，就转换一下
         auto &change = const_cast<Value &>(values[i]);
         if (change.type_cast(field_type)) {
+          if (values[i].attr_type() == TEXTS && values[i].length() > field_meta->len()) {
+            sql_debug(
+                "field length mismatch. table=%s, field=%s, field length=%d, value length=%d",
+                table_name,
+                field_meta->name(),
+                field_meta->len(),
+                values[i].length()
+            );
+            return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+          }
           continue;
         }
         sql_debug(

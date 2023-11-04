@@ -162,6 +162,10 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
 
   // 查询的方式， （索引查询还是查表）
   Index *index = table->find_index_by_fields(field_names);
+  // 如果value是null,不走索引
+  if (value_expr != nullptr && value_expr->is_null()) {
+    index = nullptr;
+  }
   if (index != nullptr) {
     ASSERT(value_expr != nullptr, "got an index but value expr is null ?");
     const Value &value = value_expr->get_value();
