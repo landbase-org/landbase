@@ -12,10 +12,12 @@ class UpdateStmt;
 class UpdatePhysicalOperator : public PhysicalOperator
 {
 public:
-  UpdatePhysicalOperator(Table *table, std::vector<const FieldMeta *> field_metas, std::vector<const Value *> values)
+  UpdatePhysicalOperator(
+      Table *table, std::vector<const FieldMeta *> field_metas, std::vector<std::unique_ptr<Expression>> &expr_list
+  )
       : table_(table),
         field_metas_(std::move(field_metas)),
-        values_(std::move(values))
+        expr_list_(std::move(expr_list))
   {}
 
   virtual ~UpdatePhysicalOperator() = default;
@@ -29,9 +31,11 @@ public:
   Tuple *current_tuple() override { return nullptr; }
 
 private:
-  Table                         *table_ = nullptr;
-  std::vector<const FieldMeta *> field_metas_;
-  std::vector<const Value *>     values_;
-  Trx                           *trx_              = nullptr;
-  bool                           has_unique_index_ = false;
+  Trx                                     *trx_   = nullptr;
+  Table                                   *table_ = nullptr;
+  std::vector<const FieldMeta *>           field_metas_;
+  std::vector<std::unique_ptr<Expression>> expr_list_;  // 用于存放valueexpr或者subqueryexpr
+  std::vector<Value>                       value_list_;
+  bool                                     invalid_sub_query_ = false;
+  bool                                     has_unique_index_  = false;
 };

@@ -200,7 +200,7 @@ struct UpdateSqlNode
 {
   std::string                   relation_name;  ///< Relation to update
   std::vector<std::string>      attr_list;      ///< 更新的字段
-  std::vector<Value>            value_list;     ///< 更新的值
+  std::vector<ParseExpr *>      expr_list;      ///< 更新的值
   std::vector<ConditionSqlNode> conditions;
 };
 

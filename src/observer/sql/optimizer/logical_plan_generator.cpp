@@ -301,7 +301,7 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
 
   // 设置update的逻辑算子
   unique_ptr<LogicalOperator> update_oper(
-      new UpdateLogicalOperator(table, update_stmt->field_metas(), update_stmt->values())
+      new UpdateLogicalOperator(table, update_stmt->field_metas(), update_stmt->expr_list())
   );
 
   // 设置子算子

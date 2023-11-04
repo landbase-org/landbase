@@ -226,7 +226,7 @@ RC MvccTrx::visit_record(Table *table, Record &record, bool readonly)
 }
 
 RC MvccTrx::update_record(
-    Table *table, Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<const Value *> &values
+    Table *table, Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<Value> &values
 )
 {
   return RC::SUCCESS;

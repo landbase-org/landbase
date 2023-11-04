@@ -17,6 +17,7 @@ public:
   ParseExpr()                       = default;
   virtual ~ParseExpr()              = default;
   virtual ParseExprType expr_type() = 0;
+  virtual AttrType      value_type() { return AttrType::UNDEFINED; }
 };
 
 class ParseValueExpr : public ParseExpr
@@ -24,7 +25,9 @@ class ParseValueExpr : public ParseExpr
 public:
   ParseValueExpr() = default;
   ParseValueExpr(Value &value) : value_(value) {}
-  ParseExprType expr_type() { return ParseExprType::VALUE; }
+  ParseExprType expr_type() override { return ParseExprType::VALUE; }
+  AttrType      value_type() override { return value_.attr_type(); }
+  bool          is_null() const { return value_.is_null(); }
 
 public:
   auto &value() { return value_; };
@@ -38,7 +41,14 @@ class ParseValueListExpr : public ParseExpr
 {
 public:
   ParseValueListExpr(std::vector<Value> &value_list) : value_list_(value_list) {}
-  ParseExprType expr_type() { return ParseExprType::VALUE_LIST; }
+  ParseExprType expr_type() override { return ParseExprType::VALUE_LIST; }
+  AttrType      value_type() override
+  {
+    if (!value_list_.empty()) {
+      return value_list_.front().attr_type();
+    }
+    return AttrType::UNDEFINED;
+  }
 
 public:
   auto &value_list() { return value_list_; }

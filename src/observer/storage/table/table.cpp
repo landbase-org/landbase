@@ -289,7 +289,7 @@ RC Table::visit_record(const RID &rid, bool readonly, std::function<void(Record 
   return record_handler_->visit_record(rid, readonly, visitor);
 }
 
-RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<const Value *> &values)
+RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<Value> &values)
 {
   RC rc = RC::SUCCESS;
   // 更改之后的数据
@@ -306,11 +306,11 @@ RC Table::update_record(Record &record, std::vector<const FieldMeta *> &field_me
   // 从parser阶段开始 field_metas 和 values 的数量一定一直是一致的
   for (int i = 0; i < field_metas.size(); ++i) {
     int field_index = table_meta_.field_index(field_metas[i]);
-    if (values[i]->is_null()) {
+    if (values[i].is_null()) {
       bitmap.set_bit(field_index);
     } else {
       bitmap.clear_bit(field_index);
-      new_record.set_value(field_metas[i], values[i]);
+      new_record.set_value(field_metas[i], &values[i]);
     }
   }
 

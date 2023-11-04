@@ -151,7 +151,7 @@ union YYSTYPE
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
   std::vector<std::string> *        id_list;
-  std::pair<std::vector<std::string>, std::vector<Value>> * update_list;
+  std::pair<std::vector<std::string>, std::vector<ParseExpr *>> * update_list;
   std::vector<ConditionSqlNode> *   condition_list;
   std::vector<std::string> *        relation_list;
   std::vector<std::string> *        aggre_attr_list;
