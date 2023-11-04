@@ -13,9 +13,9 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/update_stmt.h"
+#include "event/sql_debug.h"
 #include "sql/expr/sub_query_expr.h"
 #include "storage/db/db.h"
-
 UpdateStmt::UpdateStmt(
     Table *table, FilterStmt *filter_stmt, std::vector<const FieldMeta *> &field_meta,
     std::vector<std::unique_ptr<Expression>> &expr_list
@@ -39,14 +39,14 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
   // 检查参数
   const char *table_name = update.relation_name.c_str();
   if (nullptr == db || nullptr == table_name) {
-    LOG_WARN("invalid argument. db=%p, table_name=%p", db, table_name);
+    sql_debug("invalid argument. db=%p, table_name=%p", db, table_name);
     return RC::INVALID_ARGUMENT;
   }
 
   // 查找表
   Table *table = db->find_table(table_name);
   if (nullptr == table) {
-    LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+    sql_debug("no such table. db=%s, table_name=%s", db->name(), table_name);
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
@@ -55,7 +55,7 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
   for (auto &field_name : update.attr_list) {
     auto field_meta = table->table_meta().field(field_name.c_str());
     if (field_meta == nullptr) {
-      LOG_ERROR("Fail to find field %s in table %s", field_name.c_str(), table->name());
+      sql_debug("Fail to find field %s in table %s", field_name.c_str(), table->name());
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
     field_metas.push_back(field_meta);
@@ -72,7 +72,7 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
       if (field_metas[i]->nullable()) {
         continue;
       } else {
-        LOG_ERROR("Field %s is not nullable", field_metas[i]->name());
+        sql_debug("Field %s is not nullable", field_metas[i]->name());
         return RC::SCHEMA_FIELD_NOT_NULLABLE;
       }
     }
@@ -85,13 +85,18 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
         value.set_date(dateval);
         continue;
       }
-      LOG_ERROR(
+      // 如果可以转换，就转换一下
+      auto &change = value_expr->value();
+      if (change.type_cast(field_metas[i]->type())) {
+        continue;
+      }
+      sql_debug(
           "Fail to update %s, field type(%d) and value type(%d) mismatch",
           table->name(),
           field_metas[i]->type(),
           value_expr->value_type()
       );
-      return RC::INVALID_ARGUMENT;
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
   }
 
@@ -133,7 +138,7 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
       db, table, &table_map, update.conditions.data(), static_cast<int>(update.conditions.size()), filter_stmt
   );
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
+    sql_debug("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
     return rc;
   }
 
