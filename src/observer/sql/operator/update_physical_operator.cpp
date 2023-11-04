@@ -86,6 +86,16 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       // 如果可以转换，就转换一下
       auto &change = value_list_[i];
       if (change.type_cast(field_metas_[i]->type())) {
+        if (value_list_[i].attr_type() == TEXTS && value_list_[i].length() > field_metas_[i]->len()) {
+          sql_debug(
+              "field length mismatch. table=%s, field=%s, field length=%d, value length=%d",
+              table_->table_meta().name(),
+              field_metas_[i]->name(),
+              field_metas_[i]->len(),
+              value_list_[i].length()
+          );
+          invalid_value_list_ = true;
+        }
         continue;
       }
       invalid_value_list_ = true;

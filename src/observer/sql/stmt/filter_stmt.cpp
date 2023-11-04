@@ -199,6 +199,12 @@ RC FilterStmt::create_filter_unit(
   if (left_expr->type() == ExprType::FIELD && right_expr->type() == ExprType::VALUE) {
     auto   tmp_expr = static_cast<ValueExpr *>(right_expr);
     Value &value    = tmp_expr->get_value();
+
+    // 如果右侧为null，直接返回
+    if (value.is_null()) {
+      return RC::SUCCESS;
+    }
+
     // 检测左侧为日期属性，右侧为日期字符串的情况 处理完直接return截断，不要影响别的类型的转换
     if (left_expr->value_type() == DATES && right_expr->value_type() == CHARS) {
       int32_t check = convert_string_to_date(value.data());
@@ -249,6 +255,9 @@ RC FilterStmt::create_filter_unit(
     if (right_expr->type() == ExprType::SUBQUERY) {
       return RC::SUCCESS;
     };
+    if (left_expr->value_type() == NULLS) {
+      return RC::SUCCESS;
+    }
     sql_debug("Unimplemented");
   }
 

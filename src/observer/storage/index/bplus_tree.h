@@ -83,6 +83,7 @@ public:
         case FLOATS: {
           res = common::compare_float((void *)(v1 + pos), (void *)(v2 + pos));
         } break;
+        case TEXTS:
         case CHARS: {
           res = common::compare_string((void *)(v1 + pos), attr_length, (void *)(v2 + pos), attr_length);
         } break;
