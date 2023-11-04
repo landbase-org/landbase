@@ -44,6 +44,7 @@ public:
   const FieldMeta *meta() const { return field_; }
 
   const AggreType   aggre_type() const { return aggre_type_; }
+  const void        set_aggre_type(AggreType aggre_type) { aggre_type_ = aggre_type; }
   const std::string alias() const { return alias_; }
   AttrType          attr_type() const { return field_->type(); }
 

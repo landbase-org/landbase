@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <algorithm>
 #include <memory>
 #include <vector>
 
@@ -29,7 +30,12 @@ See the Mulan PSL v2 for more details. */
 class ProjectLogicalOperator : public LogicalOperator
 {
 public:
-  ProjectLogicalOperator(const std::vector<Field> &fields);
+  ProjectLogicalOperator(const std::vector<Expression *> &exprs)
+  {
+    for (auto expr : exprs) {
+      expres_.push_back(expr);
+    }
+  }
   virtual ~ProjectLogicalOperator() = default;
 
   LogicalOperatorType type() const override { return LogicalOperatorType::PROJECTION; }
@@ -37,11 +43,13 @@ public:
   std::vector<std::unique_ptr<Expression>>       &expressions() { return expressions_; }
   const std::vector<std::unique_ptr<Expression>> &expressions() const { return expressions_; }
   const std::vector<Field>                       &fields() const { return fields_; }
+  const std::vector<Expression *>                &expres() const { return expres_; }
 
 private:
   //! 投影映射的字段名称
   //! 并不是所有的select都会查看表字段，也可能是常量数字、字符串，
   //! 或者是执行某个函数。所以这里应该是表达式Expression。
   //! 不过现在简单处理，就使用字段来描述
-  std::vector<Field> fields_;
+  std::vector<Field>        fields_;
+  std::vector<Expression *> expres_;  // 使用expres来确定选择的row
 };
