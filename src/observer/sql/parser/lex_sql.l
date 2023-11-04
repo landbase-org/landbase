@@ -63,7 +63,6 @@ WHITE_SAPCE      [\ \t\b\f]
 DIGIT            [0-9]+
 
 ID               [A-Za-z_]+[A-Za-z0-9_]*
-AGGRE_ATTR       [A-Za-z0-9]+
 DOT              \.
 QUOTE            [\'\"]
 %x STR
@@ -137,7 +136,6 @@ NULL                                    RETURN_TOKEN(NULL_T);
 NULLABLE                                RETURN_TOKEN(NULL_T);
 
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
-{AGGRE_ATTR}                            yylval->string=strdup(yytext); RETURN_TOKEN(AGGRE_ATTR);
 "("                                     RETURN_TOKEN(LBRACE);
 ")"                                     RETURN_TOKEN(RBRACE);
 

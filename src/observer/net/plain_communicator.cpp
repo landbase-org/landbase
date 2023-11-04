@@ -235,7 +235,7 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
   rc           = RC::SUCCESS;
   Tuple *tuple = nullptr;
 
-  // TODOH 将数据写入到sql_result中
+  // !在此获取数据
   while (RC::SUCCESS == (rc = sql_result->next_tuple(tuple))) {
     assert(tuple != nullptr);
 

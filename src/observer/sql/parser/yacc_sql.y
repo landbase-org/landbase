@@ -123,8 +123,11 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   enum CompOp                       comp;
   enum AggreType                    aggre_type;
   enum OrderType                    order_type;
-  AggreTypeNode *                   aggre_node;
+  AggreSqlNode *                    aggre_node;
+  std::vector<AggreSqlNode> *       aggre_node_list;
+  std::vector<AggreSqlNode> *       aggre_node_list_opt;  // opt表示可以选择，可以有也可以没有
   RelAttrSqlNode *                  rel_attr;
+  std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
@@ -136,7 +139,6 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   std::vector<std::string> *        id_list;
   std::pair<std::vector<std::string>, std::vector<Value>> * update_list;
   std::vector<ConditionSqlNode> *   condition_list;
-  std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<std::string> *        relation_list;
   std::vector<std::string> *        aggre_attr_list;
   std::vector<JoinSqlNode> *        join_list;
@@ -150,7 +152,6 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %token <number> NUMBER
 %token <floats> FLOAT
 %token <string> ID
-%token <string> AGGRE_ATTR
 %token <string> SSS
 
 //非终结符
@@ -163,9 +164,12 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <comp>                comp_op
 %type <aggre_type>          aggre_type
 %type <order_type>          order_type
-%type <rel_attr>            rel_attr_aggre
 %type <aggre_node>          aggre_node
+%type <aggre_node_list>     aggre_node_list
+%type <aggre_node_list>     aggre_node_list_opt
 %type <rel_attr>            rel_attr        // (table column)
+%type <rel_attr_list>       rel_attr_list
+%type <rel_attr_list>       rel_attr_list_opt
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <nullable>            nullable // 用于标识字段是否可以为 null
@@ -174,11 +178,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <update_list>         update_list
 %type <condition_list>      where
 %type <condition_list>      condition_list
-%type <rel_attr_list>       selector
 %type <relation_list>       rel_list
-%type <relation_list>       attr_list
 %type <id_list>             id_list
-%type <aggre_attr_list>     aggre_attr_list
 %type <expression>          expression
 %type <expression_list>     expression_list
 %type <join_node>           join_node
@@ -211,7 +212,6 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <sql_node>            command_wrapper
 %type <string>              rel_name  // 表名
 %type <string>              attr_name // 列名
-%type <string>              aggre_attr_name // aggre_attr_name
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
 
@@ -543,83 +543,97 @@ update_list:
     ;
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT selector FROM rel_list select_join_list where select_order_list
+    SELECT rel_attr_list_opt aggre_node_list_opt FROM rel_list select_join_list where select_order_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
         $$->selection.attributes.swap(*$2);
         delete $2;
       }
-      if ($4 != nullptr) {
-        $$->selection.relations.swap(*$4);
-        delete $4;
+      if ($3 != nullptr) {
+        $$->selection.aggregations.swap(*$3);
+        delete $3;
       }
       if ($5 != nullptr) {
-        $$->selection.joinctions.swap(*$5);
+        $$->selection.relations.swap(*$5);
         delete $5;
       }
       if ($6 != nullptr) {
-        $$->selection.conditions.swap(*$6);
+        $$->selection.joinctions.swap(*$6);
         delete $6;
       }
       if ($7 != nullptr) {
-        $$->selection.orders.swap(*$7);
+        $$->selection.conditions.swap(*$7);
         delete $7;
+      }
+      if ($8 != nullptr) {
+        $$->selection.orders.swap(*$8);
+        delete $8;
       }
     }
     ;
 
-selector:
-      rel_attr_aggre
+
+aggre_node_list_opt:
+      aggre_node_list
     {
-      $$ = new std::vector<RelAttrSqlNode>{*$1}; 
-      delete $1;  
+      $$ = $1;
     }
-    | selector COMMA rel_attr_aggre
+    | /* empty */
+    {
+      $$ = nullptr;
+    }
+    ;
+
+aggre_node_list:
+      aggre_node
+    {
+      $$ = new std::vector<AggreSqlNode>{*$1}; 
+      delete $1; 
+    }
+    | aggre_node_list COMMA aggre_node
     {
       $$->emplace_back(*$3); 
       delete $3; 
     }
     ;
 
-/**
- * @description: 包含了 `COUNT(*), id` 这种情况, 需要特判
- * @return {RelAttrSqlNode*}
- */
-rel_attr_aggre:
-      rel_attr
-    {
-      $$ = $1; 
-    }
-    | aggre_node
-    {
-      $$ = new RelAttrSqlNode;
-      $$->aggretion_node = *$1; 
-      delete $1; 
-    }
-    ;
-
-/**
- * @description: 获取aggre节点, 当前COUNT(list) TODO 中暂时写的是列名, 没有考虑表名
- * @return {AggreTypeNode*}
- */
 aggre_node:
-      aggre_type LBRACE aggre_attr_list RBRACE
+      aggre_type LBRACE rel_attr RBRACE
     {
-      $$ = new AggreTypeNode;
+      $$ = new AggreSqlNode;
       $$->aggre_type = $1; 
       if ($3 != nullptr) {
-        $$->attribute_names.swap(*$3); 
+        $$->attribute_name = *$3; 
         delete $3; 
       }
     }
     ;
 
+rel_attr_list_opt:
+      rel_attr_list
+    {
+      $$ = $1; 
+    }
+    | /* empty */
+    {
+      $$ = nullptr; 
+    }
+    ;
 
-/**
- * @description: 获取一个rel_attr
- * @return {RelAttrSqlNode*} 
- */
+rel_attr_list:
+      rel_attr
+    {
+      $$ = new std::vector<RelAttrSqlNode>{*$1}; 
+      delete $1; 
+    }
+    | rel_attr_list COMMA rel_attr
+    {
+      $$->emplace_back(*$3); 
+      delete $3; 
+    }
+    ;
+
 rel_attr:
      attr_name
     {
@@ -630,24 +644,6 @@ rel_attr:
     {
       $$ = new RelAttrSqlNode{$1, $3};
       free($1);
-      free($3);
-    }
-    ;
-
-
-/**
- * @description: 获取列名的列表
- * @return {std::vector<std::string>*} 
- */
-attr_list:
-      attr_name
-    {
-      $$ = new std::vector<std::string>{$1};
-      free($1); 
-    }
-    | attr_list COMMA attr_name
-    {
-      $$->emplace_back($3); 
       free($3);
     }
     ;
@@ -948,40 +944,6 @@ opt_semicolon: /*empty*/
     | SEMICOLON
     ;
 
-aggre_attr_list:
-      /* empty */
-    {
-      $$ = nullptr; 
-    }
-    | aggre_attr_name
-    {
-      $$ = new std::vector<std::string>{$1};
-      free($1); 
-    }
-    | attr_list COMMA aggre_attr_name
-    {
-      $$->emplace_back($3); 
-      free($3);
-    }
-    ;
-
-aggre_attr_name: // aggre_attr 可能有数字
-      attr_name
-    {
-      $$ = $1; 
-    }
-    | number
-    {
-      int str_len = snprintf(NULL, 0, "%d", $1);
-      char *str = (char *)malloc((str_len + 1) * sizeof(char));
-      snprintf(str, str_len + 1, "%d", $1);
-      $$ = str;
-    }
-    | AGGRE_ATTR // 数字 + 字母 可能没有, 先加上
-    {
-      $$ = $1; 
-    }
-    ;
 
 id_list:
       ID

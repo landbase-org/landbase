@@ -579,3 +579,17 @@ bool Value::type_cast(const AttrType target)
     }
   }
 }
+
+Value Value::operator+(const Value &other) const
+{
+  if (this->is_null() || other.is_null()) {
+    return Value();
+  }
+  // 只有INT和FLOAT可以加减
+  assert(this->attr_type_ == INTS || this->attr_type_ == FLOATS);
+  assert(other.attr_type_ == INTS || other.attr_type_ == FLOATS);
+  if (this->attr_type_ == INTS && other.attr_type() == INTS) {
+    return Value(this->get_int() + other.get_int());
+  }
+  return Value(this->get_float() + other.get_float());
+}

@@ -26,6 +26,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/comp_op.h"
 #include "sql/parser/value.h"
 
+class ExprNode;
 class Expression;
 
 /**
@@ -37,9 +38,9 @@ class Expression;
  */
 enum OrderType
 {
-  NONE,  // 无ORDER要求
-  ORDER_ASC,   // 升序
-  ORDER_DESC   // 降序
+  NONE,       // 无ORDER要求
+  ORDER_ASC,  // 升序
+  ORDER_DESC  // 降序
 };
 
 /**
@@ -70,196 +71,6 @@ static std::string aggreType2str(AggreType aggre)
 }
 
 /**
- * @description: 计算Aggre的类型
- * @return {*}
- */
-class AggreCalc
-{
-  using date = int32_t;
-  // 每次执行更新操作 `count` 更新一次, 便于求avg的值
-  // 求 avg 和 sum都统一更新sum
-
-public:
-  AggreCalc() = delete;
-  // AggreType: MIN, MAX, AVG, COUNT, SUM
-  AggreCalc(AggreType aggre_type, Value value) : aggre_type_(aggre_type), value_(value)
-  {
-    attr_type_ = value.attr_type();
-    i_count++;
-
-    switch (attr_type_) {
-      case CHARS: {
-        switch (aggre_type_) {
-          case AGGRE_MAX: s_max = value.get_string(); break;
-          case AGGRE_MIN: s_min = value.get_string(); break;
-          default: break;
-        }
-      } break;
-      case DATES: {
-        switch (aggre_type_) {
-          case AGGRE_MAX: d_max = value.get_date(); break;
-          case AGGRE_MIN: d_min = value.get_date(); break;
-          default: break;
-        }
-      } break;
-      case INTS: {
-        switch (aggre_type_) {
-          case AGGRE_MAX: i_max = value.get_int(); break;
-          case AGGRE_MIN: i_min = value.get_int(); break;
-          case AGGRE_AVG:
-          case AGGRE_SUM: i_sum += value.get_int(); break;
-          default: break;
-        }
-      } break;
-      case FLOATS: {
-        switch (aggre_type_) {
-          case AGGRE_MAX: f_max = value.get_float(); break;
-          case AGGRE_MIN: f_min = value.get_float(); break;
-          case AGGRE_AVG:
-          case AGGRE_SUM: f_sum += value.get_float(); break;
-          default: break;
-        }
-      } break;
-      case NULLS: {
-        if (aggre_type_ != AGGRE_COUNT_ALL) {
-          i_count--;
-        }
-      } break;
-      default: break;
-    }
-  }
-
-  void update(Value value)
-  {
-    // 如果传进来的是 null，同时不是 count(*)，不更新
-    if (value.is_null() && aggre_type_ != AGGRE_COUNT_ALL) {
-      return;
-    }
-    // 有时第一个加进来的值是NULL, 需要更新attr_type
-    if (attr_type_ == NULLS && value.attr_type() != NULLS) {
-      attr_type_ = value.attr_type();
-    }
-
-    i_count++;
-
-    switch (attr_type_) {
-      case CHARS: {
-        switch (aggre_type_) {
-          case AGGRE_MAX: s_max = std::max(s_max, value.get_string()); break;
-          case AGGRE_MIN: s_min = std::min(s_min, value.get_string()); break;
-          default: break;
-        }
-      } break;
-      case DATES: {
-        switch (aggre_type_) {
-          case AGGRE_MAX: d_max = std::max(d_max, value.get_date()); break;
-          case AGGRE_MIN: d_min = std::min(d_min, value.get_date()); break;
-          default: break;
-        }
-      } break;
-      case INTS: {
-        switch (aggre_type_) {
-          case AGGRE_MAX: i_max = std::max(i_max, value.get_int()); break;
-          case AGGRE_MIN: i_min = std::min(i_min, value.get_int()); break;
-          case AGGRE_AVG:
-          case AGGRE_SUM: i_sum += value.get_int(); break;
-          default: break;
-        }
-      } break;
-      case FLOATS: {
-        switch (aggre_type_) {
-          case AGGRE_MAX: f_max = std::max(f_max, value.get_float()); break;
-          case AGGRE_MIN: f_min = std::min(f_min, value.get_float()); break;
-          case AGGRE_AVG:
-          case AGGRE_SUM: f_sum += value.get_float(); break;
-          default: break;
-        }
-      } break;
-      default: break;
-    }
-  }
-
-  const Value get_value()
-  {
-    if (aggre_type_ == AGGRE_COUNT || aggre_type_ == AGGRE_COUNT_ALL)
-      return Value((int)i_count);
-
-    switch (attr_type_) {
-      case CHARS: {
-        switch (aggre_type_) {
-          case AGGRE_MAX: value_.set_string(s_max.c_str()); break;
-          case AGGRE_MIN: value_.set_string(s_min.c_str()); break;
-          default: break;
-        }
-      } break;
-      case DATES: {
-        switch (aggre_type_) {
-          case AGGRE_MAX: value_.set_date(d_max); break;
-          case AGGRE_MIN: value_.set_date(d_min); break;
-          default: break;
-        }
-      } break;
-      case INTS: {
-        switch (aggre_type_) {
-          case AGGRE_MAX: value_.set_int(i_max); break;
-          case AGGRE_MIN: value_.set_int(i_min); break;
-          case AGGRE_AVG: {
-            if (i_sum % i_count == 0) {
-              value_.set_int(i_sum / i_count);
-            } else {  // 如果结果为小数, 需要转化为FLOAT类型的value
-              value_.set_type(FLOATS);
-              value_.set_float(static_cast<float>(i_sum) / i_count);
-            }
-          } break;
-          case AGGRE_SUM: value_.set_int(i_sum); break;
-          default: break;
-        }
-      } break;
-      case FLOATS: {
-        switch (aggre_type_) {
-          case AGGRE_MAX: value_.set_float(f_max); break;
-          case AGGRE_MIN: value_.set_float(f_min); break;
-          case AGGRE_AVG: value_.set_float(f_sum / i_count); break;
-          case AGGRE_SUM: value_.set_float(f_sum); break;
-          default: break;
-        }
-      }
-      default: break;
-    }
-    return value_;
-  }
-
-private:
-  AggreType   aggre_type_;
-  Value       value_;
-  AttrType    attr_type_;
-  std::string s_min;
-  std::string s_max;
-
-  date d_min;
-  date d_max;
-
-  int       i_max{INT_MIN};
-  int       i_min{INT_MAX};
-  float     i_avg{0};  // 结果可能有小数
-  long long i_sum{0};
-  long long i_count{0};
-
-  double f_sum{0};
-  double f_avg{0};
-  float  f_max{FLT_MIN};
-  float  f_min{FLT_MAX};
-};
-/**
- * @description: aggretion 节点
- */
-struct AggreTypeNode
-{
-  std::vector<std::string> attribute_names;         ///< 可能是多个字段
-  AggreType                aggre_type{AGGRE_NONE};  ///< 聚合类型
-};
-
-/**
  * @brief 描述一个属性
  * @ingroup SQLParser
  * @details 属性，或者说字段(column, field)
@@ -268,9 +79,17 @@ struct AggreTypeNode
  */
 struct RelAttrSqlNode
 {
-  std::string   relation_name;   ///< relation name (may be NULL) 表名
-  std::string   attribute_name;  ///< attribute name              属性名
-  AggreTypeNode aggretion_node;
+  std::string relation_name;   ///< relation name (may be NULL) 表名
+  std::string attribute_name;  ///< attribute name              属性名
+};
+
+/**
+ * @description: aggretion 节点
+ */
+struct AggreSqlNode
+{
+  RelAttrSqlNode attribute_name;          ///< 查询的字段
+  AggreType      aggre_type{AGGRE_NONE};  ///< 聚合类型
 };
 
 /**
@@ -323,11 +142,12 @@ struct OrderSqlNode
 
 struct SelectSqlNode
 {
-  std::vector<RelAttrSqlNode>   attributes;  ///< attributes in select clause
-  std::vector<std::string>      relations;   ///< 查询的表
-  std::vector<ConditionSqlNode> conditions;  ///< 查询条件，使用AND串联起来多个条件
-  std::vector<JoinSqlNode>      joinctions;  ///< Join-list
-  std::vector<OrderSqlNode>     orders;      ///< Order-requirements
+  std::vector<RelAttrSqlNode>   attributes;    ///< attributes in select clause
+  std::vector<AggreSqlNode>     aggregations;  ///< aggregations
+  std::vector<std::string>      relations;     ///< 查询的表
+  std::vector<ConditionSqlNode> conditions;    ///< 查询条件，使用AND串联起来多个条件
+  std::vector<JoinSqlNode>      joinctions;    ///< Join-list
+  std::vector<OrderSqlNode>     orders;        ///< Order-requirements
 };
 
 /**
@@ -499,6 +319,33 @@ struct ErrorSqlNode
   std::string error_msg;
   int         line;
   int         column;
+};
+
+////////////////////// !expresion///
+/**
+ * @brief 表达式类型
+ * @ingroup Expression
+ */
+enum class ExprType
+{
+  NONE,
+  STAR,         ///< 星号，表示所有字段
+  FIELD,        ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
+  VALUE,        ///< 常量值
+  CAST,         ///< 需要做类型转换的表达式
+  COMPARISON,   ///< 需要做比较的表达式
+  CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
+  ARITHMETIC,   ///< 算术运算
+  AGGREGATION,  ///< 聚合运算
+};
+struct ExprNode
+{
+  explicit ExprNode() = default;
+  ExprNode(AggreSqlNode aggre) : aggre_(aggre), type_(ExprType::AGGREGATION) {}
+  ExprNode(RelAttrSqlNode rel_attr) : rel_attr_(rel_attr), type_(ExprType::FIELD) {}
+  AggreSqlNode   aggre_;
+  RelAttrSqlNode rel_attr_;
+  ExprType       type_;
 };
 
 /**
