@@ -39,6 +39,7 @@ class OptimizeStage
 {
 public:
   RC handle_request(SQLStageEvent *event);
+  RC handle_expr(Expression *expr);
 
 private:
   /**

@@ -48,19 +48,15 @@ static RC get_expressions(
 {
   // 如果只是普通的查询列表数据
   RC rc = RC::SUCCESS;
-  if (sql_node.attributes.size()) {
+  if (!sql_node.attributes.empty()) {
     return FieldExpr::create(sql_node.attributes, table_map, tables, res_expressions, db);
   }
 
   // aggregation的情况
-  std::vector<ExprNode> expr_nodes;
-  for (auto aggre : sql_node.aggregations) {
-    expr_nodes.push_back(ExprNode(aggre));
-  }
 
-  for (auto &expr_node : expr_nodes) {
+  for (auto &expr_node : sql_node.aggregations) {
     Expression *tmp_expression;
-    rc = Expression::create(expr_node, table_map, tables, tmp_expression, db);
+    rc = AggreExpression::create(expr_node, table_map, tables, tmp_expression, db);
     if (rc != RC::SUCCESS) {
       LOG_WARN("create expression err");
       return rc;
@@ -80,8 +76,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // parse the tables;
   std::vector<Table *>                     tables;
   std::unordered_map<std::string, Table *> table_map;
-  std::vector<ConditionSqlNode>            conditions = select_sql.conditions;
-  std::vector<OrderSqlNode>                orderbys   = select_sql.orders;
+  std::vector<OrderSqlNode>                orderbys = select_sql.orders;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const char *table_name = select_sql.relations[i].c_str();
     if (nullptr == table_name) {
@@ -132,6 +127,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   }
 
   // add up the join's conditions
+  std::vector<ConditionSqlNode> conditions = select_sql.conditions;
   for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
     std::vector<ConditionSqlNode> const &tmp_vec_condi = select_sql.joinctions[i].join_conditions;
     for (auto j : tmp_vec_condi)

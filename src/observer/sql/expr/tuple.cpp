@@ -57,9 +57,15 @@ void AggregationTuple::init(std::vector<std::unique_ptr<AggreExpression>> *aggre
   all_null_.resize(size_);
   aggre_resluts_.resize(size_);
   field_results_.resize(size_);
-
   field_exprs_.resize(size_);
   aggre_exprs_ = aggre_exprs;
+  // 设置result的默认值
+  for (size_t i = 0; i < size_; ++i) {
+    if ((*aggre_exprs_)[i]->get_aggre_type() == AGGRE_COUNT_ALL ||
+        (*aggre_exprs_)[i]->get_aggre_type() == AGGRE_COUNT) {
+      aggre_resluts_[i].set_int(0);
+    }
+  }
 }
 
 void AggregationTuple::do_aggregation_begin()

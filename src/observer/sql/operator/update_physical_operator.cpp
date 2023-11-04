@@ -43,7 +43,7 @@ RC UpdatePhysicalOperator::next()
     return RC::RECORD_EOF;
   }
 
-  PhysicalOperator *child = children_[0].get();
+  auto &child = children_[0];
   while (RC::SUCCESS == (rc = child->next())) {
     if (has_unique_index_) {
       rc = child->next();

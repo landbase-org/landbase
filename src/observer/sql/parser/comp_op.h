@@ -18,5 +18,9 @@ enum CompOp
   NOT_LIKE,     ///< NOT LIKE
   IS,           ///< 目前仅用于判断是否为 null
   IS_NOT,       ///< 目前仅用于判断是否为 null
+  IN,           ///< IN
+  NOT_IN,       ///< NOT IN
+  EXISTS,       ///< EXISTS
+  NOT_EXISTS,   ///< NOT EXISTS
   NO_OP,        ///< no condition
 };

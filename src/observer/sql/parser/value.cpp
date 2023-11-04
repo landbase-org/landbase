@@ -525,6 +525,7 @@ bool Value::type_cast(const AttrType target)
 {
   if (attr_type_ == target)
     return true;
+
   std::stringstream ss;
   switch (target) {
     case INTS: {
@@ -542,7 +543,7 @@ bool Value::type_cast(const AttrType target)
         str_value_.clear();
         return true;
       }
-    }
+    } break;
     case FLOATS: {
       float temp{0.0f};
       if (attr_type_ == INTS) {
@@ -557,7 +558,7 @@ bool Value::type_cast(const AttrType target)
         set_float(temp);
         return true;
       }
-    }
+    } break;
     case CHARS: {
       std::string res;
       if (attr_type_ == INTS) {
@@ -572,12 +573,13 @@ bool Value::type_cast(const AttrType target)
         set_string(res.c_str());
         return true;
       }
-    }
+    } break;
     default: {
       LOG_WARN("Typecast Failed");
       return false;
-    }
+    } break;
   }
+  return false;
 }
 
 Value Value::operator+(const Value &other) const

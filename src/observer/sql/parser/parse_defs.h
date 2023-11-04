@@ -24,9 +24,9 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/log/log.h"
 #include "sql/parser/comp_op.h"
+#include "sql/parser/parse_expr_defs.h"
 #include "sql/parser/value.h"
 
-class ExprNode;
 class Expression;
 
 /**
@@ -92,25 +92,19 @@ struct AggreSqlNode
   AggreType      aggre_type{AGGRE_NONE};  ///< 聚合类型
 };
 
+// TODO: 内存泄漏
 /**
  * @brief 表示一个条件比较
  * @ingroup SQLParser
  * @details 条件比较就是SQL查询中的 where a>b 这种。
  * 一个条件比较是有两部分组成的，称为左边和右边。
  * 左边和右边理论上都可以是任意的数据，比如是字段（属性，列），也可以是数值常量。
- * 这个结构中记录的仅仅支持字段和值。
  */
 struct ConditionSqlNode
 {
-  int left_is_attr;              ///< TRUE if left-hand side is an attribute
-                                 ///< 1时，操作符左边是属性名，0时，是属性值
-  Value          left_value;     ///< left-hand side value if left_is_attr = FALSE
-  RelAttrSqlNode left_attr;      ///< left-hand side attribute
-  CompOp         comp;           ///< comparison operator
-  int            right_is_attr;  ///< TRUE if right-hand side is an attribute
-                                 ///< 1时，操作符右边是属性名，0时，是属性值
-  RelAttrSqlNode right_attr;     ///< right-hand side attribute if right_is_attr = TRUE 右边的属性
-  Value          right_value;    ///< right-hand side value if right_is_attr = FALSE
+  ParseExpr *left = nullptr;
+  CompOp     comp{CompOp::NO_OP};  ///< comparison operator
+  ParseExpr *right = nullptr;
 };
 
 /**
@@ -148,6 +142,22 @@ struct SelectSqlNode
   std::vector<ConditionSqlNode> conditions;    ///< 查询条件，使用AND串联起来多个条件
   std::vector<JoinSqlNode>      joinctions;    ///< Join-list
   std::vector<OrderSqlNode>     orders;        ///< Order-requirements
+};
+
+class ParseSubQueryExpr : public ParseExpr
+{
+public:
+  ParseSubQueryExpr(SelectSqlNode &sub_query)
+  {
+    sub_query_ = std::unique_ptr<SelectSqlNode>(new SelectSqlNode(sub_query));
+  }
+  ParseExprType expr_type() { return ParseExprType::SUBQUERY; }
+
+public:
+  auto &sub_query() const { return sub_query_; }
+
+private:
+  std::unique_ptr<SelectSqlNode> sub_query_ = nullptr;
 };
 
 /**
@@ -319,33 +329,6 @@ struct ErrorSqlNode
   std::string error_msg;
   int         line;
   int         column;
-};
-
-////////////////////// !expresion///
-/**
- * @brief 表达式类型
- * @ingroup Expression
- */
-enum class ExprType
-{
-  NONE,
-  STAR,         ///< 星号，表示所有字段
-  FIELD,        ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
-  VALUE,        ///< 常量值
-  CAST,         ///< 需要做类型转换的表达式
-  COMPARISON,   ///< 需要做比较的表达式
-  CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
-  ARITHMETIC,   ///< 算术运算
-  AGGREGATION,  ///< 聚合运算
-};
-struct ExprNode
-{
-  explicit ExprNode() = default;
-  ExprNode(AggreSqlNode aggre) : aggre_(aggre), type_(ExprType::AGGREGATION) {}
-  ExprNode(RelAttrSqlNode rel_attr) : rel_attr_(rel_attr), type_(ExprType::FIELD) {}
-  AggreSqlNode   aggre_;
-  RelAttrSqlNode rel_attr_;
-  ExprType       type_;
 };
 
 /**

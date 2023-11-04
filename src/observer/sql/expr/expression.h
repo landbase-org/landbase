@@ -19,9 +19,11 @@ See the Mulan PSL v2 for more details. */
 #include <string.h>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "common/lang/string.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
 #include "storage/db/db.h"
@@ -35,6 +37,27 @@ class Tuple;
  * @defgroup Expression
  * @brief 表达式
  */
+
+/**
+ * @brief 表达式类型
+ * @ingroup Expression
+ */
+enum class ExprType
+{
+  NONE,
+  STAR,         ///< 星号，表示所有字段
+  FIELD,        ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
+  VALUE,        ///< 常量值
+  CAST,         ///< 需要做类型转换的表达式
+  COMPARISON,   ///< 需要做比较的表达式
+  CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
+  ARITHMETIC,   ///< 算术运算
+  IN,
+  EXISTS,
+  VALUELIST,
+  SUBQUERY,
+  AGGREGATION,  ///< 聚合运算
+};
 
 /**
  * @brief 表达式的抽象描述
@@ -82,16 +105,6 @@ public:
   virtual std::string name() const { return name_; }  // 这里是输出结果显示的table_name
   virtual void        set_name(std::string name) { name_ = name; }
 
-  /**
-   * @brief 创建表达式
-   * @details 根据sql_node的类型选择（aggregation, ...) 创建不同的expresson
-   * 此处的sql_node可能为 RelAttrSqlNode， AggreSqlNode ...
-   */
-  static RC create(
-      const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map,
-      const std::vector<Table *> &tables, Expression *&res_expr, Db *db
-  );
-
 private:
   std::string name_;
 };
@@ -138,7 +151,7 @@ public:
    * 用于知道rel_attr的情况下构建对应的FieldExpr;
    */
   static RC create(
-      const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map,
+      const RelAttrSqlNode &node, const std::unordered_map<std::string, Table *> &table_map,
       const std::vector<Table *> &tables, Expression *&res_expr
   );
 
@@ -172,6 +185,10 @@ public:
   void get_value(Value &value) const { value = value_; }
 
   const Value &get_value() const { return value_; }
+
+  auto &get_value() { return value_; }
+
+  bool is_null() const { return value_.is_null(); }
 
 private:
   Value value_;
@@ -319,6 +336,112 @@ private:
   std::unique_ptr<Expression> right_;
 };
 
+class ValueListExpr : public Expression
+{
+public:
+  ValueListExpr() = default;
+  ValueListExpr(const std::vector<Value> &value_list) : value_list_(value_list) {}
+  ExprType type() const override { return ExprType::VALUELIST; }
+  AttrType value_type() const override { return value_list_.front().attr_type(); }
+  RC       get_value(const Tuple &tuple, Value &value) const override { return try_get_value(value); }
+  RC       try_get_value(Value &value) const override
+  {
+    if (value_list_.size() == 1) {
+      value = value_list_.front();
+      return RC::SUCCESS;
+    }
+    sql_debug("ValueListExpr::value_list_ size is %d", value_list_.size());
+    return RC::INTERNAL;
+  }
+
+  bool has_values() { return !value_list_.empty(); }
+
+public:
+  auto &value_list() const { return value_list_; }
+  auto &value_list() { return value_list_; }
+  bool  contains(const Value &value) const
+  {
+    return std::find(value_list_.begin(), value_list_.end(), value) != value_list_.end();
+  }
+
+protected:
+  std::vector<Value> value_list_;
+};
+
+/**
+ * @brief In 表达式
+ * @ingroup Expression
+ * left_ : FieldExpr, ValueExpr, 返回一个值的SubQueryExor, 和返回一个值的ValueListExpr
+ * right_: SubQueryExpr, ValueListExpr
+ */
+class InExpr : public Expression
+{
+public:
+  InExpr(std::unique_ptr<Expression> left, CompOp comp, std::unique_ptr<Expression> right)
+      : left_(std::move(left)),
+        comp_(comp),
+        right_(std::move(right))
+  {}
+  ExprType type() const override { return ExprType::IN; }
+  AttrType value_type() const override { return BOOLEANS; }
+  RC       get_value(const Tuple &tuple, Value &value) const override
+  {
+    Value left_value;
+
+    RC rc = left_->get_value(tuple, left_value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+      return rc;
+    }
+
+    auto right_expr = static_cast<ValueListExpr *>(right_.get());
+    bool bool_value = right_expr->contains(left_value);
+    if (comp_ == CompOp::NOT_IN) {
+      bool_value = !bool_value;
+    }
+    value.set_boolean(bool_value);
+    return rc;
+  }
+
+  auto &left() { return left_; }
+  auto &right() { return right_; }
+
+private:
+  CompOp                      comp_;
+  std::unique_ptr<Expression> left_;
+  std::unique_ptr<Expression> right_;
+};
+
+/**
+ * @brief Exists 表达式
+ * @ingroup Expression
+ * right_: SubQueryExpr
+ */
+class ExistsExpr : public Expression
+{
+public:
+  ExistsExpr(CompOp comp, std::unique_ptr<Expression> right) : comp_(comp), right_(std::move(right)) {}
+  ExprType type() const override { return ExprType::EXISTS; }
+  AttrType value_type() const override { return BOOLEANS; }
+  RC       get_value(const Tuple &tuple, Value &value) const override { return try_get_value(value); }
+  RC       try_get_value(Value &value) const override
+  {
+    // TODO: 还可以优化，比如将right_改为 ValueListExpr?
+    auto value_list_expr = static_cast<ValueListExpr *>(right_.get());
+
+    bool result = (value_list_expr->has_values()) ^ (comp_ == CompOp::NOT_EXISTS);
+    value.set_boolean(result);
+    return RC::SUCCESS;
+  }
+
+  auto &right() { return right_; }
+  auto &sub_expr() { return right_; }
+
+private:
+  CompOp                      comp_;
+  std::unique_ptr<Expression> right_;
+};
+
 class AggreExpression : public Expression
 {
 public:
@@ -344,12 +467,25 @@ public:
   const char *field_name() const { return field_->field_name(); }
   AggreType   get_aggre_type() const { return type_; }
   std::string get_aggre_type_str() const { return aggreType2str(type_); };
-  AttrType    get_return_value_type() const;
   void        set_full_table_name(bool flag) { full_table_name_ = flag; }
   bool        is_full_table_name() { return full_table_name_; }
 
 public:
-  AttrType value_type() const override { return value_->value_type(); };
+  AttrType value_type() const override
+  {
+    switch (type_) {
+      case AGGRE_MAX: return field_->value_type();
+      case AGGRE_MIN: return field_->value_type();
+      case AGGRE_SUM: return field_->value_type();
+      case AGGRE_AVG: return FLOATS;
+      case AGGRE_COUNT: return INTS;
+      case AGGRE_COUNT_ALL: return INTS;
+      default: {
+        sql_debug("invalid aggre type. aggre_type=%d", type_);
+      } break;
+    }
+    return UNDEFINED;
+  };
   ExprType type() const override { return ExprType::AGGREGATION; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
   /**
@@ -361,7 +497,7 @@ public:
 public:
   static void get_aggre_expression(Expression *expr, std::vector<std::unique_ptr<AggreExpression>> &aggrfunc_exprs);
   static RC   create(
-        const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map,
+        const AggreSqlNode &node, const std::unordered_map<std::string, Table *> &table_map,
         const std::vector<Table *> &tables, Expression *&res_expr, Db *db = nullptr
     );
 

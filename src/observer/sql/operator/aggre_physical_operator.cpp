@@ -11,8 +11,7 @@
 RC AggrePhysicalOperator::open(Trx *trx)
 {
   if (children_.size() != 1) {
-    LOG_WARN("predicate operator must has one child");
-    return RC::INTERNAL;
+    return RC::SUCCESS;
   }
 
   return children_[0]->open(trx);
@@ -22,6 +21,13 @@ RC AggrePhysicalOperator::next()
 {
   if (is_record_eof) {
     return RC::RECORD_EOF;
+  }
+
+  // select count(*) from table where 1=0;
+  // 此时children_是空的，直接返回结果
+  if (children_.empty()) {
+    is_record_eof = true;
+    return RC::SUCCESS;
   }
 
   RC                rc   = RC::SUCCESS;
@@ -51,6 +57,11 @@ RC AggrePhysicalOperator::next()
 
 RC AggrePhysicalOperator::close()
 {
+  // 聚合是有可能没有子opererator的，例如select count(*) from table where 1=0;
+  // 这种情况下，children_是空的
+  if (children_.empty()) {
+    return RC::SUCCESS;
+  }
   children_[0]->close();
   return RC::SUCCESS;
 }

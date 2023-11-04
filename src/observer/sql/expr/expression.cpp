@@ -27,31 +27,6 @@ using namespace std;
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////!Expression/////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
-RC Expression::create(
-    const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables,
-    Expression *&res_expr, Db *db
-)
-{
-  switch (node.type_) {
-    case ExprType::FIELD: {
-      return FieldExpr::create(node, table_map, tables, res_expr);
-    } break;
-    case ExprType::AGGREGATION: {
-      return AggreExpression::create(node, table_map, tables, res_expr);
-    } break;
-    case ExprType::VALUE:
-    case ExprType::NONE:
-    case ExprType::STAR:
-    case ExprType::CAST:
-    case ExprType::COMPARISON:
-    case ExprType::CONJUNCTION:
-    case ExprType::ARITHMETIC: {
-      LOG_ERROR("not compliment other type");
-      // DEFALT; 如果到时候需要再加
-    } break;
-  }
-  return RC::SUCCESS;
-}
 
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 {
@@ -138,12 +113,11 @@ RC FieldExpr::create(
 }
 
 RC FieldExpr::create(
-    const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables,
-    Expression *&res_expr
+    const RelAttrSqlNode &node, const std::unordered_map<std::string, Table *> &table_map,
+    const std::vector<Table *> &tables, Expression *&res_expr
 )
 {
-  assert(node.type_ == ExprType::FIELD);
-  const auto &[table_name, field_name] = node.rel_attr_;
+  const auto &[table_name, field_name] = node;
   const Table     *table;
   const FieldMeta *field_meta;
 
@@ -520,20 +494,6 @@ std::string AggreExpression::name() const
   return name_str;
 }
 
-AttrType AggreExpression::get_return_value_type() const
-{
-  switch (type_) {
-    case AGGRE_MAX: return field_->value_type();
-    case AGGRE_MIN: return field_->value_type();
-    case AGGRE_SUM: return field_->value_type();
-    case AGGRE_AVG: return FLOATS;
-    case AGGRE_COUNT: return INTS;
-    case AGGRE_COUNT_ALL: return INTS;
-    case AGGRE_NONE: return UNDEFINED;
-  }
-  return UNDEFINED;
-}
-
 void AggreExpression::get_aggre_expression(Expression *expr, std::vector<unique_ptr<AggreExpression>> &aggrfunc_exprs)
 {
   if (auto x = dynamic_cast<AggreExpression *>(expr)) {
@@ -543,20 +503,16 @@ void AggreExpression::get_aggre_expression(Expression *expr, std::vector<unique_
 }
 
 RC AggreExpression::create(
-    const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables,
-    Expression *&res_expr, Db *db
+    const AggreSqlNode &aggre_node, const std::unordered_map<std::string, Table *> &table_map,
+    const std::vector<Table *> &tables, Expression *&res_expr, Db *db
 )
 {
-  assert(node.type_ == ExprType::AGGREGATION);
-
-  RC          rc         = RC::SUCCESS;
-  Table      *table      = tables.front();
-  const auto &aggre_node = node.aggre_;
+  RC     rc    = RC::SUCCESS;
+  Table *table = tables.front();
 
   const auto &rel_attr             = aggre_node.attribute_name;
   const auto &[rel, attr]          = rel_attr;
   const auto      &aggre_type      = aggre_node.aggre_type;
-  auto             field_meta      = table->table_meta().field(attr.c_str());
   Expression      *field_expr      = nullptr;  // FieldExpr 表达式
   AggreExpression *aggre_expr      = nullptr;
   bool             full_table_name = tables.size() > 1;  // 当前默认是两张表及以上显示rel.attr
@@ -569,20 +525,20 @@ RC AggreExpression::create(
 
   // aggre_type 为COUNT 需要特判
   if (aggre_type == AGGRE_COUNT) {  // 如果是COUNT的情况， 那么COUNT（attr)可以为任何字符，使用Value存储该字符
-    auto &change = const_cast<AggreType &>(aggre_type);
-
     if (attr == "*") {  // 如果是COUNT（*）那么是查询所有包括空的表， 否则之查询当前列
-      change = AGGRE_COUNT_ALL;
-      aggre_expr =
-          new AggreExpression(aggre_type, new FieldExpr(tables[0], tables[0]->table_meta().field(1)), full_table_name);
-      auto value_expr = new ValueExpr(Value(attr.c_str()));
+      aggre_expr = new AggreExpression(
+          AGGRE_COUNT_ALL, new FieldExpr(tables[0], tables[0]->table_meta().field(1)), full_table_name
+      );
+      auto value_expr = new ValueExpr(Value("*"));
       aggre_expr->set_param_value(value_expr);
+
       res_expr = aggre_expr;
       return rc;
     }
 
     // attr 字段不为“*”
-    if (RC::SUCCESS != (rc = Expression::create(ExprNode(rel_attr), table_map, tables, field_expr, db))) {
+    rc = FieldExpr::create(rel_attr, table_map, tables, field_expr);
+    if (rc != RC::SUCCESS) {
       LOG_ERROR("Aggregation attr name:%s not created succ.", attr.c_str());
       return rc;
     }
@@ -592,11 +548,12 @@ RC AggreExpression::create(
   }
 
   // aggre_type 为其他
-  rc = Expression::create(ExprNode(aggre_node.attribute_name), table_map, tables, field_expr, db);
+  rc = FieldExpr::create(rel_attr, table_map, tables, field_expr);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("AggreExpression Create Param Expression Failed. RC = %d:%s", rc, strrc(rc));
     return rc;
   }
+
   aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr), full_table_name);
   res_expr   = aggre_expr;
   return rc;

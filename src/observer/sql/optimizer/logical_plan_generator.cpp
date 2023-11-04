@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/optimizer/logical_plan_generator.h"
 
 #include "sql/expr/expression.h"
+#include "sql/expr/sub_query_expr.h"
 #include "sql/operator/aggre_logical_operator.h"
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
@@ -129,7 +130,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   for (auto expr : select_stmt->expressions()) {
     AggreExpression::get_aggre_expression(expr, aggre_exprs);
   }
-  if (aggre_exprs.size()) {
+  if (!aggre_exprs.empty()) {
     unique_ptr<LogicalOperator> aggre_oper(new AggreLogicalOperator(std::move(aggre_exprs)));
     aggre_oper->add_child(std::move(root_oper));
     root_oper = std::move(aggre_oper);
@@ -157,29 +158,91 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
 RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  std::vector<unique_ptr<Expression>> cmp_exprs;
+  std::vector<unique_ptr<Expression>> expr_list;
   const std::vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
   for (const FilterUnit *filter_unit : filter_units) {
-    const FilterObj &filter_obj_left  = filter_unit->left();
-    const FilterObj &filter_obj_right = filter_unit->right();
+    auto &filter_unit_left  = filter_unit->left();
+    auto &filter_unit_right = filter_unit->right();
 
-    unique_ptr<Expression> left(
-        filter_obj_left.is_attr ? static_cast<Expression *>(new FieldExpr(filter_obj_left.field))
-                                : static_cast<Expression *>(new ValueExpr(filter_obj_left.value))
-    );
+    unique_ptr<Expression> left = nullptr;
+    switch (filter_unit_left->type()) {
+      case ExprType::FIELD: {
+        auto tmp_expr = static_cast<const FieldExpr *>(filter_unit_left);
+        left          = unique_ptr<Expression>(new FieldExpr(tmp_expr->field()));
+      } break;
+      case ExprType::VALUE: {
+        auto tmp_expr = static_cast<const ValueExpr *>(filter_unit_left);
+        left          = unique_ptr<Expression>(new ValueExpr(tmp_expr->get_value()));
+      } break;
+      case ExprType::VALUELIST: {
+        auto tmp_expr = static_cast<const ValueListExpr *>(filter_unit_left);
+        left          = unique_ptr<Expression>(new ValueListExpr(tmp_expr->value_list()));
+      } break;
+      case ExprType::SUBQUERY: {
+        left = std::unique_ptr<Expression>(filter_unit_left);
+      } break;
+      default: {
+        sql_debug("unimplement expr: %d", filter_unit_left->type());
+      } break;
+    }
 
-    unique_ptr<Expression> right(
-        filter_obj_right.is_attr ? static_cast<Expression *>(new FieldExpr(filter_obj_right.field))
-                                 : static_cast<Expression *>(new ValueExpr(filter_obj_right.value))
-    );
+    unique_ptr<Expression> right = nullptr;
+    switch (filter_unit_right->type()) {
+      case ExprType::FIELD: {
+        auto tmp_expr = static_cast<const FieldExpr *>(filter_unit_right);
+        right         = unique_ptr<Expression>(new FieldExpr(tmp_expr->field()));
+      } break;
+      case ExprType::VALUE: {
+        auto tmp_expr = static_cast<const ValueExpr *>(filter_unit_right);
+        right         = unique_ptr<Expression>(new ValueExpr(tmp_expr->get_value()));
+      } break;
+      case ExprType::VALUELIST: {
+        auto tmp_expr = static_cast<const ValueListExpr *>(filter_unit_right);
+        right         = unique_ptr<Expression>(new ValueListExpr(tmp_expr->value_list()));
+      } break;
+      case ExprType::SUBQUERY: {
+        right = unique_ptr<Expression>(filter_unit_right);
+      } break;
+      default: {
+        sql_debug("unimplement expr: %d", filter_unit_left->type());
+      } break;
+    }
 
-    ComparisonExpr *cmp_expr = new ComparisonExpr(filter_unit->comp(), std::move(left), std::move(right));
-    cmp_exprs.emplace_back(cmp_expr);
+    Expression *expr = nullptr;
+    switch (filter_unit->comp()) {
+      case EQUAL_TO:
+      case LESS_EQUAL:
+      case NOT_EQUAL:
+      case LESS_THAN:
+      case GREAT_EQUAL:
+      case GREAT_THAN:
+      case LIKE:
+      case NOT_LIKE:
+      case IS:
+      case IS_NOT: {
+        expr = new ComparisonExpr(filter_unit->comp(), std::move(left), std::move(right));
+      } break;
+      case IN:
+      case NOT_IN: {
+        expr = new InExpr(std::move(left), filter_unit->comp(), std::move(right));
+      } break;
+      case EXISTS:
+      case NOT_EXISTS: {
+        expr = new ExistsExpr(filter_unit->comp(), std::move(right));
+      } break;
+      case NO_OP: {
+        sql_debug("no comp op where create plan");
+      } break;
+      default: {
+        sql_debug("unimplement comp: %d", filter_unit->comp());
+      } break;
+    }
+    expr_list.emplace_back(expr);
   }
 
   unique_ptr<PredicateLogicalOperator> predicate_oper;
-  if (!cmp_exprs.empty()) {
-    unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, cmp_exprs));
+  if (!expr_list.empty()) {
+    unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, expr_list));
     predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(conjunction_expr)));
   }
 
