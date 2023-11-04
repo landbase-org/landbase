@@ -351,7 +351,7 @@ public:
       return RC::SUCCESS;
     }
     sql_debug("ValueListExpr::value_list_ size is %d", value_list_.size());
-    return RC::FAILURE;
+    return RC::INTERNAL;
   }
 
   bool has_values() { return !value_list_.empty(); }
