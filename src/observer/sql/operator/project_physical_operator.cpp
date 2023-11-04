@@ -14,11 +14,11 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/project_physical_operator.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "storage/field/field_meta.h"
 #include "storage/record/record.h"
 #include "storage/table/table.h"
-
 RC ProjectPhysicalOperator::open(Trx *trx)
 {
   if (children_.empty()) {
@@ -28,7 +28,7 @@ RC ProjectPhysicalOperator::open(Trx *trx)
   PhysicalOperator *child = children_[0].get();
   RC                rc    = child->open(trx);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to open child operator: %s", strrc(rc));
+    sql_debug("failed to open child operator: %s", strrc(rc));
     return rc;
   }
 

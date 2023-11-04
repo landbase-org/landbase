@@ -1,6 +1,7 @@
 #include "order_physical_operator.h"
 #include "common/log/log.h"
 #include "common/rc.h"
+#include "event/sql_debug.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/comp_op.h"
@@ -46,7 +47,7 @@ RC OrderPhysicalOperator::initialize()
   while (RC::SUCCESS == children_[0]->next()) {
     Tuple *tup_ptr = children_[0]->current_tuple();
     if (tup_ptr == nullptr) {
-      LOG_WARN("Faild to get Row/Join");
+      sql_debug("Faild to get Row/Join");
       return RC::INTERNAL;
     }
     ordered_tuples_.emplace_back(tup_ptr);
@@ -71,7 +72,7 @@ OrderPhysicalOperator::~OrderPhysicalOperator()
 RC OrderPhysicalOperator::open(Trx *trx)
 {
   if (children_.size() > 1) {
-    LOG_WARN("Order should only have one child -> TableScan/Join");
+    sql_debug("Order should only have one child -> TableScan/Join");
     return RC::INTERNAL;
   }
 
@@ -85,7 +86,7 @@ RC OrderPhysicalOperator::next()
     RC rc = RC::SUCCESS;
     rc    = initialize();
     if (RC::SUCCESS != rc) {
-      LOG_WARN("Error at Order-init");
+      sql_debug("Error at Order-init");
       return rc;
     }
   } else {

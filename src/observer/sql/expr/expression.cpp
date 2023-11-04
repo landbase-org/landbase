@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/expr/expression.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/parse_defs.h"
@@ -54,7 +55,7 @@ RC FieldExpr::create(
     const auto field_name = relation_attr.attribute_name;
     const auto aggre_type = AGGRE_NONE;
     if (table_name == "*" || field_name == "") {
-      LOG_WARN("no fields type err=%s.%s", table_name.c_str(), field_name.c_str());
+      sql_debug("no fields type err=%s.%s", table_name.c_str(), field_name.c_str());
       return RC::SCHEMA_FIELD_MISSING;
     }
 
@@ -64,21 +65,21 @@ RC FieldExpr::create(
       }
     } else if (table_name == "" && field_name != "*") {  // field_name != "*"
       if (tables.size() != 1) {
-        LOG_WARN("invalid. I do not know the attr's table. attr=%s", relation_attr.attribute_name.c_str());
+        sql_debug("invalid. I do not know the attr's table. attr=%s", relation_attr.attribute_name.c_str());
         return RC::SCHEMA_FIELD_MISSING;
       }
 
       Table           *table      = tables[0];
       const FieldMeta *field_meta = table->table_meta().field(relation_attr.attribute_name.c_str());
       if (nullptr == field_meta) {
-        LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), relation_attr.attribute_name.c_str());
+        sql_debug("no such field. field=%s.%s.%s", db->name(), table->name(), relation_attr.attribute_name.c_str());
         return RC::SCHEMA_FIELD_MISSING;
       }
       res_expr.push_back(new FieldExpr(table, field_meta));
     } else {  // table_name != "*"
       auto iter = table_map.find(table_name);
       if (iter == table_map.end()) {
-        LOG_WARN("no such table in from list: %s", table_name.c_str());
+        sql_debug("no such table in from list: %s", table_name.c_str());
         return RC::SCHEMA_FIELD_MISSING;
       }
 
@@ -88,7 +89,7 @@ RC FieldExpr::create(
       } else {
         const FieldMeta *field_meta = table->table_meta().field(field_name.c_str());
         if (nullptr == field_meta) {
-          LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), field_name.c_str());
+          sql_debug("no such field. field=%s.%s.%s", db->name(), table->name(), field_name.c_str());
           return RC::SCHEMA_FIELD_MISSING;
         }
         res_expr.push_back(new FieldExpr(table, field_meta));
@@ -123,27 +124,27 @@ RC FieldExpr::create(
 
   if (table_name == "") {  // table_name 为空
     if (tables.size() != 1) {
-      LOG_WARN("invalid. I do not know the attr's table. attr=%s", field_name.c_str());
+      sql_debug("invalid. I do not know the attr's table. attr=%s", field_name.c_str());
       return RC::SCHEMA_FIELD_MISSING;
     }
 
     table      = tables.front();  // 只有一个表
     field_meta = table->table_meta().field(field_name.c_str());
     if (nullptr == field_meta) {
-      LOG_WARN("no such field. field=%s.%s", table->name(), field_name.c_str());
+      sql_debug("no such field. field=%s.%s", table->name(), field_name.c_str());
       return RC::SCHEMA_FIELD_MISSING;
     }
   } else {
     auto iter = table_map.find(table_name);
     if (iter == table_map.end()) {
-      LOG_WARN("no such table in from list: %s", table_name.c_str());
+      sql_debug("no such table in from list: %s", table_name.c_str());
       return RC::SCHEMA_FIELD_MISSING;
     }
 
     table      = iter->second;
     field_meta = table->table_meta().field(field_name.c_str());
     if (nullptr == field_meta) {
-      LOG_WARN("no such field. field=%s.%s", table->name(), field_name.c_str());
+      sql_debug("no such field. field=%s.%s", table->name(), field_name.c_str());
       return RC::SCHEMA_FIELD_MISSING;
     }
   }
@@ -179,7 +180,7 @@ RC CastExpr::cast(const Value &value, Value &cast_value) const
     } break;
     default: {
       rc = RC::INTERNAL;
-      LOG_WARN("unsupported convert from type %d to %d", child_->value_type(), cast_type_);
+      sql_debug("unsupported convert from type %d to %d", child_->value_type(), cast_type_);
     }
   }
   return rc;
@@ -236,7 +237,7 @@ RC ComparisonExpr::try_get_value(Value &cell) const
     RC rc = compare_value(left_cell, right_cell, value);
 
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to compare tuple cells. rc=%s", strrc(rc));
+      sql_debug("failed to compare tuple cells. rc=%s", strrc(rc));
     } else {
       cell.set_boolean(value);
     }
@@ -253,12 +254,12 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 
   RC rc = left_->get_value(tuple, left_value);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+    sql_debug("failed to get value of left expression. rc=%s", strrc(rc));
     return rc;
   }
   rc = right_->get_value(tuple, right_value);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+    sql_debug("failed to get value of right expression. rc=%s", strrc(rc));
     return rc;
   }
 
@@ -288,7 +289,7 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
   for (const unique_ptr<Expression> &expr : children_) {
     rc = expr->get_value(tuple, tmp_value);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get value by child expression. rc=%s", strrc(rc));
+      sql_debug("failed to get value by child expression. rc=%s", strrc(rc));
       return rc;
     }
     bool bool_value = tmp_value.get_boolean();
@@ -391,7 +392,7 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
 
     default: {
       rc = RC::INTERNAL;
-      LOG_WARN("unsupported arithmetic type. %d", arithmetic_type_);
+      sql_debug("unsupported arithmetic type. %d", arithmetic_type_);
     } break;
   }
   return rc;
@@ -406,12 +407,12 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
 
   rc = left_->get_value(tuple, left_value);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+    sql_debug("failed to get value of left expression. rc=%s", strrc(rc));
     return rc;
   }
   rc = right_->get_value(tuple, right_value);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+    sql_debug("failed to get value of right expression. rc=%s", strrc(rc));
     return rc;
   }
   return calc_value(left_value, right_value, value);
@@ -426,14 +427,14 @@ RC ArithmeticExpr::try_get_value(Value &value) const
 
   rc = left_->try_get_value(left_value);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+    sql_debug("failed to get value of left expression. rc=%s", strrc(rc));
     return rc;
   }
 
   if (right_) {
     rc = right_->try_get_value(right_value);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+      sql_debug("failed to get value of right expression. rc=%s", strrc(rc));
       return rc;
     }
   }
@@ -519,7 +520,7 @@ RC AggreExpression::create(
 
   // attr为“*”但是attr_type不为COUNT
   if (attr == "*" && aggre_type != AGGRE_COUNT) {
-    LOG_WARN("Aggregation type %s cannot match parameters '*'", aggreType2str(aggre_type).c_str());
+    sql_debug("Aggregation type %s cannot match parameters '*'", aggreType2str(aggre_type).c_str());
     return RC::FAILURE;
   }
 
@@ -539,7 +540,7 @@ RC AggreExpression::create(
     // attr 字段不为“*”
     rc = FieldExpr::create(rel_attr, table_map, tables, field_expr);
     if (rc != RC::SUCCESS) {
-      LOG_ERROR("Aggregation attr name:%s not created succ.", attr.c_str());
+      sql_debug("Aggregation attr name:%s not created succ.", attr.c_str());
       return rc;
     }
     aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr), full_table_name);
@@ -550,7 +551,7 @@ RC AggreExpression::create(
   // aggre_type 为其他
   rc = FieldExpr::create(rel_attr, table_map, tables, field_expr);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("AggreExpression Create Param Expression Failed. RC = %d:%s", rc, strrc(rc));
+    sql_debug("AggreExpression Create Param Expression Failed. RC = %d:%s", rc, strrc(rc));
     return rc;
   }
 

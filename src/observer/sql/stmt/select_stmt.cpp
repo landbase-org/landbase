@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/stmt/select_stmt.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/stmt/filter_stmt.h"
@@ -24,7 +25,6 @@ See the Mulan PSL v2 for more details. */
 #include <algorithm>
 #include <cstddef>
 #include <vector>
-
 SelectStmt::~SelectStmt()
 {
   if (nullptr != filter_stmt_) {
@@ -58,7 +58,7 @@ static RC get_expressions(
     Expression *tmp_expression;
     rc = AggreExpression::create(expr_node, table_map, tables, tmp_expression, db);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("create expression err");
+      sql_debug("create expression err");
       return rc;
     }
     res_expressions.push_back(tmp_expression);
@@ -69,7 +69,7 @@ static RC get_expressions(
 RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
 {
   if (nullptr == db) {
-    LOG_WARN("invalid argument. db is null");
+    sql_debug("invalid argument. db is null");
     return RC::INVALID_ARGUMENT;
   }
 
@@ -80,13 +80,13 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const char *table_name = select_sql.relations[i].c_str();
     if (nullptr == table_name) {
-      LOG_WARN("invalid argument. relation name is null. index=%d", i);
+      sql_debug("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
     }
 
     Table *table = db->find_table(table_name);
     if (nullptr == table) {
-      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      sql_debug("no such table. db=%s, table_name=%s", db->name(), table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
@@ -98,13 +98,13 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
     const char *table_name = select_sql.joinctions[i].join_relation.c_str();
     if (nullptr == table_name) {
-      LOG_WARN("invalid argument. join relation name is null. index=%d", i);
+      sql_debug("invalid argument. join relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
     }
 
     Table *table = db->find_table(table_name);
     if (nullptr == table) {
-      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      sql_debug("no such table. db=%s, table_name=%s", db->name(), table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
@@ -116,7 +116,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   std::vector<Expression *> expressions;
   auto                      rc = get_expressions(select_sql, expressions, table_map, tables, db);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("cannot parse express");
+    sql_debug("cannot parse express");
     return rc;
   }
 
@@ -141,7 +141,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       db, default_table, &table_map, conditions.data(), static_cast<int>(conditions.size()), filter_stmt
   );
   if (rc != RC::SUCCESS) {
-    LOG_WARN("cannot construct filter stmt");
+    sql_debug("cannot construct filter stmt");
     return rc;
   }
 
@@ -152,7 +152,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       db, default_table, &table_map, orderbys.data(), static_cast<int>(orderbys.size()), orderby_stmt
   );
   if (rc != RC::SUCCESS) {
-    LOG_WARN("cannot construct orderby stmt");
+    sql_debug("cannot construct orderby stmt");
     return rc;
   }
 

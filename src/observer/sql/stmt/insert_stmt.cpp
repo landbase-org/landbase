@@ -14,10 +14,10 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/stmt/insert_stmt.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/parser/value.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
-
 InsertStmt::InsertStmt(Table *table, const std::vector<std::vector<Value>> &values_list, int value_list_amount)
     : table_(table),
       values_list_(values_list),
@@ -29,7 +29,7 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
   // 检查参数
   const char *table_name = inserts.relation_name.c_str();
   if (nullptr == db || nullptr == table_name || inserts.values_list.empty()) {
-    LOG_WARN(
+    sql_debug(
         "invalid argument. db=%p, table_name=%p, value_list_num=%d",
         db,
         table_name,
@@ -41,7 +41,7 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
   // check whether the table exists
   Table *table = db->find_table(table_name);
   if (nullptr == table) {
-    LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+    sql_debug("no such table. db=%s, table_name=%s", db->name(), table_name);
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
@@ -52,7 +52,7 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
   for (const auto &values : value_list) {
     const int value_num = values.size();
     if (field_num != value_num) {
-      LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
+      sql_debug("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
       return RC::SCHEMA_FIELD_MISSING;
     }
 
@@ -65,7 +65,7 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
 
       if (values[i].is_null()) {
         if (!field_meta->nullable()) {
-          LOG_WARN("table %s field %s is not nullable", table_meta.name(), field_meta->name());
+          sql_debug("table %s field %s is not nullable", table_meta.name(), field_meta->name());
           return RC::SCHEMA_FIELD_NOT_NULLABLE;
         } else {
           continue;
@@ -80,7 +80,7 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
           int32_t mid = 0;
           mid         = convert_string_to_date(change->data());
           if (mid == -1) {
-            LOG_WARN(
+            sql_debug(
                 "field type mismatch. table=%s, field=%s, field type=%d, value_type=%d",
                 table_name,
                 field_meta->name(),
@@ -97,7 +97,7 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
         if (change.type_cast(field_type)) {
           continue;
         }
-        LOG_WARN(
+        sql_debug(
             "field type mismatch. table=%s, field=%s, field type=%d, value_type=%d",
             table_name,
             field_meta->name(),

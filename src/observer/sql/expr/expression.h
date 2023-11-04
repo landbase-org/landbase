@@ -30,7 +30,6 @@ See the Mulan PSL v2 for more details. */
 #include "storage/field/field.h"
 #include "storage/field/field_meta.h"
 #include "storage/table/table.h"
-
 class Tuple;
 
 /**
@@ -390,7 +389,7 @@ public:
 
     RC rc = left_->get_value(tuple, left_value);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+      sql_debug("failed to get value of left expression. rc=%s", strrc(rc));
       return rc;
     }
 

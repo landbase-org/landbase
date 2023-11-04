@@ -21,6 +21,7 @@ See the Mulan PSL v2 for more details. */
 #include <utility>
 
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "sql/operator/aggre_logical_operator.h"
 #include "sql/operator/aggre_physical_operator.h"
@@ -52,7 +53,6 @@ See the Mulan PSL v2 for more details. */
 #include "storage/field/field.h"
 #include "storage/field/field_meta.h"
 #include "storage/index/index.h"
-
 using namespace std;
 
 RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<PhysicalOperator> &oper)
@@ -169,7 +169,7 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
     for some value which type-dismatch better code for the idx select realize
     if (value.attr_type() != idx_tree_type) {
       if (!const_cast<Value &>(value).type_cast(idx_tree_type)) {
-        LOG_WARN(
+        sql_debug(
             "Using %s data to init %s idx_scanner",
             attr_type_to_string(value.attr_type()),
             attr_type_to_string(idx_tree_type)
@@ -230,7 +230,7 @@ RC PhysicalPlanGenerator::create_plan(PredicateLogicalOperator &pred_oper, uniqu
   unique_ptr<PhysicalOperator> child_phy_oper;
   RC                           rc = create(child_oper, child_phy_oper);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create child operator of predicate operator. rc=%s", strrc(rc));
+    sql_debug("failed to create child operator of predicate operator. rc=%s", strrc(rc));
     return rc;
   }
 
@@ -254,7 +254,7 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
     LogicalOperator *child_oper = child_opers.front().get();
     rc                          = create(*child_oper, child_phy_oper);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to create project logical operator's child physical operator. rc=%s", strrc(rc));
+      sql_debug("failed to create project logical operator's child physical operator. rc=%s", strrc(rc));
       return rc;
     }
   }
@@ -295,7 +295,7 @@ RC PhysicalPlanGenerator::create_plan(UpdateLogicalOperator &update_oper, unique
     LogicalOperator *child_oper = child_opers.front().get();
     rc                          = create(*child_oper, child_physical_oper);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to create physical operator. rc=%s", strrc(rc));
+      sql_debug("failed to create physical operator. rc=%s", strrc(rc));
       return rc;
     }
   }
@@ -321,7 +321,7 @@ RC PhysicalPlanGenerator::create_plan(DeleteLogicalOperator &delete_oper, unique
     LogicalOperator *child_oper = child_opers.front().get();
     rc                          = create(*child_oper, child_physical_oper);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to create physical operator. rc=%s", strrc(rc));
+      sql_debug("failed to create physical operator. rc=%s", strrc(rc));
       return rc;
     }
   }
@@ -344,7 +344,7 @@ RC PhysicalPlanGenerator::create_plan(ExplainLogicalOperator &explain_oper, uniq
     unique_ptr<PhysicalOperator> child_physical_oper;
     rc = create(*child_oper, child_physical_oper);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to create child physical operator. rc=%s", strrc(rc));
+      sql_debug("failed to create child physical operator. rc=%s", strrc(rc));
       return rc;
     }
 
@@ -361,7 +361,7 @@ RC PhysicalPlanGenerator::create_plan(JoinLogicalOperator &join_oper, unique_ptr
 
   vector<unique_ptr<LogicalOperator>> &child_opers = join_oper.children();
   if (child_opers.size() != 2) {
-    LOG_WARN("join operator should have 2 children, but have %d", child_opers.size());
+    sql_debug("join operator should have 2 children, but have %d", child_opers.size());
     return RC::INTERNAL;
   }
 
@@ -370,7 +370,7 @@ RC PhysicalPlanGenerator::create_plan(JoinLogicalOperator &join_oper, unique_ptr
     unique_ptr<PhysicalOperator> child_physical_oper;
     rc = create(*child_oper, child_physical_oper);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to create physical child oper. rc=%s", strrc(rc));
+      sql_debug("failed to create physical child oper. rc=%s", strrc(rc));
       return rc;
     }
 
@@ -394,12 +394,12 @@ RC PhysicalPlanGenerator::create_plan(OrderLogicalOperator &orderby_oper, std::u
   vector<unique_ptr<LogicalOperator>> &child_opers = orderby_oper.children();
 
   if (child_opers.empty()) {
-    LOG_ERROR("order should have at least 1 child");
+    sql_debug("order should have at least 1 child");
     return RC::SUCCESS;
   }
 
   if (child_opers.size() > 1) {
-    LOG_WARN("order have more than 1 child");
+    sql_debug("order have more than 1 child");
     // DO SOME THING ?
   }
 
@@ -411,7 +411,7 @@ RC PhysicalPlanGenerator::create_plan(OrderLogicalOperator &orderby_oper, std::u
     LogicalOperator *child_oper = child_opers.front().get();
     rc                          = create(*child_oper, child_phy_oper);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to create order physical operator's child physical operator. rc=%s", strrc(rc));
+      sql_debug("failed to create order physical operator's child physical operator. rc=%s", strrc(rc));
       return rc;
     }
     if (child_phy_oper) {
@@ -438,7 +438,7 @@ RC PhysicalPlanGenerator::create_plan(AggreLogicalOperator &aggre_oper, std::uni
     LogicalOperator *child_oper = child_opers.front().get();
     rc                          = create(*child_oper, child_phy_oper);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to create order physical operator's child physical operator. rc=%s", strrc(rc));
+      sql_debug("failed to create order physical operator's child physical operator. rc=%s", strrc(rc));
       return rc;
     }
     if (child_phy_oper) {

@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include <vector>
 
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/parse.h"
@@ -27,7 +28,6 @@ See the Mulan PSL v2 for more details. */
 #include "storage/field/field.h"
 #include "storage/field/field_meta.h"
 #include "storage/record/record.h"
-
 class Table;
 
 /**
@@ -150,7 +150,7 @@ public:
   RC cell_at(int index, Value &cell) const override
   {
     if (index < 0 || index >= static_cast<int>(speces_.size())) {
-      LOG_WARN("invalid argument. index=%d", index);
+      sql_debug("invalid argument. index=%d", index);
       return RC::INVALID_ARGUMENT;
     }
 
@@ -188,7 +188,7 @@ public:
   RC cell_spec_at(int index, const TupleCellSpec *&spec) const override
   {
     if (index < 0 || index >= static_cast<int>(speces_.size())) {
-      LOG_WARN("invalid argument. index=%d", index);
+      sql_debug("invalid argument. index=%d", index);
       return RC::INVALID_ARGUMENT;
     }
     spec = speces_[index];

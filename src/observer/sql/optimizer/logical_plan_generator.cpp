@@ -29,6 +29,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/update_logical_operator.h"
 
+#include "event/sql_debug.h"
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/delete_stmt.h"
 #include "sql/stmt/explain_stmt.h"
@@ -40,7 +41,6 @@ See the Mulan PSL v2 for more details. */
 #include "storage/field/field.h"
 #include <memory>
 #include <utility>
-
 using std::unique_ptr;
 
 RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical_operator)
@@ -117,7 +117,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   unique_ptr<LogicalOperator> predicate_oper;
   RC                          rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
+    sql_debug("failed to create predicate logical plan. rc=%s", strrc(rc));
     return rc;
   }
   if (predicate_oper) {  // 将(root_oper)table_oper插入作为predicate_oper的子结点然后再更新root_oper
@@ -140,7 +140,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   unique_ptr<LogicalOperator> orderby_oper;
   rc = create_plan(select_stmt->order_by_stmt(), orderby_oper);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create order logical plan. rc=%s", strrc(rc));
+    sql_debug("failed to create order logical plan. rc=%s", strrc(rc));
     return rc;
   }
   if (orderby_oper) {
@@ -352,7 +352,7 @@ RC LogicalPlanGenerator::create_plan(ExplainStmt *explain_stmt, unique_ptr<Logic
   unique_ptr<LogicalOperator> child_oper;
   RC                          rc = create(child_stmt, child_oper);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create explain's child operator. rc=%s", strrc(rc));
+    sql_debug("failed to create explain's child operator. rc=%s", strrc(rc));
     return rc;
   }
 

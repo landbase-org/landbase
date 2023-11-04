@@ -1,11 +1,11 @@
 #include "tuple.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
 #include "storage/field/field.h"
 #include <cstddef>
-
 /***********************
  *   AGGREGATIONTUPLE  *
  ***********************/
@@ -108,7 +108,7 @@ void AggregationTuple::do_aggregation()
           tmp_value.set_float(0);
         } else {
           tmp_value.set_float(0);
-          LOG_WARN("Invalid attr Type");
+          sql_debug("Invalid attr Type");
         }
         aggre_resluts_[i] = tmp_value;
       } else {  // 其他类型（MAX，MIN）初始话为数据的本身
@@ -122,7 +122,7 @@ void AggregationTuple::do_aggregation()
       case AGGRE_MIN: res = std::min(res, cur_value); break;
       case AGGRE_AVG:
       case AGGRE_SUM: res = res + cur_value; break;
-      default: LOG_ERROR("Not support AggreType"); break;
+      default: sql_debug("Not support AggreType"); break;
     }
   }
 }

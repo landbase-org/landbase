@@ -21,7 +21,6 @@ See the Mulan PSL v2 for more details. */
 #include <cmath>
 #include <cstdio>
 #include <sstream>
-
 // 这里的顺序必须和AttrType的顺序相同
 const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "dates", "ints", "floats", "booleans"};
 
@@ -108,7 +107,7 @@ void Value::set_data(char *data, int length)
       length_ = length;
     } break;
     default: {
-      LOG_WARN("unknown data type: %d", attr_type_);
+      sql_debug("unknown data type: %d", attr_type_);
     } break;
   }
 }
@@ -222,7 +221,7 @@ std::string Value::to_string() const
       os << "NULL";
     } break;
     default: {
-      LOG_WARN("unsupported attr type: %d", attr_type_);
+      sql_debug("unsupported attr type: %d", attr_type_);
     } break;
   }
   return os.str();
@@ -296,7 +295,7 @@ bool Value::compare(const CompOp &comp_op, const Value &other) const
         cmp_result = common::compare_int((void *)&this->num_value_.bool_value_, (void *)&other.num_value_.bool_value_);
       } break;
       default: {
-        LOG_WARN("unsupported type: %d", this->attr_type_);
+        sql_debug("unsupported type: %d", this->attr_type_);
       }
     }
   } else if (this->attr_type_ == INTS && other.attr_type_ == FLOATS) {
@@ -323,7 +322,7 @@ bool Value::compare(const CompOp &comp_op, const Value &other) const
     oppsite.type_cast(FLOATS);
     cmp_result = common::compare_float((void *)&self.num_value_.float_value_, (void *)&oppsite.num_value_.float_value_);
   } else {
-    LOG_WARN("not supported,Type Error");
+    sql_debug("not supported,Type Error");
     return false;
   }
 
@@ -434,7 +433,7 @@ int Value::get_int() const
       return (int)(num_value_.bool_value_);
     }
     default: {
-      LOG_WARN("unknown data type. type=%d", attr_type_);
+      sql_debug("unknown data type. type=%d", attr_type_);
       return 0;
     }
   }
@@ -462,7 +461,7 @@ float Value::get_float() const
       return float(num_value_.bool_value_);
     } break;
     default: {
-      LOG_WARN("unknown data type. type=%d", attr_type_);
+      sql_debug("unknown data type. type=%d", attr_type_);
       return 0;
     }
   }
@@ -503,7 +502,7 @@ bool Value::get_boolean() const
       return num_value_.bool_value_;
     } break;
     default: {
-      LOG_WARN("unknown data type. type=%d", attr_type_);
+      sql_debug("unknown data type. type=%d", attr_type_);
       return false;
     }
   }
@@ -575,7 +574,7 @@ bool Value::type_cast(const AttrType target)
       }
     } break;
     default: {
-      LOG_WARN("Typecast Failed");
+      sql_debug("Typecast Failed");
       return false;
     } break;
   }

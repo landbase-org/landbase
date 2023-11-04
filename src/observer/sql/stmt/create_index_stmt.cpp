@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/create_index_stmt.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "storage/db/db.h"
 #include "storage/field/field_meta.h"
 #include "storage/table/table.h"
@@ -31,19 +32,19 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
 
   // check the table_name empty;
   if (is_blank(table_name) || is_blank(create_index.index_name.c_str())) {
-    LOG_WARN("invalid argument. db=%p, table_name=%p, index name=%s", db, table_name, create_index.index_name.c_str());
+    sql_debug("invalid argument. db=%p, table_name=%p, index name=%s", db, table_name, create_index.index_name.c_str());
     return RC::INVALID_ARGUMENT;
   }
 
   // check whether the table exists
   if (nullptr == table) {
-    LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+    sql_debug("no such table. db=%s, table_name=%s", db->name(), table_name);
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
   Index *index = table->find_index(create_index.index_name.c_str());
   if (nullptr != index) {
-    LOG_WARN("index with name(%s) already exists. table name=%s", create_index.index_name.c_str(), table_name);
+    sql_debug("index with name(%s) already exists. table name=%s", create_index.index_name.c_str(), table_name);
     return RC::SCHEMA_INDEX_NAME_REPEAT;
   }
 
@@ -56,7 +57,7 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
     });
 
     if (filed_metas->end() == target) {
-      LOG_WARN("no such field in table. db=%s, table=%s, field name=%s", db->name(), table_name, atr_name.c_str());
+      sql_debug("no such field in table. db=%s, table=%s, field name=%s", db->name(), table_name, atr_name.c_str());
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
 

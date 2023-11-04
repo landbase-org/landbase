@@ -3,7 +3,6 @@
 #include "sql/expr/sub_query_expr.h"
 #include "storage/index/index.h"
 #include "storage/trx/trx.h"
-
 RC UpdatePhysicalOperator::open(Trx *trx)
 {
   if (children_.empty()) {
@@ -13,7 +12,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   std::unique_ptr<PhysicalOperator> &child = children_[0];
   RC                                 rc    = child->open(trx);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to open child operator: %s", strrc(rc));
+    sql_debug("failed to open child operator: %s", strrc(rc));
     return rc;
   }
 
@@ -107,7 +106,7 @@ RC UpdatePhysicalOperator::next()
 
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
-      LOG_WARN("failed to get current record: %s", strrc(rc));
+      sql_debug("failed to get current record: %s", strrc(rc));
       return rc;
     }
 
@@ -147,7 +146,7 @@ RC UpdatePhysicalOperator::next()
     delete[] new_data;
 
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to update record: %s", strrc(rc));
+      sql_debug("failed to update record: %s", strrc(rc));
       return rc;
     }
   }

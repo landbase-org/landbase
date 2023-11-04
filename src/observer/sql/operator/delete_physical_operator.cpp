@@ -14,12 +14,12 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/delete_physical_operator.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/operator/index_scan_physical_operator.h"
 #include "sql/stmt/delete_stmt.h"
 #include "storage/record/record.h"
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
-
 RC DeletePhysicalOperator::open(Trx *trx)
 {
   if (children_.empty()) {
@@ -29,7 +29,7 @@ RC DeletePhysicalOperator::open(Trx *trx)
   std::unique_ptr<PhysicalOperator> &child = children_[0];
   RC                                 rc    = child->open(trx);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to open child operator: %s", strrc(rc));
+    sql_debug("failed to open child operator: %s", strrc(rc));
     return rc;
   }
 
@@ -49,7 +49,7 @@ RC DeletePhysicalOperator::next()
   while (RC::SUCCESS == (rc = child->next())) {
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
-      LOG_WARN("failed to get current record: %s", strrc(rc));
+      sql_debug("failed to get current record: %s", strrc(rc));
       return rc;
     }
 
@@ -57,7 +57,7 @@ RC DeletePhysicalOperator::next()
     Record   &record    = row_tuple->record();
     rc                  = trx_->delete_record(table_, record);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to delete record: %s", strrc(rc));
+      sql_debug("failed to delete record: %s", strrc(rc));
       return rc;
     }
 
