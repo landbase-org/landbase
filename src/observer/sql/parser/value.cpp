@@ -22,11 +22,11 @@ See the Mulan PSL v2 for more details. */
 #include <cstdio>
 #include <sstream>
 // 这里的顺序必须和AttrType的顺序相同
-const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "dates", "ints", "floats", "booleans"};
+const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "dates", "ints", "floats", "booleans", "nulls", "texts"};
 
 const char *attr_type_to_string(AttrType type)
 {
-  if (type >= UNDEFINED && type <= FLOATS) {
+  if (type >= UNDEFINED && type <= TEXTS) {
     return ATTR_TYPE_NAME[type];
   }
   return "unknown";
@@ -85,6 +85,9 @@ Value::Value(const char *s, int len /*= 0*/) { set_string(s, len); }
 void Value::set_data(char *data, int length)
 {
   switch (attr_type_) {
+    case TEXTS: {
+      set_text(data, length);
+    } break;
     case CHARS: {
       set_string(data, length);
     } break;
@@ -106,8 +109,11 @@ void Value::set_data(char *data, int length)
       set_date(*(int32_t *)data);
       length_ = length;
     } break;
+    case NULLS: {
+      attr_type_ = NULLS;
+    } break;
     default: {
-      sql_debug("unknown data type: %d", attr_type_);
+      sql_debug("unsupported attr type: %d", attr_type_);
     } break;
   }
 }
@@ -133,6 +139,18 @@ void Value::set_boolean(bool val)
 void Value::set_string(const char *s, int len /*= 0*/)
 {
   attr_type_ = CHARS;
+  if (len > 0) {
+    len = strnlen(s, len);
+    str_value_.assign(s, len);
+  } else {
+    str_value_.assign(s);
+  }
+  length_ = str_value_.length();
+}
+
+void Value::set_text(const char *s, int len /*= 0*/)
+{
+  attr_type_ = TEXTS;
   if (len > 0) {
     len = strnlen(s, len);
     str_value_.assign(s, len);
@@ -168,6 +186,9 @@ void Value::set_value(const Value &value)
     case CHARS: {
       set_string(value.get_string().c_str());
     } break;
+    case TEXTS: {
+      set_text(value.str_value_.c_str());
+    } break;
     case BOOLEANS: {
       set_boolean(value.get_boolean());
     } break;
@@ -186,16 +207,24 @@ void Value::set_value(const Value &value)
 const char *Value::data() const
 {
   switch (attr_type_) {
+    case TEXTS:
     case CHARS: {
       return str_value_.c_str();
     } break;
     case DATES: {
       return (const char *)&num_value_.date_value_;
     } break;
-    default: {
-      return (const char *)&num_value_;
+    case INTS: {
+      return (const char *)&num_value_.int_value_;
     } break;
+    case FLOATS: {
+      return (const char *)&num_value_.float_value_;
+    } break;
+    case UNDEFINED:
+    case BOOLEANS:
+    case NULLS: break;
   }
+  sql_debug("unsupported attr type: %d", attr_type_);
 }
 
 std::string Value::to_string() const
@@ -211,6 +240,7 @@ std::string Value::to_string() const
     case BOOLEANS: {
       os << num_value_.bool_value_;
     } break;
+    case TEXTS:
     case CHARS: {
       os << str_value_;
     } break;
@@ -271,6 +301,7 @@ bool Value::compare(const CompOp &comp_op, const Value &other) const
         cmp_result =
             common::compare_float((void *)&this->num_value_.float_value_, (void *)&other.num_value_.float_value_);
       } break;
+      case TEXTS:
       case CHARS: {
         if (comp_op == LIKE || comp_op == NOT_LIKE) {
           cmp_result = common::string_match(
@@ -371,6 +402,7 @@ CompOp Value::compare_value(const Value &left, const Value &right)
 
   int comp_result = 0;
   switch (left.attr_type()) {
+    case TEXTS:
     case CHARS: {
       comp_result = common::compare_string(
           (void *)left.str_value_.c_str(),
@@ -397,7 +429,7 @@ CompOp Value::compare_value(const Value &left, const Value &right)
       return CompOp::EQUAL_TO;
     } break;
     default: {
-      sql_debug("unknown data type. type=%s", attr_type_to_string(left.attr_type()));
+      sql_debug("[Value::compare_value] unknown data type. type=%s", attr_type_to_string(left.attr_type()));
       return CompOp::NO_OP;
     } break;
   }
@@ -415,6 +447,7 @@ CompOp Value::compare_value(const Value &left, const Value &right)
 int Value::get_int() const
 {
   switch (attr_type_) {
+    case TEXTS:
     case CHARS: {
       try {
         return (int)(std::stol(str_value_));
@@ -432,17 +465,23 @@ int Value::get_int() const
     case BOOLEANS: {
       return (int)(num_value_.bool_value_);
     }
-    default: {
-      sql_debug("unknown data type. type=%d", attr_type_);
+    case DATES: {
+      return num_value_.date_value_;
+    } break;
+    case NULLS: {
       return 0;
-    }
+    } break;
+    case UNDEFINED: {
+    } break;
   }
+  sql_debug("unknown data type. type=%d", attr_type_);
   return 0;
 }
 
 float Value::get_float() const
 {
   switch (attr_type_) {
+    case TEXTS:
     case CHARS: {
       try {
         return std::stof(str_value_);
@@ -460,11 +499,17 @@ float Value::get_float() const
     case BOOLEANS: {
       return float(num_value_.bool_value_);
     } break;
-    default: {
-      sql_debug("unknown data type. type=%d", attr_type_);
+    case DATES: {
+      return float(num_value_.date_value_);
+    } break;
+    case NULLS: {
       return 0;
-    }
+    } break;
+    case UNDEFINED: {
+    } break;
   }
+  sql_debug("unknown data type. type=%d", attr_type_);
+  return 0;
   return 0;
 }
 
@@ -473,6 +518,7 @@ std::string Value::get_string() const { return this->to_string(); }
 bool Value::get_boolean() const
 {
   switch (attr_type_) {
+    case TEXTS:
     case CHARS: {
       try {
         float val = std::stof(str_value_);
@@ -501,11 +547,14 @@ bool Value::get_boolean() const
     case BOOLEANS: {
       return num_value_.bool_value_;
     } break;
-    default: {
-      sql_debug("unknown data type. type=%d", attr_type_);
+    case NULLS: {
       return false;
-    }
+    } break;
+    case DATES:
+    case UNDEFINED: {
+    } break;
   }
+  sql_debug("unknown data type. type=%d", attr_type_);
   return false;
 }
 
@@ -533,7 +582,7 @@ bool Value::type_cast(const AttrType target)
         temp = static_cast<int>(round(num_value_.float_value_));
         set_int(temp);
         return true;
-      } else if (attr_type_ == CHARS) {
+      } else if (attr_type_ == CHARS || attr_type_ == TEXTS) {
         ss << str_value_;
         ss >> temp;
         if (ss.fail())
@@ -549,7 +598,7 @@ bool Value::type_cast(const AttrType target)
         temp = static_cast<float>(num_value_.int_value_);
         set_float(temp);
         return true;
-      } else if (attr_type_ == CHARS) {
+      } else if (attr_type_ == CHARS || attr_type_ == TEXTS) {
         ss << str_value_;
         ss >> temp;
         if (ss.fail())
@@ -570,6 +619,20 @@ bool Value::type_cast(const AttrType target)
         ss << num_value_.float_value_;
         ss >> res;
         set_string(res.c_str());
+        return true;
+      }
+      if (attr_type_ == DATES) {
+        date val = convert_string_to_date(str_value_.c_str());
+        if (val == -1) {
+          return false;
+        }
+        set_date(val);
+        return true;
+      }
+    } break;
+    case TEXTS: {
+      if (attr_type_ == CHARS) {
+        attr_type_ = TEXTS;
         return true;
       }
     } break;

@@ -84,6 +84,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         TRX_ROLLBACK
         INT_T
         STRING_T
+        TEXT_T
         FLOAT_T
         DATE_T
         NULL_T
@@ -413,7 +414,11 @@ attr_def:
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
-      $$->length = 4;
+      if($$->type==TEXTS){
+        $$->length = 65535;
+      }else{
+        $$->length = 4;
+      }
       $$->nullable = $3;
       free($1);
     }
@@ -440,6 +445,7 @@ number:
 type:
     INT_T      { $$=INTS; }
     | STRING_T { $$=CHARS; }
+    | TEXT_T   { $$=TEXTS; }
     | FLOAT_T  { $$=FLOATS; }
     | DATE_T   { $$=DATES;}
     ;

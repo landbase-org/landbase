@@ -31,7 +31,7 @@ See the Mulan PSL v2 for more details. */
 // the flags below are negotiate by handshake packet
 const uint32_t CLIENT_PROTOCOL_41 = 512;
 // const uint32_t CLIENT_INTERACTIVE   = 1024;  // This is an interactive client
-const uint32_t CLIENT_TRANSACTIONS  = 8192;         // Client knows about transactions.
+const uint32_t CLIENT_TRANSACTIONS  = 65535;        // Client knows about transactions.
 const uint32_t CLIENT_SESSION_TRACK = (1UL << 23);  // Capable of handling server state change information
 const uint32_t CLIENT_DEPRECATE_EOF = (1UL << 24);  // Client no longer needs EOF_Packet and will use OK_Packet instead
 const uint32_t CLIENT_OPTIONAL_RESULTSET_METADATA =

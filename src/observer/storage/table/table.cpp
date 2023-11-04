@@ -432,7 +432,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     }
 
     null_field.clear_bit(normal_field_start_index + i);
-    if (field->type() == CHARS) {
+    if (field->type() == CHARS || field->type() == TEXTS) {
       const size_t data_len = value.length();
       if (copy_len > data_len) {
         copy_len = data_len + 1;
