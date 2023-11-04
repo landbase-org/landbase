@@ -30,7 +30,7 @@ public:
 
   void add_expressions(std::vector<std::unique_ptr<Expression>> &&expressions) {}
   void add_projection(const Table *table, const FieldMeta *field);
-  void add_projection(const Field &field);
+  void add_projection(const Expression *expr);
 
   PhysicalOperatorType type() const override { return PhysicalOperatorType::PROJECT; }
 

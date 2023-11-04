@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "sql/parser/comp_op.h"
+#include <cassert>
 #include <string>
 
 /**
@@ -56,7 +57,6 @@ public:
 
   Value(const Value &other)            = default;
   Value &operator=(const Value &other) = default;
-  bool operator==(const Value &other) const;
 
   void        set_type(AttrType type) { this->attr_type_ = type; }
   void        set_data(char *data, int length);
@@ -91,6 +91,18 @@ public:
   bool        get_boolean() const;
   date        get_date() const;
   bool        is_null() const;
+
+public:
+  /**
+   * 重载运算符
+   */
+  bool  operator==(const Value &other) const { return compare_value(*this, other) == CompOp::EQUAL_TO; }
+  bool  operator!=(const Value &other) const { return compare_value(*this, other) == CompOp::NOT_EQUAL; }
+  bool  operator<(const Value &other) const { return compare_value(*this, other) == CompOp::LESS_THAN; }
+  bool  operator<=(const Value &other) const { return compare_value(*this, other) == CompOp::LESS_EQUAL; }
+  bool  operator>(const Value &other) const { return compare_value(*this, other) == CompOp::GREAT_THAN; }
+  bool  operator>=(const Value &other) const { return compare_value(*this, other) == CompOp::GREAT_EQUAL; }
+  Value operator+(const Value &other) const;
 
 private:
   AttrType attr_type_ = UNDEFINED;
