@@ -50,13 +50,14 @@ RC UpdatePhysicalOperator::open(Trx *trx)
         if (value_list.empty()) {
           this->value_list_.emplace_back(Value());
         } else if (value_list.size() != 1) {
-          invalid_sub_query_ = true;
+          invalid_value_list_ = true;
           this->value_list_.emplace_back(value_list.front());
         } else {
           this->value_list_.emplace_back(value_list.front());
         }
       } break;
       default: {
+        invalid_value_list_ = true;
         sql_debug("invalid expr type: %d", expr->type());
       } break;
     }
@@ -68,8 +69,9 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       if (field_metas_[i]->nullable()) {
         continue;
       } else {
+        invalid_value_list_ = true;
         sql_debug("Field %s is not nullable", field_metas_[i]->name());
-        return RC::SCHEMA_FIELD_NOT_NULLABLE;
+        continue;
       }
     }
 
@@ -86,13 +88,13 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       if (change.type_cast(field_metas_[i]->type())) {
         continue;
       }
+      invalid_value_list_ = true;
       sql_debug(
           "Fail to update %s, field type(%d) and value type(%d) mismatch",
           table_->name(),
           field_metas_[i]->type(),
           value_list_[i].attr_type()
       );
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
   }
 
@@ -126,7 +128,7 @@ RC UpdatePhysicalOperator::next()
 
   auto &child = children_[0];
   while (RC::SUCCESS == (rc = child->next())) {
-    if (invalid_sub_query_) {
+    if (invalid_value_list_) {
       sql_debug("invalid sub query");
       return RC::INTERNAL;
     }
