@@ -325,7 +325,7 @@ private:
   int                 size_{0};   // aggre_exprs的长度
   std::vector<bool>   all_null_;  // true表示当前列中所有数据都是null
   std::vector<size_t> counts_;    // 不为null的个数
-  std::vector<Value>  aggre_resluts_;
+  std::vector<Value>  aggre_results_;
   std::vector<Value>  field_results_;
 
 private:

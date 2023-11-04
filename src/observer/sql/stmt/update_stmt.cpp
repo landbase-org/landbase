@@ -62,43 +62,7 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
   }
 
   // 检查字段和值的类型是否匹配
-  const auto size = field_metas.size();
-  for (int i = 0; i < size; i++) {
-    if (update.expr_list[i]->expr_type() != ParseExprType::VALUE) {
-      continue;
-    }
-    auto value_expr = static_cast<ParseValueExpr *>(update.expr_list[i]);
-    if (value_expr->is_null()) {
-      if (field_metas[i]->nullable()) {
-        continue;
-      } else {
-        sql_debug("Field %s is not nullable", field_metas[i]->name());
-        return RC::SCHEMA_FIELD_NOT_NULLABLE;
-      }
-    }
-
-    if (field_metas[i]->type() != value_expr->value_type()) {
-      // 日期格式特殊处理
-      if (field_metas[i]->type() == DATES && value_expr->value_type() == CHARS) {
-        auto   &value   = value_expr->value();
-        int32_t dateval = convert_string_to_date(value.data());
-        value.set_date(dateval);
-        continue;
-      }
-      // 如果可以转换，就转换一下
-      auto &change = value_expr->value();
-      if (change.type_cast(field_metas[i]->type())) {
-        continue;
-      }
-      sql_debug(
-          "Fail to update %s, field type(%d) and value type(%d) mismatch",
-          table->name(),
-          field_metas[i]->type(),
-          value_expr->value_type()
-      );
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-    }
-  }
+  // 因为有子查询，所以类型检查和typecast后移到了update_physical_operator.cpp
 
   // 新建 expr_list
   std::vector<std::unique_ptr<Expression>> expr_list;

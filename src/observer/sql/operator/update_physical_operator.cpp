@@ -18,6 +18,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
   trx_ = trx;
 
+  // 执行子查询
   for (auto &expr : expr_list_) {
     switch (expr->type()) {
       case ExprType::SUBQUERY: {
@@ -35,7 +36,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       } break;
     }
   }
-
+  // 收集value
   for (auto &expr : expr_list_) {
     switch (expr->type()) {
       case ExprType::VALUE: {
@@ -58,6 +59,40 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       default: {
         sql_debug("invalid expr type: %d", expr->type());
       } break;
+    }
+  }
+  // 检查value和field是否匹配
+  const auto size = field_metas_.size();
+  for (int i = 0; i < size; ++i) {
+    if (value_list_[i].is_null()) {
+      if (field_metas_[i]->nullable()) {
+        continue;
+      } else {
+        sql_debug("Field %s is not nullable", field_metas_[i]->name());
+        return RC::SCHEMA_FIELD_NOT_NULLABLE;
+      }
+    }
+
+    if (field_metas_[i]->type() != value_list_[i].attr_type()) {
+      // 日期格式特殊处理
+      if (field_metas_[i]->type() == DATES && value_list_[i].attr_type() == CHARS) {
+        auto   &value   = value_list_[i];
+        int32_t dateval = convert_string_to_date(value.data());
+        value.set_date(dateval);
+        continue;
+      }
+      // 如果可以转换，就转换一下
+      auto &change = value_list_[i];
+      if (change.type_cast(field_metas_[i]->type())) {
+        continue;
+      }
+      sql_debug(
+          "Fail to update %s, field type(%d) and value type(%d) mismatch",
+          table_->name(),
+          field_metas_[i]->type(),
+          value_list_[i].attr_type()
+      );
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
   }
 
