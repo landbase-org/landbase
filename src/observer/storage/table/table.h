@@ -79,9 +79,10 @@ public:
   RC insert_record(Record &record);
   RC delete_record(const Record &record);
   RC visit_record(const RID &rid, bool readonly, std::function<void(Record &)> visitor);
-  RC update_record(Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<Value> &values);
+  RC update_record(const Record &record, const Record &new_record);
   RC get_record(const RID &rid, Record &record);
 
+  // 和insert_record一模一样。
   RC recover_insert_record(Record &record);
 
   // TODO refactor
@@ -101,7 +102,7 @@ public:
 
   RC sync();
 
-private:
+  // private:
   RC insert_entry_of_indexes(const Record &record);
   RC delete_entry_of_indexes(const Record &record, bool error_on_not_exists);
 

@@ -44,9 +44,7 @@ public:
   RC insert_record(Table *table, Record &record) override;
   RC delete_record(Table *table, Record &record) override;
   RC visit_record(Table *table, Record &record, bool readonly) override;
-  RC update_record(
-      Table *table, Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<Value> &values
-  ) override;
+  RC update_record(Table *table, Record &record, Record &new_record) override;
   RC start_if_need() override;
   RC commit() override;
   RC rollback() override;

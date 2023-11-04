@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "storage/trx/mvcc_trx.h"
+#include "event/sql_debug.h"
 #include "storage/clog/clog.h"
 #include "storage/db/db.h"
 #include "storage/field/field.h"
@@ -120,19 +121,24 @@ MvccTrx::~MvccTrx() {}
 
 RC MvccTrx::insert_record(Table *table, Record &record)
 {
+  // 首先拿出begin和end字段
   Field begin_field;
   Field end_field;
   trx_fields(table, begin_field, end_field);
 
+  // begin id 小于0说明是刚插入而且没有提交的数据
   begin_field.set_int(record, -trx_id_);
+  // end id 设置为最大值，说明是最新的数据
   end_field.set_int(record, trx_kit_.max_trx_id());
 
+  // 插入数据
   RC rc = table->insert_record(record);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to insert record into table. rc=%s", strrc(rc));
     return rc;
   }
 
+  // 加到clog里面
   rc = log_manager_->append_log(
       CLogType::INSERT, trx_id_, table->table_id(), record.rid(), record.len(), 0 /*offset*/, record.data()
   );
@@ -146,6 +152,7 @@ RC MvccTrx::insert_record(Table *table, Record &record)
       strrc(rc)
   );
 
+  // 加到操作集合里面
   pair<OperationSet::iterator, bool> ret = operations_.insert(Operation(Operation::Type::INSERT, table, record.rid()));
   if (!ret.second) {
     rc = RC::INTERNAL;
@@ -156,10 +163,12 @@ RC MvccTrx::insert_record(Table *table, Record &record)
 
 RC MvccTrx::delete_record(Table *table, Record &record)
 {
+  // 首先拿出begin和end字段
   Field begin_field;
   Field end_field;
   trx_fields(table, begin_field, end_field);
 
+  // 取出end_xid
   [[maybe_unused]] int32_t end_xid = end_field.get_int(record);
   /// 在删除之前，第一次获取record时，就已经对record做了对应的检查，并且保证不会有其它的事务来访问这条数据
   ASSERT(
@@ -174,7 +183,11 @@ RC MvccTrx::delete_record(Table *table, Record &record)
     return RC::SUCCESS;
   }
 
+  // 设置end_xid < 0，表示正在删除
   end_field.set_int(record, -trx_id_);
+  // 我赌它不会走索引，所以可以删掉，不然如果是unique index，就会有问题
+  table->delete_entry_of_indexes(record, false);
+  // 加到clog里面
   RC rc = log_manager_->append_log(CLogType::DELETE, trx_id_, table->table_id(), record.rid(), 0, 0, nullptr);
   ASSERT(
       rc == RC::SUCCESS,
@@ -186,6 +199,7 @@ RC MvccTrx::delete_record(Table *table, Record &record)
       strrc(rc)
   );
 
+  // 加到操作集合里面
   operations_.insert(Operation(Operation::Type::DELETE, table, record.rid()));
 
   return RC::SUCCESS;
@@ -193,15 +207,19 @@ RC MvccTrx::delete_record(Table *table, Record &record)
 
 RC MvccTrx::visit_record(Table *table, Record &record, bool readonly)
 {
+  // 首先拿出begin和end字段
   Field begin_field;
   Field end_field;
   trx_fields(table, begin_field, end_field);
 
+  // 取出begin_xid和end_xid
   int32_t begin_xid = begin_field.get_int(record);
   int32_t end_xid   = end_field.get_int(record);
 
   RC rc = RC::SUCCESS;
+  // 如果都大于零，说明已经插入成功，或者已经删除了
   if (begin_xid > 0 && end_xid > 0) {
+    // 当前事务的事务号在begin_xid和end_xid之间，可以访问
     if (trx_id_ >= begin_xid && trx_id_ <= end_xid) {
       rc = RC::SUCCESS;
     } else {
@@ -225,10 +243,70 @@ RC MvccTrx::visit_record(Table *table, Record &record, bool readonly)
   return rc;
 }
 
-RC MvccTrx::update_record(
-    Table *table, Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<Value> &values
-)
+RC MvccTrx::update_record(Table *table, Record &record, Record &new_record)
 {
+  RC rc = RC::SUCCESS;
+
+  // 查看是否访问冲突
+  rc = this->visit_record(table, record, false /*readonly*/);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  // 首先拿出begin和end字段
+  Field begin_field;
+  Field end_field;
+  trx_fields(table, begin_field, end_field);
+
+  // 设置旧的record
+  end_field.set_int(record, -trx_id_);
+  // 设置新的record
+  begin_field.set_int(new_record, -trx_id_);
+  end_field.set_int(new_record, trx_kit_.max_trx_id());
+  table->delete_entry_of_indexes(record, false);
+  rc = table->insert_record(new_record);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to update record rc=%s", strrc(rc));
+    table->insert_entry_of_indexes(record);
+    return rc;
+  }
+
+  // 加到clog里面
+  rc = log_manager_->append_log(CLogType::DELETE, trx_id_, table->table_id(), record.rid(), 0, 0 /*offset*/, 0);
+  ASSERT(
+      rc == RC::SUCCESS,
+      "failed to append update record log. trx id=%d, table id=%d, rid=%s, record len=%d, rc=%s",
+      trx_id_,
+      table->table_id(),
+      record.rid().to_string().c_str(),
+      record.len(),
+      strrc(rc)
+  );
+  rc = log_manager_->append_log(
+      CLogType::INSERT, trx_id_, table->table_id(), new_record.rid(), new_record.len(), 0 /*offset*/, new_record.data()
+  );
+  ASSERT(
+      rc == RC::SUCCESS,
+      "failed to append update record log. trx id=%d, table id=%d, rid=%s, record len=%d, rc=%s",
+      trx_id_,
+      table->table_id(),
+      record.rid().to_string().c_str(),
+      record.len(),
+      strrc(rc)
+  );
+
+  // 加到操作集合里面
+  pair<OperationSet::iterator, bool> ret = operations_.insert(Operation(Operation::Type::DELETE, table, record.rid()));
+  if (!ret.second) {
+    rc = RC::INTERNAL;
+    LOG_WARN("failed to delete operation(insertion) into operation set: duplicate");
+  }
+  ret = operations_.insert(Operation(Operation::Type::INSERT, table, new_record.rid()));
+  if (!ret.second) {
+    rc = RC::INTERNAL;
+    LOG_WARN("failed to delete operation(insertion) into operation set: duplicate");
+  }
+
   return RC::SUCCESS;
 }
 
@@ -273,24 +351,28 @@ RC MvccTrx::commit()
 RC MvccTrx::commit_with_trx_id(int32_t commit_xid)
 {
   // TODO 这里存在一个很大的问题，不能让其他事务一次性看到当前事务更新到的数据或同时看不到
-  RC rc    = RC::SUCCESS;
+  RC rc = RC::SUCCESS;
+
   started_ = false;
 
   for (const Operation &operation : operations_) {
     switch (operation.type()) {
       case Operation::Type::INSERT: {
+        // 取出记录所在表和RID
         RID    rid(operation.page_num(), operation.slot_num());
         Table *table = operation.table();
-        Field  begin_xid_field, end_xid_field;
+        // 取出begin_xid和end_xid字段
+        Field begin_xid_field, end_xid_field;
         trx_fields(table, begin_xid_field, end_xid_field);
 
+        // 之前将begin_xid设置为了-trx_id_，这里将其设置为commit_xid
         auto record_updater = [this, &begin_xid_field, commit_xid](Record &record) {
-          LOG_DEBUG(
+          sql_debug(
               "before commit insert record. trx id=%d, begin xid=%d, commit xid=%d, lbt=%s",
               trx_id_,
               begin_xid_field.get_int(record),
               commit_xid,
-              lbt()
+              common::lbt()
           );
           ASSERT(
               begin_xid_field.get_int(record) == -this->trx_id_,
@@ -312,12 +394,13 @@ RC MvccTrx::commit_with_trx_id(int32_t commit_xid)
       } break;
 
       case Operation::Type::DELETE: {
+        // 取出记录所在表和RID
         Table *table = operation.table();
         RID    rid(operation.page_num(), operation.slot_num());
-
+        // 取出begin_xid和end_xid字段
         Field begin_xid_field, end_xid_field;
         trx_fields(table, begin_xid_field, end_xid_field);
-
+        // 之前将end_xid设置为了-trx_id_，这里将其设置为commit_xid
         auto record_updater = [this, &end_xid_field, commit_xid](Record &record) {
           (void)this;
           ASSERT(
@@ -338,7 +421,6 @@ RC MvccTrx::commit_with_trx_id(int32_t commit_xid)
             strrc(rc)
         );
       } break;
-
       default: {
         ASSERT(false, "unsupported operation. type=%d", static_cast<int>(operation.type()));
       }
@@ -346,7 +428,9 @@ RC MvccTrx::commit_with_trx_id(int32_t commit_xid)
   }
 
   operations_.clear();
-
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
   if (!recovering_) {
     rc = log_manager_->commit_trx(trx_id_, commit_xid);
   }
@@ -382,6 +466,7 @@ RC MvccTrx::rollback()
         );
       } break;
 
+      case Operation::Type::UPDATE:
       case Operation::Type::DELETE: {
         Table *table = operation.table();
         RID    rid(operation.page_num(), operation.slot_num());
@@ -431,6 +516,7 @@ RC find_table(Db *db, const CLogRecord &log_record, Table *&table)
 {
   switch (clog_type_from_integer(log_record.header().type_)) {
     case CLogType::INSERT:
+    case CLogType::UPDATE:
     case CLogType::DELETE: {
       const CLogRecordData &data_record = log_record.data_record();
       table                             = db->find_table(data_record.table_id_);

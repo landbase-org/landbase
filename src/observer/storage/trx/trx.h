@@ -62,12 +62,20 @@ public:
         page_num_(rid.page_num),
         slot_num_(rid.slot_num)
   {}
+  Operation(Type type, Table *table, const RID &rid, Record *new_record)
+      : type_(type),
+        table_(table),
+        page_num_(rid.page_num),
+        slot_num_(rid.slot_num),
+        new_record_(new_record)
+  {}
 
   Type    type() const { return type_; }
   int32_t table_id() const { return table_->table_id(); }
   Table  *table() const { return table_; }
   PageNum page_num() const { return page_num_; }
   SlotNum slot_num() const { return slot_num_; }
+  Record *new_record() const { return new_record_; }
 
 private:
   ///< 操作的哪张表。这里直接使用表其实并不准确，因为表中的索引也可能有日志
@@ -76,6 +84,7 @@ private:
   Table  *table_ = nullptr;
   PageNum page_num_;  // TODO use RID instead of page num and slot num
   SlotNum slot_num_;
+  Record *new_record_;
 };
 
 class OperationHasher
@@ -140,12 +149,10 @@ public:
   Trx()          = default;
   virtual ~Trx() = default;
 
-  virtual RC insert_record(Table *table, Record &record)               = 0;
-  virtual RC delete_record(Table *table, Record &record)               = 0;
-  virtual RC visit_record(Table *table, Record &record, bool readonly) = 0;
-  virtual RC update_record(
-      Table *table, Record &record, std::vector<const FieldMeta *> &field_metas, std::vector<Value> &values
-  ) = 0;
+  virtual RC insert_record(Table *table, Record &record)                     = 0;
+  virtual RC delete_record(Table *table, Record &record)                     = 0;
+  virtual RC visit_record(Table *table, Record &record, bool readonly)       = 0;
+  virtual RC update_record(Table *table, Record &record, Record &new_record) = 0;
 
   virtual RC start_if_need() = 0;
   virtual RC commit()        = 0;
