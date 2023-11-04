@@ -14,8 +14,8 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/optimizer/logical_plan_generator.h"
 
-#include "sql/expr/sub_query_expr.h"
 #include "sql/expr/expression.h"
+#include "sql/expr/sub_query_expr.h"
 #include "sql/operator/aggre_logical_operator.h"
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
@@ -130,7 +130,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   for (auto expr : select_stmt->expressions()) {
     AggreExpression::get_aggre_expression(expr, aggre_exprs);
   }
-  if (aggre_exprs.size()) {
+  if (!aggre_exprs.empty()) {
     unique_ptr<LogicalOperator> aggre_oper(new AggreLogicalOperator(std::move(aggre_exprs)));
     aggre_oper->add_child(std::move(root_oper));
     root_oper = std::move(aggre_oper);
