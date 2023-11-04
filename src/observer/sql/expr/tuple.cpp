@@ -1,11 +1,11 @@
 #include "tuple.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
 #include "storage/field/field.h"
 #include <cstddef>
-
 /***********************
  *   AGGREGATIONTUPLE  *
  ***********************/
@@ -29,7 +29,7 @@ RC AggregationTuple::find_cell(const TupleCellSpec &spec, Value &cell) const
     for (size_t i = 0; i < aggre_exprs_->size(); i++) {
       const auto &expr = (*aggre_exprs_)[i];
       if (spec == *expr) {
-        cell = aggre_resluts_[i];
+        cell = aggre_results_[i];
         LOG_INFO("Field is found in aggre_exprs");
         return RC::SUCCESS;
       }
@@ -55,7 +55,7 @@ void AggregationTuple::init(std::vector<std::unique_ptr<AggreExpression>> *aggre
   size_  = aggre_exprs->size();
   counts_.resize(size_);
   all_null_.resize(size_);
-  aggre_resluts_.resize(size_);
+  aggre_results_.resize(size_);
   field_results_.resize(size_);
   field_exprs_.resize(size_);
   aggre_exprs_ = aggre_exprs;
@@ -63,7 +63,7 @@ void AggregationTuple::init(std::vector<std::unique_ptr<AggreExpression>> *aggre
   for (size_t i = 0; i < size_; ++i) {
     if ((*aggre_exprs_)[i]->get_aggre_type() == AGGRE_COUNT_ALL ||
         (*aggre_exprs_)[i]->get_aggre_type() == AGGRE_COUNT) {
-      aggre_resluts_[i].set_int(0);
+      aggre_results_[i].set_int(0);
     }
   }
 }
@@ -98,7 +98,7 @@ void AggregationTuple::do_aggregation()
     }
 
     all_null_[i] = false;
-    if (aggre_resluts_[i].is_null()) {
+    if (aggre_results_[i].is_null()) {
       if (AggreType::AGGRE_AVG == aggre_type ||
           AggreType::AGGRE_SUM == aggre_type) {  // 如果是AGGRE_AVG或者AGGRE_SUM的话，应该初始话为0
         Value tmp_value;
@@ -108,21 +108,21 @@ void AggregationTuple::do_aggregation()
           tmp_value.set_float(0);
         } else {
           tmp_value.set_float(0);
-          LOG_WARN("Invalid attr Type");
+          sql_debug("Invalid attr Type");
         }
-        aggre_resluts_[i] = tmp_value;
+        aggre_results_[i] = tmp_value;
       } else {  // 其他类型（MAX，MIN）初始话为数据的本身
-        aggre_resluts_[i] = cur_value;
+        aggre_results_[i] = cur_value;
       }
     }
 
-    auto &res = aggre_resluts_[i];
+    auto &res = aggre_results_[i];
     switch (expr->get_aggre_type()) {
       case AGGRE_MAX: res = std::max(res, cur_value); break;
       case AGGRE_MIN: res = std::min(res, cur_value); break;
       case AGGRE_AVG:
       case AGGRE_SUM: res = res + cur_value; break;
-      default: LOG_ERROR("Not support AggreType"); break;
+      default: sql_debug("Not support AggreType"); break;
     }
   }
 }
@@ -130,7 +130,7 @@ void AggregationTuple::do_aggregation_end()
 {
   for (size_t i = 0; i < size_; i++) {
     const auto &expr       = (*aggre_exprs_)[i];
-    Value      &res        = aggre_resluts_[i];  // 最后处理结果
+    Value      &res        = aggre_results_[i];  // 最后处理结果
     AggreType   aggre_type = expr->get_aggre_type();
 
     // 如果这列的所有数据都是NULL且不为COUNT, 那么当前列的结果为NULL

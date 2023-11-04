@@ -36,6 +36,6 @@ private:
   std::vector<const FieldMeta *>           field_metas_;
   std::vector<std::unique_ptr<Expression>> expr_list_;  // 用于存放valueexpr或者subqueryexpr
   std::vector<Value>                       value_list_;
-  bool                                     invalid_sub_query_ = false;
-  bool                                     has_unique_index_  = false;
+  bool                                     invalid_value_list_ = false;
+  bool                                     has_unique_index_   = false;
 };

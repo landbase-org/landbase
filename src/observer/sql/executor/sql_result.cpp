@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/executor/sql_result.h"
 #include "common/log/log.h"
 #include "common/rc.h"
+#include "event/sql_debug.h"
 #include "session/session.h"
 #include "sql/expr/tuple.h"
 #include "sql/parser/parse_defs.h"
@@ -42,7 +43,7 @@ RC SqlResult::close()
   }
   RC rc = operator_->close();
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to close operator. rc=%s", strrc(rc));
+    sql_debug("failed to close operator. rc=%s", strrc(rc));
   }
 
   operator_.reset();

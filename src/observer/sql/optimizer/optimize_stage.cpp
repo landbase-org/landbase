@@ -15,12 +15,12 @@ See the Mulan PSL v2 for more details. */
 #include <string.h>
 #include <string>
 
+#include "event/sql_debug.h"
 #include "event/sql_event.h"
 #include "optimize_stage.h"
 #include "sql/expr/sub_query_expr.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/stmt/stmt.h"
-
 using namespace std;
 using namespace common;
 
@@ -30,27 +30,27 @@ RC OptimizeStage::handle_request(SQLStageEvent *sql_event)
   RC                          rc = create_logical_plan(sql_event, logical_operator);
   if (rc != RC::SUCCESS) {
     if (rc != RC::UNIMPLENMENT) {
-      LOG_WARN("failed to create logical plan. rc=%s", strrc(rc));
+      sql_debug("failed to create logical plan. rc=%s", strrc(rc));
     }
     return rc;
   }
 
   rc = rewrite(logical_operator);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to rewrite plan. rc=%s", strrc(rc));
+    sql_debug("failed to rewrite plan. rc=%s", strrc(rc));
     return rc;
   }
 
   rc = optimize(logical_operator);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to optimize plan. rc=%s", strrc(rc));
+    sql_debug("failed to optimize plan. rc=%s", strrc(rc));
     return rc;
   }
 
   unique_ptr<PhysicalOperator> physical_operator;
   rc = generate_physical_plan(logical_operator, physical_operator);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to generate physical plan. rc=%s", strrc(rc));
+    sql_debug("failed to generate physical plan. rc=%s", strrc(rc));
     return rc;
   }
 
@@ -69,27 +69,27 @@ RC OptimizeStage::handle_expr(Expression *expr)
   RC rc = logical_plan_generator_.create(subquery_expr->stmt(), logical_operator);
   if (rc != RC::SUCCESS) {
     if (rc != RC::UNIMPLENMENT) {
-      LOG_WARN("failed to create logical plan. rc=%s", strrc(rc));
+      sql_debug("failed to create logical plan. rc=%s", strrc(rc));
     }
     return rc;
   }
 
   rc = rewrite(logical_operator);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to rewrite plan. rc=%s", strrc(rc));
+    sql_debug("failed to rewrite plan. rc=%s", strrc(rc));
     return rc;
   }
 
   rc = optimize(logical_operator);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to optimize plan. rc=%s", strrc(rc));
+    sql_debug("failed to optimize plan. rc=%s", strrc(rc));
     return rc;
   }
 
   unique_ptr<PhysicalOperator> physical_operator;
   rc = generate_physical_plan(logical_operator, physical_operator);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to generate physical plan. rc=%s", strrc(rc));
+    sql_debug("failed to generate physical plan. rc=%s", strrc(rc));
     return rc;
   }
   subquery_expr->set_operator(std::move(physical_operator));
@@ -110,7 +110,7 @@ RC OptimizeStage::generate_physical_plan(
   RC rc = RC::SUCCESS;
   rc    = physical_plan_generator_.create(*logical_operator, physical_operator);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create physical operator. rc=%s", strrc(rc));
+    sql_debug("failed to create physical operator. rc=%s", strrc(rc));
   }
   return rc;
 }
@@ -124,7 +124,7 @@ RC OptimizeStage::rewrite(unique_ptr<LogicalOperator> &logical_operator)
     change_made = false;
     rc          = rewriter_.rewrite(logical_operator, change_made);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to do expression rewrite on logical plan. rc=%s", strrc(rc));
+      sql_debug("failed to do expression rewrite on logical plan. rc=%s", strrc(rc));
       return rc;
     }
   } while (change_made);

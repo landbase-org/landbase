@@ -1,10 +1,10 @@
 #include "common/lang/string.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "order_by_stmt.h"
 #include "sql/parser/parse_defs.h"
 #include "storage/field/field_meta.h"
 #include "storage/table/table.h"
-
 RC get_unit_info(
     Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables, const RelAttrSqlNode &attr,
     Table *&table, const FieldMeta *&field
@@ -21,13 +21,13 @@ RC get_unit_info(
     table = db->find_table(attr.relation_name.c_str());
   }
   if (nullptr == table) {
-    LOG_WARN("No such table: attr.relation_name: %s", attr.relation_name.c_str());
+    sql_debug("No such table: attr.relation_name: %s", attr.relation_name.c_str());
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
   field = table->table_meta().field(attr.attribute_name.c_str());
   if (nullptr == field) {
-    LOG_WARN("no such field in table: table %s, field %s", table->name(), attr.attribute_name.c_str());
+    sql_debug("no such field in table: table %s, field %s", table->name(), attr.attribute_name.c_str());
     table = nullptr;
     return RC::SCHEMA_FIELD_NOT_EXIST;
   }
@@ -59,7 +59,7 @@ RC OrderByStmt::create(
     if (rc != RC::SUCCESS) {
       delete stmt;
       stmt = nullptr;
-      LOG_WARN("failed to create orderby unit. orderby index=%d", i);
+      sql_debug("failed to create orderby unit. orderby index=%d", i);
       return rc;
     }
     stmt->order_units_.emplace_back(orderby_unit);
@@ -77,7 +77,7 @@ RC OrderByStmt::create_orderby_unit(
   const FieldMeta *field_mt  = nullptr;
   RC               rc        = get_unit_info(db, default_table, tables, orderby.rel_attr, table_tmp, field_mt);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("Order field not found");
+    sql_debug("Order field not found");
     return rc;
   }
 

@@ -11,11 +11,11 @@ See the Mulan PSL v2 for more details. */
 //
 // Created by Wangyunlai on 2022/5/22.
 //
-
 #include "sql/stmt/filter_stmt.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
 #include "common/rc.h"
+#include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/sub_query_expr.h"
 #include "sql/parser/parse_defs.h"
@@ -46,7 +46,7 @@ RC FilterStmt::create(
     rc                      = create_filter_unit(db, default_table, tables, conditions[i], filter_unit);
     if (rc != RC::SUCCESS) {
       delete tmp_stmt;
-      LOG_WARN("failed to create filter unit. condition index=%d", i);
+      sql_debug("failed to create filter unit. condition index=%d", i);
       return rc;
     }
     tmp_stmt->filter_units_.push_back(filter_unit);
@@ -72,13 +72,13 @@ RC get_table_and_field(
     table = db->find_table(field_expr->table_name().c_str());
   }
   if (nullptr == table) {
-    LOG_WARN("No such table: attr.relation_name: %s", field_expr->table_name().c_str());
+    sql_debug("No such table: attr.relation_name: %s", field_expr->table_name().c_str());
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
   field = table->table_meta().field(field_expr->field_name().c_str());
   if (nullptr == field) {
-    LOG_WARN("no such field in table: table %s, field %s", table->name(), field_expr->field_name().c_str());
+    sql_debug("no such field in table: table %s, field %s", table->name(), field_expr->field_name().c_str());
     table = nullptr;
     return RC::SCHEMA_FIELD_NOT_EXIST;
   }
@@ -95,7 +95,7 @@ RC FilterStmt::create_filter_unit(
 
   CompOp comp = condition.comp;
   if (comp < EQUAL_TO || comp >= NO_OP) {
-    LOG_WARN("invalid compare operator : %d", comp);
+    sql_debug("invalid compare operator : %d", comp);
     return RC::INVALID_ARGUMENT;
   }
 
@@ -110,7 +110,7 @@ RC FilterStmt::create_filter_unit(
       auto             field_expr = static_cast<const ParseFieldExpr *>(condition.left);
       rc                          = get_table_and_field(db, default_table, tables, field_expr, table, field);
       if (rc != RC::SUCCESS) {
-        LOG_WARN("cannot find attr");
+        sql_debug("cannot find attr");
         return rc;
       }
       left_expr = new FieldExpr(Field(table, field));
@@ -152,7 +152,7 @@ RC FilterStmt::create_filter_unit(
       auto             field_expr = static_cast<const ParseFieldExpr *>(condition.right);
       rc                          = get_table_and_field(db, default_table, tables, field_expr, table, field);
       if (rc != RC::SUCCESS) {
-        LOG_WARN("cannot find attr");
+        sql_debug("cannot find attr");
         return rc;
       }
       right_expr = new FieldExpr(Field(table, field));

@@ -19,10 +19,10 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/log/log.h"
 #include "event/session_event.h"
+#include "event/sql_debug.h"
 #include "event/sql_event.h"
 #include "session/session.h"
 #include "sql/stmt/stmt.h"
-
 using namespace common;
 
 RC ResolveStage::handle_request(SQLStageEvent *sql_event)
@@ -33,7 +33,7 @@ RC ResolveStage::handle_request(SQLStageEvent *sql_event)
 
   Db *db = session_event->session()->get_current_db();
   if (nullptr == db) {
-    LOG_ERROR("cannot find current db");
+    sql_debug("cannot find current db");
     rc = RC::SCHEMA_DB_NOT_EXIST;
     sql_result->set_return_code(rc);
     sql_result->set_state_string("no db selected");
@@ -44,7 +44,7 @@ RC ResolveStage::handle_request(SQLStageEvent *sql_event)
   Stmt          *stmt     = nullptr;
   rc                      = Stmt::create_stmt(db, *sql_node, stmt);
   if (rc != RC::SUCCESS && rc != RC::UNIMPLENMENT) {
-    LOG_WARN("failed to create stmt. rc=%d:%s", rc, strrc(rc));
+    sql_debug("failed to create stmt. rc=%d:%s", rc, strrc(rc));
     sql_result->set_return_code(rc);
     return rc;
   }

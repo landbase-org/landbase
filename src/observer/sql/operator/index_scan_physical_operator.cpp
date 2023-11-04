@@ -13,12 +13,12 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/operator/index_scan_physical_operator.h"
+#include "event/sql_debug.h"
 #include "sql/expr/sub_query_expr.h"
 #include "storage/index/index.h"
 #include "storage/trx/trx.h"
 #include <cstddef>
 #include <cstring>
-
 IndexScanPhysicalOperator::IndexScanPhysicalOperator(
     Table *table, Index *index, bool readonly, const char *left_value, size_t left_value_len, bool left_inclusive,
     const char *right_value, size_t right_value_len, bool right_inclusive
@@ -50,13 +50,13 @@ RC IndexScanPhysicalOperator::open(Trx *trx)
       left_value_, left_value_len_, left_inclusive_, right_value_, right_value_len_, right_inclusive_
   );
   if (nullptr == index_scanner) {
-    LOG_WARN("failed to create index scanner");
+    sql_debug("failed to create index scanner");
     return RC::INTERNAL;
   }
 
   record_handler_ = table_->record_handler();
   if (nullptr == record_handler_) {
-    LOG_WARN("invalid record handler");
+    sql_debug("invalid record handler");
     index_scanner->destroy();
     return RC::INTERNAL;
   }

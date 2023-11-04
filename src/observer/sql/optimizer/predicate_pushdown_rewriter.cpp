@@ -13,10 +13,10 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/optimizer/predicate_pushdown_rewriter.h"
+#include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
-
 RC PredicatePushdownRewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bool &change_made)
 {
   RC rc = RC::SUCCESS;
@@ -44,7 +44,7 @@ RC PredicatePushdownRewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bo
   std::vector<std::unique_ptr<Expression>> pushdown_exprs;
   rc = get_exprs_can_pushdown(predicate_expr, pushdown_exprs);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get exprs can pushdown. rc=%s", strrc(rc));
+    sql_debug("failed to get exprs can pushdown. rc=%s", strrc(rc));
     return rc;
   }
 
@@ -88,7 +88,7 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(
       // 如果可以的话，就从当前孩子节点中删除他
       rc = get_exprs_can_pushdown(*iter, pushdown_exprs);
       if (rc != RC::SUCCESS) {
-        LOG_WARN("failed to get pushdown expressions. rc=%s", strrc(rc));
+        sql_debug("failed to get pushdown expressions. rc=%s", strrc(rc));
         return rc;
       }
 

@@ -3,7 +3,6 @@
 #include "sql/expr/sub_query_expr.h"
 #include "storage/index/index.h"
 #include "storage/trx/trx.h"
-
 RC UpdatePhysicalOperator::open(Trx *trx)
 {
   if (children_.empty()) {
@@ -13,12 +12,13 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   std::unique_ptr<PhysicalOperator> &child = children_[0];
   RC                                 rc    = child->open(trx);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to open child operator: %s", strrc(rc));
+    sql_debug("failed to open child operator: %s", strrc(rc));
     return rc;
   }
 
   trx_ = trx;
 
+  // 执行子查询
   for (auto &expr : expr_list_) {
     switch (expr->type()) {
       case ExprType::SUBQUERY: {
@@ -36,7 +36,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       } break;
     }
   }
-
+  // 收集value
   for (auto &expr : expr_list_) {
     switch (expr->type()) {
       case ExprType::VALUE: {
@@ -50,15 +50,51 @@ RC UpdatePhysicalOperator::open(Trx *trx)
         if (value_list.empty()) {
           this->value_list_.emplace_back(Value());
         } else if (value_list.size() != 1) {
-          invalid_sub_query_ = true;
+          invalid_value_list_ = true;
           this->value_list_.emplace_back(value_list.front());
         } else {
           this->value_list_.emplace_back(value_list.front());
         }
       } break;
       default: {
+        invalid_value_list_ = true;
         sql_debug("invalid expr type: %d", expr->type());
       } break;
+    }
+  }
+  // 检查value和field是否匹配
+  const auto size = field_metas_.size();
+  for (int i = 0; i < size; ++i) {
+    if (value_list_[i].is_null()) {
+      if (field_metas_[i]->nullable()) {
+        continue;
+      } else {
+        invalid_value_list_ = true;
+        sql_debug("Field %s is not nullable", field_metas_[i]->name());
+        continue;
+      }
+    }
+
+    if (field_metas_[i]->type() != value_list_[i].attr_type()) {
+      // 日期格式特殊处理
+      if (field_metas_[i]->type() == DATES && value_list_[i].attr_type() == CHARS) {
+        auto   &value   = value_list_[i];
+        int32_t dateval = convert_string_to_date(value.data());
+        value.set_date(dateval);
+        continue;
+      }
+      // 如果可以转换，就转换一下
+      auto &change = value_list_[i];
+      if (change.type_cast(field_metas_[i]->type())) {
+        continue;
+      }
+      invalid_value_list_ = true;
+      sql_debug(
+          "Fail to update %s, field type(%d) and value type(%d) mismatch",
+          table_->name(),
+          field_metas_[i]->type(),
+          value_list_[i].attr_type()
+      );
     }
   }
 
@@ -92,7 +128,7 @@ RC UpdatePhysicalOperator::next()
 
   auto &child = children_[0];
   while (RC::SUCCESS == (rc = child->next())) {
-    if (invalid_sub_query_) {
+    if (invalid_value_list_) {
       sql_debug("invalid sub query");
       return RC::INTERNAL;
     }
@@ -107,7 +143,7 @@ RC UpdatePhysicalOperator::next()
 
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
-      LOG_WARN("failed to get current record: %s", strrc(rc));
+      sql_debug("failed to get current record: %s", strrc(rc));
       return rc;
     }
 
@@ -147,7 +183,7 @@ RC UpdatePhysicalOperator::next()
     delete[] new_data;
 
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to update record: %s", strrc(rc));
+      sql_debug("failed to update record: %s", strrc(rc));
       return rc;
     }
   }

@@ -13,13 +13,13 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/operator/join_physical_operator.h"
-
+#include "event/sql_debug.h"
 NestedLoopJoinPhysicalOperator::NestedLoopJoinPhysicalOperator() {}
 
 RC NestedLoopJoinPhysicalOperator::open(Trx *trx)
 {
   if (children_.size() != 2) {
-    LOG_WARN("nlj operator should have 2 children");
+    sql_debug("nlj operator should have 2 children");
     return RC::INTERNAL;
   }
 
@@ -68,13 +68,13 @@ RC NestedLoopJoinPhysicalOperator::close()
 {
   RC rc = left_->close();
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to close left oper. rc=%s", strrc(rc));
+    sql_debug("failed to close left oper. rc=%s", strrc(rc));
   }
 
   if (!right_closed_) {
     rc = right_->close();
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to close right oper. rc=%s", strrc(rc));
+      sql_debug("failed to close right oper. rc=%s", strrc(rc));
     } else {
       right_closed_ = true;
     }

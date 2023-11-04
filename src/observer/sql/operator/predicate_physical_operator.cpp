@@ -14,11 +14,11 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/predicate_physical_operator.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/expr/sub_query_expr.h"
 #include "sql/stmt/filter_stmt.h"
 #include "storage/field/field.h"
 #include "storage/record/record.h"
-
 PredicatePhysicalOperator::PredicatePhysicalOperator(std::unique_ptr<Expression> expr) : expression_(std::move(expr))
 {
   ASSERT(expression_->value_type() == BOOLEANS, "predicate's expression should be BOOLEAN type");
@@ -27,7 +27,7 @@ PredicatePhysicalOperator::PredicatePhysicalOperator(std::unique_ptr<Expression>
 RC PredicatePhysicalOperator::open(Trx *trx)
 {
   if (children_.size() != 1) {
-    LOG_WARN("predicate operator must has one child");
+    sql_debug("predicate operator must has one child");
     return RC::INTERNAL;
   }
 
@@ -120,7 +120,7 @@ RC PredicatePhysicalOperator::next()
 
     if (nullptr == tuple) {
       rc = RC::INTERNAL;
-      LOG_WARN("failed to get tuple from operator");
+      sql_debug("failed to get tuple from operator");
       break;
     }
 

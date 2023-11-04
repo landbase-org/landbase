@@ -13,9 +13,9 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/update_stmt.h"
+#include "event/sql_debug.h"
 #include "sql/expr/sub_query_expr.h"
 #include "storage/db/db.h"
-
 UpdateStmt::UpdateStmt(
     Table *table, FilterStmt *filter_stmt, std::vector<const FieldMeta *> &field_meta,
     std::vector<std::unique_ptr<Expression>> &expr_list
@@ -39,14 +39,14 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
   // 检查参数
   const char *table_name = update.relation_name.c_str();
   if (nullptr == db || nullptr == table_name) {
-    LOG_WARN("invalid argument. db=%p, table_name=%p", db, table_name);
+    sql_debug("invalid argument. db=%p, table_name=%p", db, table_name);
     return RC::INVALID_ARGUMENT;
   }
 
   // 查找表
   Table *table = db->find_table(table_name);
   if (nullptr == table) {
-    LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+    sql_debug("no such table. db=%s, table_name=%s", db->name(), table_name);
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
@@ -55,45 +55,14 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
   for (auto &field_name : update.attr_list) {
     auto field_meta = table->table_meta().field(field_name.c_str());
     if (field_meta == nullptr) {
-      LOG_ERROR("Fail to find field %s in table %s", field_name.c_str(), table->name());
+      sql_debug("Fail to find field %s in table %s", field_name.c_str(), table->name());
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
     field_metas.push_back(field_meta);
   }
 
   // 检查字段和值的类型是否匹配
-  const auto size = field_metas.size();
-  for (int i = 0; i < size; i++) {
-    if (update.expr_list[i]->expr_type() != ParseExprType::VALUE) {
-      continue;
-    }
-    auto value_expr = static_cast<ParseValueExpr *>(update.expr_list[i]);
-    if (value_expr->is_null()) {
-      if (field_metas[i]->nullable()) {
-        continue;
-      } else {
-        LOG_ERROR("Field %s is not nullable", field_metas[i]->name());
-        return RC::SCHEMA_FIELD_NOT_NULLABLE;
-      }
-    }
-
-    if (field_metas[i]->type() != value_expr->value_type()) {
-      // 日期格式特殊处理
-      if (field_metas[i]->type() == DATES && value_expr->value_type() == CHARS) {
-        auto   &value   = value_expr->value();
-        int32_t dateval = convert_string_to_date(value.data());
-        value.set_date(dateval);
-        continue;
-      }
-      LOG_ERROR(
-          "Fail to update %s, field type(%d) and value type(%d) mismatch",
-          table->name(),
-          field_metas[i]->type(),
-          value_expr->value_type()
-      );
-      return RC::INVALID_ARGUMENT;
-    }
-  }
+  // 因为有子查询，所以类型检查和typecast后移到了update_physical_operator.cpp
 
   // 新建 expr_list
   std::vector<std::unique_ptr<Expression>> expr_list;
@@ -133,7 +102,7 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
       db, table, &table_map, update.conditions.data(), static_cast<int>(update.conditions.size()), filter_stmt
   );
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
+    sql_debug("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
     return rc;
   }
 

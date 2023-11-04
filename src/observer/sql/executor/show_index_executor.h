@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "common/rc.h"
 #include "event/session_event.h"
+#include "event/sql_debug.h"
 #include "event/sql_event.h"
 #include "session/session.h"
 #include "sql/executor/sql_result.h"
@@ -48,7 +49,7 @@ public:
     const auto    &table_name      = show_index_stmt->getTableName();
     Table         *table           = db->find_table(table_name.c_str());
     if (table == nullptr) {  // table not exist;
-      LOG_ERROR("it is not exits with the table=%s of the query index", table_name.c_str());
+      sql_debug("it is not exits with the table=%s of the query index", table_name.c_str());
       return RC::FAILURE;
     }
     auto &indexes = table->get_indexes();

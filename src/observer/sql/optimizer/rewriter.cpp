@@ -13,11 +13,11 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/optimizer/rewriter.h"
+#include "event/sql_debug.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/optimizer/expression_rewriter.h"
 #include "sql/optimizer/predicate_pushdown_rewriter.h"
 #include "sql/optimizer/predicate_rewrite.h"
-
 Rewriter::Rewriter()
 {
   rewrite_rules_.emplace_back(new ExpressionRewriter);
@@ -34,7 +34,7 @@ RC Rewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bool &change_made)
     bool sub_change_made = false;
     rc                   = rule->rewrite(oper, sub_change_made);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to rewrite logical operator. rc=%s", strrc(rc));
+      sql_debug("failed to rewrite logical operator. rc=%s", strrc(rc));
       return rc;
     }
 
@@ -52,7 +52,7 @@ RC Rewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bool &change_made)
     bool sub_change_made = false;
     rc                   = this->rewrite(child_oper, sub_change_made);
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to rewrite child oper. rc=%s", strrc(rc));
+      sql_debug("failed to rewrite child oper. rc=%s", strrc(rc));
       return rc;
     }
 
