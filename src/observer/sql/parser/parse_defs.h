@@ -173,9 +173,9 @@ static void parse_rel_attr_aggre(SelectSqlNode &sql_node, std::vector<RelAttrAgg
   for (auto node : nodes) {
     auto rel_attr = static_cast<RelAttrSqlNode>(node);
     if (node.is_aggre()) {
-      rel_attrs.push_back(rel_attr);
-    } else {
       aggres.push_back(AggreSqlNode{rel_attr, node.aggre_type});
+    } else {
+      rel_attrs.push_back(rel_attr);
     }
   }
   sql_node.rel_attrs.swap(rel_attrs);
