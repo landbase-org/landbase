@@ -116,6 +116,12 @@ RC SubQueryExpr::executor(Trx *trx)
     }
     value_list_.push_back(value);
   }
+
+  if (rc != RC::RECORD_EOF) {
+    sql_debug("[executor] failed to get next tuple. rc=%s", strrc(rc));
+    return rc;
+  }
+
   rc = close();
   if (rc != RC::SUCCESS) {
     sql_debug("failed to close operator. rc=%s", strrc(rc));

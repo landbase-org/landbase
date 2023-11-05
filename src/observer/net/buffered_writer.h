@@ -57,6 +57,8 @@ public:
    */
   RC flush();
 
+  RC clear();
+
 private:
   /**
    * @brief 刷新缓存

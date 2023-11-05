@@ -33,11 +33,6 @@ RC TableScanPhysicalOperator::open(Trx *trx)
     // 尝试执行子查询，如果不需要父tuple就能执行成功
     rc = do_expr(trx_, expr.get(), nullptr);
 
-    // need_tuple不算错误，我们只是在尝试执行
-    if (rc == RC::NEED_TUPLE) {
-      rc = RC::SUCCESS;
-    }
-
     if (rc != RC::SUCCESS) {
       sql_debug("[open] failed to do expression");
     }

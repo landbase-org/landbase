@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 #include "common/rc.h"
@@ -83,6 +84,8 @@ public:
    * @brief 缓存中已经写入数据的空间大小
    */
   int32_t size() const { return data_size_; }
+
+  RC clear();
 
 private:
   int32_t read_pos() const { return (write_pos_ - this->size() + capacity()) % capacity(); }

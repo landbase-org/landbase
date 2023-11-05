@@ -163,8 +163,7 @@ RC do_subquery_expr(Trx *trx, SubQueryExpr *subquery_expr, Tuple *tuple)
   RC rc = RC::SUCCESS;
   if (subquery_expr->need_parent_tuple()) {
     if (tuple == nullptr) {
-      sql_debug("[do_subquery_expr] tuple is null");
-      return RC::NEED_TUPLE;
+      return RC::SUCCESS;
     }
     subquery_expr->set_parent_tuple(tuple);
     rc = subquery_expr->executor(trx);

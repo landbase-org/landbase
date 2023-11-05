@@ -127,3 +127,13 @@ RC BufferedWriter::flush_internal(int32_t size)
 
   return rc;
 }
+
+RC BufferedWriter::clear()
+{
+  if (fd_ < 0) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  buffer_.clear();
+  return RC::SUCCESS;
+}
