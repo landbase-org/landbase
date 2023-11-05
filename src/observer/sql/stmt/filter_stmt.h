@@ -70,6 +70,9 @@ public:
       FilterUnit *&filter_unit
   );
 
+  bool has_or() const { return has_or_; }
+
 private:
   std::vector<FilterUnit *> filter_units_;  // 默认当前都是AND关系
+  bool                      has_or_ = false;
 };

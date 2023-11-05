@@ -96,6 +96,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         FROM
         WHERE
         AND
+        OR
         SET
         ON
         LOAD
@@ -820,6 +821,13 @@ condition_list:
     }
     | condition AND condition_list {
       $$ = $3;
+      $1->has_or = false;
+      $$->emplace_back(*$1);
+      delete $1;
+    }
+    | condition OR condition_list {
+      $$ = $3;
+      $1->has_or = true;
       $$->emplace_back(*$1);
       delete $1;
     }

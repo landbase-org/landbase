@@ -53,6 +53,10 @@ RC FilterStmt::create(
   }
 
   stmt = tmp_stmt;
+  // 设置是否全为or
+  if (condition_num > 1) {
+    stmt->has_or_ = conditions[1].has_or;
+  }
   return rc;
 }
 
