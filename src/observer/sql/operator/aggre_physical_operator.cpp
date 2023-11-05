@@ -62,8 +62,10 @@ RC AggrePhysicalOperator::close()
   if (children_.empty()) {
     return RC::SUCCESS;
   }
-  children_[0]->close();
-  return RC::SUCCESS;
+  is_started_   = false;
+  is_record_eof = false;
+  tuple_.reinit();
+  return children_[0]->close();
 }
 
 Tuple *AggrePhysicalOperator::current_tuple() { return &tuple_; }

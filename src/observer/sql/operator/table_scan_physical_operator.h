@@ -48,9 +48,10 @@ public:
   Tuple *current_tuple() override;
 
   void set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs);
+  void set_parent_tuple(Tuple *parent_tuple) override { parent_tuple_ = parent_tuple; }
 
 private:
-  RC filter(RowTuple &tuple, bool &result);
+  RC filter(Tuple *tuple, bool &result);
 
 private:
   Table                                                   *table_    = nullptr;
@@ -62,4 +63,5 @@ private:
   std::pair<const Table *, const std::vector<FieldMeta> *> oper_meta;
   std::vector<RowTuple *>                                  tuples_;
   std::vector<std::unique_ptr<Expression>>                 predicates_;  // TODO chang predicate to table tuple filter
+  Tuple                                                   *parent_tuple_ = nullptr;
 };

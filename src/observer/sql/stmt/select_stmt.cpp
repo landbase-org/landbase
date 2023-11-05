@@ -134,6 +134,33 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       conditions.emplace_back(j);
   }
 
+  // 复杂子查询，将condition中的父表加入到table_map中
+  for (auto &cond : conditions) {
+    if (cond.left->expr_type() == ParseExprType::FIELD) {
+      auto left_expr = static_cast<ParseFieldExpr *>(cond.left);
+      if (left_expr->table_name() != "") {
+        auto table_name = left_expr->table_name();
+        auto table      = db->find_table(table_name.c_str());
+        if (table == nullptr) {
+          sql_debug("no such table. db=%s, table_name=%s", db->name(), table_name.c_str());
+          return RC::SCHEMA_TABLE_NOT_EXIST;
+        }
+        table_map.insert(std::pair<std::string, Table *>(table_name, table));
+      }
+    }
+    if (cond.right->expr_type() == ParseExprType::FIELD) {
+      auto right_expr = static_cast<ParseFieldExpr *>(cond.right);
+      if (right_expr->table_name() != "") {
+        auto table_name = right_expr->table_name();
+        auto table      = db->find_table(table_name.c_str());
+        if (table == nullptr) {
+          sql_debug("no such table. db=%s, table_name=%s", db->name(), table_name.c_str());
+          return RC::SCHEMA_TABLE_NOT_EXIST;
+        }
+        table_map.insert(std::pair<std::string, Table *>(table_name, table));
+      }
+    }
+  }
   // create filter statement in `where` statement
   // 有关 where 条件的处理, 过滤出需要的数据
   FilterStmt *filter_stmt = nullptr;

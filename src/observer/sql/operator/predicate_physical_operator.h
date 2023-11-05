@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "sql/expr/expression.h"
+#include "sql/expr/sub_query_expr.h"
 #include "sql/operator/physical_operator.h"
 #include <memory>
 
@@ -37,8 +38,17 @@ public:
   RC next() override;
   RC close() override;
 
+  void set_parent_tuple(Tuple *tuple) override
+  {
+    parent_tuple_ = tuple;
+    if (!children_.empty()) {
+      children_[0]->set_parent_tuple(tuple);
+    }
+  }
   Tuple *current_tuple() override;
 
 private:
+  Trx                        *trx_ = nullptr;
   std::unique_ptr<Expression> expression_;
+  Tuple                      *parent_tuple_ = nullptr;  // 父查询的元组
 };

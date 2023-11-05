@@ -34,12 +34,12 @@ public:
 
   PhysicalOperatorType type() const override { return PhysicalOperatorType::PROJECT; }
 
-  RC open(Trx *trx) override;
-  RC next() override;
-  RC close() override;
-
+  RC  open(Trx *trx) override;
+  RC  next() override;
+  RC  close() override;
   int cell_num() const { return tuple_.cell_num(); }
 
+  void   set_parent_tuple(Tuple *tuple) override { children_[0]->set_parent_tuple(tuple); }
   Tuple *current_tuple() override;
 
 private:

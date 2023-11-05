@@ -26,8 +26,8 @@ RC AggregationTuple::find_cell(const TupleCellSpec &spec, Value &cell) const
 
   // 当前只可能在aggre中找到
   if (AggreType::AGGRE_NONE != spec.aggre_type()) {
-    for (size_t i = 0; i < aggre_exprs_->size(); i++) {
-      const auto &expr = (*aggre_exprs_)[i];
+    for (size_t i = 0; i < aggre_exprs_.size(); i++) {
+      const auto &expr = aggre_exprs_[i];
       if (spec == *expr) {
         cell = aggre_results_[i];
         LOG_INFO("Field is found in aggre_exprs");
@@ -49,20 +49,44 @@ RC AggregationTuple::find_cell(const TupleCellSpec &spec, Value &cell) const
   return RC::NOTFOUND;
 }
 
-void AggregationTuple::init(std::vector<std::unique_ptr<AggreExpression>> *aggre_exprs)
+void AggregationTuple::init(std::vector<std::unique_ptr<AggreExpression>> aggre_exprs)
 {
   count_ = 0;
-  size_  = aggre_exprs->size();
+  size_  = aggre_exprs.size();
   counts_.resize(size_);
   all_null_.resize(size_);
   aggre_results_.resize(size_);
   field_results_.resize(size_);
   field_exprs_.resize(size_);
-  aggre_exprs_ = aggre_exprs;
+  aggre_exprs_ = std::move(aggre_exprs);
   // 设置result的默认值
   for (size_t i = 0; i < size_; ++i) {
-    if ((*aggre_exprs_)[i]->get_aggre_type() == AGGRE_COUNT_ALL ||
-        (*aggre_exprs_)[i]->get_aggre_type() == AGGRE_COUNT) {
+    if (aggre_exprs_[i]->get_aggre_type() == AGGRE_COUNT_ALL || aggre_exprs_[i]->get_aggre_type() == AGGRE_COUNT) {
+      aggre_results_[i].set_int(0);
+    }
+  }
+}
+
+void AggregationTuple::reinit()
+{
+  count_ = 0;
+  counts_.clear();
+  counts_.resize(size_);
+
+  all_null_.clear();
+  all_null_.resize(size_);
+
+  aggre_results_.clear();
+  aggre_results_.resize(size_);
+
+  field_results_.clear();
+  field_results_.resize(size_);
+
+  field_exprs_.clear();
+  field_exprs_.resize(size_);
+  // 设置result的默认值
+  for (size_t i = 0; i < size_; ++i) {
+    if (aggre_exprs_[i]->get_aggre_type() == AGGRE_COUNT_ALL || aggre_exprs_[i]->get_aggre_type() == AGGRE_COUNT) {
       aggre_results_[i].set_int(0);
     }
   }
@@ -84,7 +108,7 @@ void AggregationTuple::do_aggregation()
 
   Value cur_value;
   for (size_t i = 0; i < size_; i++) {
-    const auto &expr = (*aggre_exprs_)[i];
+    const auto &expr = aggre_exprs_[i];
     expr->get_value(*tuple_, cur_value);
     AggreType aggre_type = expr->get_aggre_type();
 
@@ -129,7 +153,7 @@ void AggregationTuple::do_aggregation()
 void AggregationTuple::do_aggregation_end()
 {
   for (size_t i = 0; i < size_; i++) {
-    const auto &expr       = (*aggre_exprs_)[i];
+    const auto &expr       = aggre_exprs_[i];
     Value      &res        = aggre_results_[i];  // 最后处理结果
     AggreType   aggre_type = expr->get_aggre_type();
 

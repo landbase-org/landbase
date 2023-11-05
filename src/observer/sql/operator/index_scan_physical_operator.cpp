@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/index_scan_physical_operator.h"
 #include "event/sql_debug.h"
+#include "sql/expr/do_expr.h"
 #include "sql/expr/sub_query_expr.h"
 #include "storage/index/index.h"
 #include "storage/trx/trx.h"
@@ -66,66 +67,17 @@ RC IndexScanPhysicalOperator::open(Trx *trx)
 
   trx_ = trx;
 
-  // 理论上此时只有 COMPARISON expr
   for (auto &expr : predicates_) {
-    switch (expr->type()) {
-      case ExprType::COMPARISON: {
-        auto  comp_expr  = static_cast<ComparisonExpr *>(expr.get());
-        auto &left_expr  = comp_expr->left();
-        auto &right_expr = comp_expr->right();
-        if (left_expr->type() == ExprType::SUBQUERY) {
-          auto subquery_expr = static_cast<SubQueryExpr *>(left_expr.get());
-          rc                 = subquery_expr->executor(trx);
-          if (rc != RC::SUCCESS) {
-            sql_debug("failed to execute subquery expression");
-            return rc;
-          }
-        }
-        if (right_expr->type() == ExprType::SUBQUERY) {
-          auto subquery_expr = static_cast<SubQueryExpr *>(right_expr.get());
-          rc                 = subquery_expr->executor(trx);
-          if (rc != RC::SUCCESS) {
-            sql_debug("failed to execute subquery expression");
-            return rc;
-          }
-        }
-      } break;
-      case ExprType::IN: {
-        auto  in_expr    = static_cast<InExpr *>(expr.get());
-        auto &left_expr  = in_expr->left();
-        auto &right_expr = in_expr->right();
-        if (left_expr->type() == ExprType::SUBQUERY) {
-          auto subquery_expr = static_cast<SubQueryExpr *>(left_expr.get());
-          rc                 = subquery_expr->executor(trx);
-          if (rc != RC::SUCCESS) {
-            sql_debug("failed to execute subquery expression");
-            return rc;
-          }
-        }
-        if (right_expr->type() == ExprType::SUBQUERY) {
-          auto subquery_expr = static_cast<SubQueryExpr *>(right_expr.get());
-          rc                 = subquery_expr->executor(trx);
-          if (rc != RC::SUCCESS) {
-            sql_debug("failed to execute subquery expression");
-            return rc;
-          }
-        }
-      } break;
-      case ExprType::EXISTS: {
-        auto  exists_expr    = static_cast<ExistsExpr *>(expr.get());
-        auto &sub_query_expr = exists_expr->right();
-        if (sub_query_expr->type() == ExprType::SUBQUERY) {
-          auto subquery_expr = static_cast<SubQueryExpr *>(sub_query_expr.get());
-          rc                 = subquery_expr->executor(trx);
-          if (rc != RC::SUCCESS) {
-            sql_debug("failed to execute subquery expression");
-            return rc;
-          }
-        }
-      } break;
-      default: {
-        sql_debug("unsupported expression type: %d", expr->type());
-      } break;
+    // 尝试执行子查询，如果不需要父tuple就能执行成功
+    rc = do_expr(trx_, expr.get(), nullptr);
+
+    // need_tuple不算错误，我们只是在尝试执行
+    if (rc == RC::NEED_TUPLE) {
+      rc = RC::SUCCESS;
+    }
+
+    if (rc != RC::SUCCESS) {
+      sql_debug("[open] failed to do expression");
     }
   }
 
@@ -149,7 +101,15 @@ RC IndexScanPhysicalOperator::next()
     }
 
     inspector_.set_record(&current_record_);
-    rc = filter(inspector_, filter_result);
+
+    // 有可能是复杂子查询，所以要将parent_tuple_也包含在里面
+    Tuple *tuple = &inspector_;
+    if (nullptr != parent_tuple_) {
+      CompoundTuple *tmp = new CompoundTuple(parent_tuple_, tuple);
+      tuple              = tmp;
+    }
+
+    rc = filter(tuple, filter_result);
     if (rc != RC::SUCCESS) {
       return rc;
     }
@@ -187,12 +147,12 @@ void IndexScanPhysicalOperator::set_predicates(std::vector<std::unique_ptr<Expre
   predicates_ = std::move(exprs);
 }
 
-RC IndexScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
+RC IndexScanPhysicalOperator::filter(Tuple *tuple, bool &result)
 {
   RC    rc = RC::SUCCESS;
   Value value;
   for (std::unique_ptr<Expression> &expr : predicates_) {
-    rc = expr->get_value(tuple, value);
+    rc = expr->get_value(*tuple, value);
     if (rc != RC::SUCCESS) {
       return rc;
     }

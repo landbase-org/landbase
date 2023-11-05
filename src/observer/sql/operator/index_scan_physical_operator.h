@@ -51,10 +51,11 @@ public:
   Tuple *current_tuple() override;
 
   void set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs);
+  void set_parent_tuple(Tuple *parent_tuple) override { parent_tuple_ = parent_tuple; }
 
 private:
   // 与TableScanPhysicalOperator代码相同，可以优化
-  RC filter(RowTuple &tuple, bool &result);
+  RC filter(Tuple *tuple, bool &result);
 
 private:
   Trx               *trx_            = nullptr;
@@ -78,4 +79,6 @@ private:
   bool        idx_iterator_neet_increase = true;
 
   std::vector<std::unique_ptr<Expression>> predicates_;
+
+  Tuple *parent_tuple_ = nullptr;
 };
