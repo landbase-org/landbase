@@ -28,6 +28,7 @@ See the Mulan PSL v2 for more details. */
 
 class ExprNode;
 class Expression;
+class FuncExpr;
 
 /**
  * @defgroup SQLParser SQL Parser
@@ -56,6 +57,17 @@ enum AggreType
   AGGRE_AVG,
   AGGRE_SUM
 };
+
+/**
+ * @brief 函数类型
+ */
+enum FuncType
+{
+  LENGTH_,
+  ROUND_,
+  DATE_FORMAT_,
+};
+
 static std::string aggreType2str(AggreType aggre)
 {
   static std::unordered_map<AggreType, std::string> m{
@@ -123,6 +135,18 @@ struct JoinSqlNode
   std::vector<ConditionSqlNode> join_conditions;
 };
 
+/**
+ * @brief 函数节点
+ */
+struct FunctionNode
+{
+  FuncType       f_type;
+  RelAttrSqlNode rel_attr;
+  Expression    *left  = nullptr;  // 左侧数值参数
+  Expression    *right = nullptr;  // 右侧参数：精确位数，格式化字符串
+  std::string    res_name;         // 函数结果的别名
+};
+
 struct OrderSqlNode
 {
   RelAttrSqlNode rel_attr;
@@ -148,6 +172,7 @@ struct SelectSqlNode
   std::vector<ConditionSqlNode> conditions;    ///< 查询条件，使用AND串联起来多个条件
   std::vector<JoinSqlNode>      joinctions;    ///< Join-list
   std::vector<OrderSqlNode>     orders;        ///< Order-requirements
+  std::vector<FunctionNode>     functions;     ///< functions
 };
 
 /**
@@ -337,14 +362,18 @@ enum class ExprType
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
   AGGREGATION,  ///< 聚合运算
+  FUNCTION      ///< 函数
 };
+
 struct ExprNode
 {
   explicit ExprNode() = default;
   ExprNode(AggreSqlNode aggre) : aggre_(aggre), type_(ExprType::AGGREGATION) {}
-  ExprNode(RelAttrSqlNode rel_attr) : rel_attr_(rel_attr), type_(ExprType::FIELD) {}
+  ExprNode(const RelAttrSqlNode rel_attr) : rel_attr_(rel_attr), type_(ExprType::FIELD) {}
+  ExprNode(FunctionNode &func) : func_(func), type_(ExprType::FUNCTION) {}
   AggreSqlNode   aggre_;
   RelAttrSqlNode rel_attr_;
+  FunctionNode   func_;
   ExprType       type_;
 };
 
@@ -378,6 +407,7 @@ enum SqlCommandFlag
   SCF_EXPLAIN,
   SCF_SET_VARIABLE,  ///< 设置变量
 };
+
 /**
  * @brief 表示一个SQL语句
  * @ingroup SQLParser

@@ -25,13 +25,15 @@ class TupleCellSpec
 public:
   TupleCellSpec(const char *table_name, const char *field_name, const char *alias = nullptr);
   TupleCellSpec(const char *table_name, const char *field_name, AggreType aggre_type, const char *alias = nullptr);
+  TupleCellSpec(const char *table_name, const char *field_name, FuncType func_type, const char *alias = nullptr);
   TupleCellSpec(const char *alias);
 
   const char     *table_name() const { return table_name_.c_str(); }
   const char     *field_name() const { return field_name_.c_str(); }
   const char     *alias() const { return alias_.c_str(); }
   const AggreType aggre_type() const { return aggre_type_; }
-  const void      set_aggre_type(AggreType aggre_type) { aggre_type_ = aggre_type; }
+  void            set_aggre_type(AggreType aggre_type) { aggre_type_ = aggre_type; }
+  void            set_func_type(FuncType ftp) { func_type_ = ftp; }
 
 public:
   bool const operator==(const AggreExpression &expr) const;
@@ -40,6 +42,7 @@ public:
 private:
   std::string table_name_;
   std::string field_name_;
-  AggreType   aggre_type_;
+  AggreType   aggre_type_ = AggreType::AGGRE_NONE;
+  FuncType    func_type_;
   std::string alias_;
 };

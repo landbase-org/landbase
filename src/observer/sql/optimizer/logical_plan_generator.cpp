@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
 #include "sql/operator/explain_logical_operator.h"
+#include "sql/operator/expr_logical_operator.h"
 #include "sql/operator/insert_logical_operator.h"
 #include "sql/operator/join_logical_operator.h"
 #include "sql/operator/logical_operator.h"
@@ -91,8 +92,9 @@ RC LogicalPlanGenerator::create_plan(CalcStmt *calc_stmt, std::unique_ptr<Logica
 // select stmt的逻辑计划生成器
 RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  // Project -> aggre -> (Orderby) -> (predicate) -> table_scan
+  // Project -> aggre -> (Orderby) -> (predicate) -> (expression) -> (table_scan)
   // 因为是从根节点开始执行， 所以执行的顺序是从table_scan开始
+  // 如果遇到dump，就看下是否把这个nullptr节点作为了子节点
   unique_ptr<LogicalOperator> root_oper(nullptr);  // 根
 
   // 创建table_scan算子
@@ -112,6 +114,18 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   }
   root_oper = std::move(table_oper);
 
+  // 创建表达式算子 目前没有走stmt创建算子，而是直接创建算子
+  unique_ptr<LogicalOperator>      expr_oper(nullptr);
+  const std::vector<Expression *> &exprs = select_stmt->expressions();
+  if (!exprs.empty()) {
+    expr_oper = std::unique_ptr<ExprLogicalOperator>(new ExprLogicalOperator(exprs));
+  }
+  if (expr_oper) {
+    if (root_oper)
+      expr_oper->add_child(std::move(root_oper));
+    root_oper = std::move(expr_oper);
+  }
+
   // 创建filter算子
   unique_ptr<LogicalOperator> predicate_oper;
   RC                          rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
@@ -126,8 +140,9 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   // 创建aggre算子
   std::vector<std::unique_ptr<AggreExpression>> aggre_exprs;
-  for (auto expr : select_stmt->expressions()) {
-    AggreExpression::get_aggre_expression(expr, aggre_exprs);
+  for (auto &expr : select_stmt->expressions()) {
+    if (expr->type() == ExprType::AGGREGATION)
+      AggreExpression::get_aggre_expression(expr, aggre_exprs);
   }
   if (aggre_exprs.size()) {
     unique_ptr<LogicalOperator> aggre_oper(new AggreLogicalOperator(std::move(aggre_exprs)));
@@ -149,7 +164,8 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   // 生成project算子
   unique_ptr<LogicalOperator> project_oper(new ProjectLogicalOperator(select_stmt->expressions()));
-  project_oper->add_child(std::move(root_oper));
+  if (root_oper)
+    project_oper->add_child(std::move(root_oper));
 
   logical_operator.swap(project_oper);
   return RC::SUCCESS;

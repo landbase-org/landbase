@@ -371,3 +371,45 @@ private:
   const FieldExpr *field_ = nullptr;
   const ValueExpr *value_ = nullptr;  // 用来存储COUNT（attr）的值
 };
+
+class FuncExpr : public Expression
+{
+public:
+  FuncExpr(FuncType tp, Expression *left, Expression *right);
+  FuncExpr(FuncType type, Expression *left, ValueExpr *right);
+  virtual ~FuncExpr() = default;
+
+  ExprType type() const override { return ExprType::FUNCTION; }
+  FuncType func_type() const { return functype_; }
+  RC       get_value(const Tuple &tuple, Value &value) const override { return RC::UNIMPLENMENT; }
+  RC       try_get_value(Value &value) const override;
+
+  static RC create(
+      const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map,
+      const std::vector<Table *> &tables, Expression *&res_expr, Db *db
+  );
+
+  AttrType value_type() const override
+  {
+    switch (functype_) {
+      case FuncType::LENGTH_: {
+        return AttrType::INTS;
+      }
+      case FuncType::DATE_FORMAT_: {
+        return AttrType::CHARS;
+      }
+      case FuncType::ROUND_: {
+        return AttrType::INTS;
+      }
+      default: {
+        // TODOX: do something here?
+        return AttrType::BOOLEANS;
+      }
+    }
+  }
+
+private:
+  FuncType          functype_;
+  const Expression *left_;   // 左侧不确定，但是字段或者值
+  const Expression *right_;  // 右侧一定是值，为给出的参数
+};

@@ -14,7 +14,9 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/project_physical_operator.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/expr/expression.h"
+#include "sql/expr/tuple_cell.h"
 #include "storage/field/field_meta.h"
 #include "storage/record/record.h"
 #include "storage/table/table.h"
@@ -69,13 +71,26 @@ void ProjectPhysicalOperator::add_projection(const Expression *expr)
   // 对单表来说，展示的(alias) 字段总是字段名称，
   // 对多表查询来说，展示的alias 需要带表名字
   // 对于聚合查询来说， 需要有aggre_type
+  // 对于函数来说，res_name或者是FUNCTION(paras)
   TupleCellSpec *spec = nullptr;
-
-  if (auto x = dynamic_cast<const FieldExpr *>(expr)) {
-    spec = new TupleCellSpec(x->table_name(), x->field_name());
-  } else if (auto x = dynamic_cast<const AggreExpression *>(expr)) {
-    spec = new TupleCellSpec(x->table_name(), x->field_name(), x->get_aggre_type());
+  auto           type   = expr->type();
+  switch (type) {
+    case ExprType::FIELD: {
+      auto x = dynamic_cast<const FieldExpr *>(expr);
+      spec   = new TupleCellSpec(x->table_name(), x->field_name());
+    } break;
+    case ExprType::AGGREGATION: {
+      auto x = dynamic_cast<const AggreExpression *>(expr);
+      spec   = new TupleCellSpec(x->table_name(), x->field_name(), x->get_aggre_type());
+    } break;
+    case ExprType::FUNCTION: {
+      auto x = dynamic_cast<const FuncExpr *>(expr);
+      spec   = new TupleCellSpec(x->name().c_str());
+    } break;
+    default: {
+      sql_debug("unknown expr type\n");
+      return;
+    }
   }
-
   tuple_.add_cell_spec(spec);
 }

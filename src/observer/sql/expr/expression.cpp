@@ -14,12 +14,16 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/expr/expression.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
 #include "storage/field/field.h"
+#include "storage/field/field_meta.h"
 #include <cassert>
+#include <cmath>
+#include <cstddef>
 #include <memory>
 
 using namespace std;
@@ -48,6 +52,10 @@ RC Expression::create(
     case ExprType::ARITHMETIC: {
       LOG_ERROR("not compliment other type");
       // DEFALT; 如果到时候需要再加
+    } break;
+    case ExprType::FUNCTION: {
+      // 处理一下，定表达式
+      return FuncExpr::create(node, table_map, tables, res_expr, db);
     } break;
   }
   return RC::SUCCESS;
@@ -600,4 +608,69 @@ RC AggreExpression::create(
   aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr), full_table_name);
   res_expr   = aggre_expr;
   return rc;
+}
+
+/**
+ * @brief 定义FunctionExpr
+ *
+ */
+
+FuncExpr::FuncExpr(FuncType tp, Expression *left, Expression *right) : functype_(tp), left_(left), right_(right) {}
+
+RC FuncExpr::try_get_value(Value &value) const
+{
+  switch (functype_) {
+    case FuncType::LENGTH_: {
+      Value temp;
+      if (RC::SUCCESS != left_->try_get_value(temp) || temp.attr_type() != AttrType::CHARS) {
+        sql_debug("fail to get a chars parameter");
+        return RC::FAILURE;
+      }
+      value.set_int(static_cast<int>(temp.get_string().size()));
+      return RC::SUCCESS;
+    } break;
+    case FuncType::ROUND_: {
+      Value para1, para2;
+      if (RC::SUCCESS != left_->try_get_value(para1) || para1.attr_type() != AttrType::FLOATS) {
+        sql_debug("fail to get left float parameter");
+        return RC::FAILURE;
+      }
+      if (RC::SUCCESS != right_->try_get_value(para2) || para2.attr_type() != AttrType::INTS) {
+        sql_debug("fail to get right float parameter");
+        return RC::FAILURE;
+      }
+      value.set_float(static_cast<float>(round(para1.get_float() * pow(10, para2.get_int())) / pow(10, para2.get_int()))
+      );
+      return RC::SUCCESS;
+    } break;
+    case FuncType::DATE_FORMAT_: {
+      // TODOX: 实现日期format
+    } break;
+    default: {
+      sql_debug("Unkonwn Function\n");
+      return RC::FAILURE;
+    }
+  }
+  return RC::UNIMPLENMENT;
+}
+
+RC FuncExpr::create(
+    const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables,
+    Expression *&res_expr, Db *db
+)
+{
+  RC                  rc        = RC::SUCCESS;
+  const FunctionNode &func_node = node.func_;
+  // 最后返回一个函数表达式，如果是attr那么要转化成为Field表达式，左侧默认是ValueExpr
+  if (func_node.left) {
+    res_expr = new FuncExpr(func_node.f_type, func_node.left, func_node.right);
+    res_expr->set_name(func_node.res_name);
+    return rc;
+  } else {
+    Expression *fexpr_ptr = new FieldExpr();
+    FieldExpr::create(ExprNode(node.rel_attr_), table_map, tables, fexpr_ptr);
+    res_expr = new FuncExpr(func_node.f_type, fexpr_ptr, func_node.right);
+    res_expr->set_name(func_node.res_name);
+    return rc;
+  }
 }

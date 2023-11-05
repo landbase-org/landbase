@@ -114,6 +114,9 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         IS_ // 加 _ 是为了防止和comp_op冲突
         NOT
         LK
+        ROUND
+        LENGTH
+        DATE_FORMAT
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -133,6 +136,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   Expression *                      expression;
   JoinSqlNode *                     join_node;
   OrderSqlNode *                    order_node;
+  FunctionNode *                    func_node;
+  std::vector<FunctionNode> *       func_list;
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
@@ -188,6 +193,9 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <order_list>          order_list
 %type <order_list>          select_order_list
 %type <join_list>           select_join_list
+%type <func_node>           func_node
+%type <func_list>           func_list
+/* %type <func_list>           func_list_opt */
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -554,6 +562,10 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.aggregations.swap(*$3);
         delete $3;
       }
+      // if ($4 != nullptr) {
+      //   $$->selection.functions.swap(*$4);
+      //   delete $4;
+      // }
       if ($5 != nullptr) {
         $$->selection.relations.swap(*$5);
         delete $5;
@@ -570,6 +582,88 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.orders.swap(*$8);
         delete $8;
       }
+    }
+    | SELECT func_list
+    {
+      $$ = new ParsedSqlNode(SCF_SELECT);
+      if ($2 != nullptr) {
+        $$->selection.functions.swap(*$2);
+        delete $2;
+      }
+    }
+    ;
+
+func_node:
+      LENGTH LBRACE expression RBRACE ID
+    {
+      $$ = new FunctionNode;
+      $$->f_type = FuncType::LENGTH_;
+      $$->left = $3;
+      if ($5 != nullptr) {
+        $$->res_name = $5;
+        delete $5;
+      }
+    }
+    | ROUND LBRACE expression COMMA expression RBRACE ID
+    {
+      $$ = new FunctionNode;
+      $$->f_type = FuncType::ROUND_;
+      $$->left = $3;
+      $$->right = $5;
+      if ($7 != nullptr) {
+        $$->res_name = $7;
+        delete $7;
+      }
+    }
+    | DATE_FORMAT LBRACE expression COMMA expression RBRACE ID
+    {
+      $$ = new FunctionNode;
+      $$->f_type = FuncType::DATE_FORMAT_;
+      $$->left = $3;
+      $$->right = $5;
+      if ($7 != nullptr) {
+        $$->res_name = $7;
+        delete $7;
+      }
+    }
+    | LENGTH LBRACE rel_attr RBRACE
+    {
+      $$ = new FunctionNode;
+      $$->res_name = token_name(sql_string,&@$);
+      $$->f_type = FuncType::LENGTH_;
+      $$->rel_attr = *$3;
+      delete $3;
+    }
+    | ROUND LBRACE rel_attr COMMA expression RBRACE 
+    {
+      $$ = new FunctionNode;
+      $$->res_name = token_name(sql_string,&@$);
+      $$->f_type = FuncType::ROUND_;
+      $$->rel_attr = *$3;
+      $$->right = $5;
+      delete $3;
+    }
+    | DATE_FORMAT LBRACE rel_attr COMMA expression RBRACE
+    {
+      $$ = new FunctionNode;
+      $$->res_name = token_name(sql_string,&@$);
+      $$->f_type = FuncType::DATE_FORMAT_;
+      $$->rel_attr = *$3;
+      $$->right = $5;
+      delete $3;
+    }
+    ;
+
+func_list:
+      func_node
+    {
+      $$ = new std::vector<FunctionNode>{*$1};
+      delete $1;
+    }
+    | func_list COMMA func_node
+    {
+      $$->emplace_back(*$3);
+      delete $3;
     }
     ;
 

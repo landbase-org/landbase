@@ -46,6 +46,7 @@ public:
 
 public:
   const std::vector<Table *>      &tables() const { return tables_; }
+  // 这里默认认为处理STMT阶段已经处理好了所有的表达式
   const std::vector<Expression *> &expressions() const { return expressions_; }
   FilterStmt                      *filter_stmt() const { return filter_stmt_; }
   OrderByStmt                     *order_by_stmt() const { return order_stmt_; }

@@ -58,6 +58,15 @@ static RC get_expressions(
     expr_nodes.push_back(ExprNode(aggre));
   }
 
+  // Functions的情况
+  for (auto func : sql_node.functions) {
+    if (func.left == nullptr && func.rel_attr.attribute_name.empty()) {
+      return RC::FAILURE;
+    } else {
+      expr_nodes.emplace_back(ExprNode(func));
+    }
+  }
+  
   for (auto &expr_node : expr_nodes) {
     Expression *tmp_expression;
     rc = Expression::create(expr_node, table_map, tables, tmp_expression, db);
@@ -117,7 +126,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     table_map.insert(std::pair<std::string, Table *>(table_name, table));
   }
 
-  // get the expression 聚合函数, 和查询的列在这里转化
+  // get the expression 聚合函数, 三个函数、和查询的列在这里转化
   std::vector<Expression *> expressions;
   auto                      rc = get_expressions(select_sql, expressions, table_map, tables, db);
   if (rc != RC::SUCCESS) {
