@@ -13,7 +13,6 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/expr/expression.h"
-#include "common/log/log.h"
 #include "event/sql_debug.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/tuple_cell.h"

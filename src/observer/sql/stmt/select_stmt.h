@@ -21,7 +21,6 @@ See the Mulan PSL v2 for more details. */
 #include "order_by_stmt.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/stmt/stmt.h"
-#include "storage/field/field.h"
 
 class FieldMeta;
 class FilterStmt;
