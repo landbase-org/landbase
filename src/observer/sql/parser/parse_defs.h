@@ -164,6 +164,33 @@ struct OrderSqlNode
  * 甚至可以包含复杂的表达式。
  */
 
+/**
+ * @brief 被选择的对象的类型
+ *
+ */
+enum SelectorType
+{
+  RELATTR,
+  AGGRE,
+  FUNCTION,
+  EXPRESSIONS
+};
+
+/**
+ * @brief 用于存储SELECT对象的节点
+ *
+ */
+struct SelectorNode
+{
+  SelectorType   nodetype;
+  RelAttrSqlNode rel_attr;
+  AggreSqlNode   aggretion;
+  FunctionNode   function;
+  Expression    *expression;
+  SelectorNode() = delete;
+  explicit SelectorNode(SelectorType tp) : nodetype(tp) {}
+};
+
 struct SelectSqlNode
 {
   std::vector<RelAttrSqlNode>   attributes;    ///< attributes in select clause
@@ -173,6 +200,7 @@ struct SelectSqlNode
   std::vector<JoinSqlNode>      joinctions;    ///< Join-list
   std::vector<OrderSqlNode>     orders;        ///< Order-requirements
   std::vector<FunctionNode>     functions;     ///< functions
+  std::vector<SelectorNode>     selectors;     ///< 查询语句的对象
 };
 
 /**

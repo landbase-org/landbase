@@ -138,6 +138,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   JoinSqlNode *                     join_node;
   OrderSqlNode *                    order_node;
   FunctionNode *                    func_node;
+  SelectorNode *                    selector_node;
   std::vector<FunctionNode> *       func_list;
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
@@ -149,6 +150,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   std::vector<std::string> *        aggre_attr_list;
   std::vector<JoinSqlNode> *        join_list;
   std::vector<OrderSqlNode> *       order_list;
+  std::vector<SelectorNode> *       selector_list;
   char *                            string; // 是char*类型, 需要free
   int                               number;
   float                             floats;
@@ -196,6 +198,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <order_list>          select_order_list
 %type <join_list>           select_join_list
 %type <func_node>           func_node
+%type <selector_node>       selector_node;
+%type <selector_list>       selector_list;
 %type <func_list>           func_list
 %type <func_list>           func_list_opt
 %type <sql_node>            calc_stmt
@@ -551,9 +555,50 @@ update_list:
       delete $5;
     }
     ;
+/* 一种查询对象的Union */
+selector_node:
+      rel_attr
+    {
+      $$ = new SelectorNode(SelectorType::RELATTR);
+      $$->rel_attr = *$1;
+    }
+    | aggre_node
+    {
+      $$ = new SelectorNode(SelectorType::AGGRE);
+      $$->aggretion = *$1;
+    }
+    | func_node
+    {
+      $$ = new SelectorNode(SelectorType::FUNCTION);
+      $$->function = *$1;
+    } 
+    | expression
+    {
+      $$ = new SelectorNode(SelectorType::EXPRESSION);
+      $$->expression = $1;
+    }
+
+selector_list:
+      /* empty:其实是不可能为空的 */
+    {
+      $$ = nullptr;
+    }
+    | selector_node
+    {
+      $$ = new std::vector<SelectorNode>{*$1};
+      delete $1;
+    }
+    | selector_list COMMA selector_node
+    {
+      if ($3 != nullptr) {
+        $$->emplace_back(*$3);
+        delete $3;
+      }
+    }
+
 
 select_stmt:        /*  select 语句的语法解析树*/
-      SELECT rel_attr_list_opt aggre_node_list_opt FROM rel_list select_join_list where select_order_list
+      /* SELECT rel_attr_list_opt aggre_node_list_opt FROM rel_list select_join_list where select_order_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -608,13 +653,37 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.orders.swap(*$8);
         delete $8;
       }
-    }
-    | SELECT func_list
+    } */
+    SELECT selector_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
-        $$->selection.functions.swap(*$2);
+        $$->selection.selectors.swap(*$2);
         delete $2;
+      }
+    }
+    | SELECT selector_list FROM rel_list select_join_list where select_order_list
+    {
+      $$ = new ParsedSqlNode(SCF_SELECT);
+      if ($2 != nullptr) {
+        $$->selection.selectors.swap(*$2);
+        delete $2;
+      }
+      if ($4 != nullptr) {
+        $$->selection.relations.swap(*$4);
+        delete $4;
+      }
+      if ($5 != nullptr) {
+        $$->selection.joinctions.swap(*$5);
+        delete $5;
+      }
+      if ($6 != nullptr) {
+        $$->selection.conditions.swap(*$6);
+        delete $6;
+      }
+      if ($7 != nullptr) {
+        $$->selection.orders.swap(*$7);
+        delete $7;
       }
     }
     ;
@@ -674,7 +743,6 @@ func_list:
     ;
 
 func_list_opt:
-      /* empty */
     {
         $$ = nullptr;
     }
@@ -724,7 +792,7 @@ aggre_node:
 rel_attr_list_opt:
       rel_attr_list
     {
-      $$ = $1; 
+      $$ = $1;
     }
     | /* empty */
     {

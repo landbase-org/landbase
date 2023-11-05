@@ -149,6 +149,7 @@ union YYSTYPE
   JoinSqlNode *                     join_node;
   OrderSqlNode *                    order_node;
   FunctionNode *                    func_node;
+  SelectorNode *                    selector_node;
   std::vector<FunctionNode> *       func_list;
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
@@ -160,12 +161,13 @@ union YYSTYPE
   std::vector<std::string> *        aggre_attr_list;
   std::vector<JoinSqlNode> *        join_list;
   std::vector<OrderSqlNode> *       order_list;
+  std::vector<SelectorNode> *       selector_list;
   char *                            string; // 是char*类型, 需要free
   int                               number;
   float                             floats;
   bool                              nullable;
 
-#line 169 "yacc_sql.hpp"
+#line 171 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;
