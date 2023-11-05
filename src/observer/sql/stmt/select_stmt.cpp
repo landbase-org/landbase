@@ -33,6 +33,16 @@ RC handle_sub_query_alias(ParseSubQueryExpr *expr, std::vector<AttrSqlNode> &par
   auto &fields      = sub_query->attributes;
   auto &aggres      = sub_query->aggregations;
 
+  // select * from csq_1 t, csq_2 t;
+  auto iter = std::unique(table_names.begin(), table_names.end(), [](const AttrSqlNode &a, const AttrSqlNode &b) {
+    return a.table_alias == b.table_alias;
+  });
+
+  if (iter != table_names.end()) {
+    sql_debug("invalid argument. table alias cannot be repeated");
+    return RC::INVALID_ARGUMENT;
+  }
+
   // 检查非法情况：select * as alias from table_name_1 t1;
   for (auto &field : fields) {
     if (field.attribute_name == "*" && field.field_alias != "") {
@@ -125,6 +135,16 @@ RC handle_alias(SelectSqlNode &select_sql)
   auto  table_names = select_sql.relations;
   auto &fields      = select_sql.attributes;
   auto &aggres      = select_sql.aggregations;
+
+  // select * from csq_1 t, csq_2 t;
+  auto iter = std::unique(table_names.begin(), table_names.end(), [](const AttrSqlNode &a, const AttrSqlNode &b) {
+    return a.table_alias == b.table_alias;
+  });
+
+  if (iter != table_names.end()) {
+    sql_debug("invalid argument. table alias cannot be repeated");
+    return RC::INVALID_ARGUMENT;
+  }
 
   // 检查非法情况：select * as alias from table_name_1 t1;
   for (auto &field : fields) {
