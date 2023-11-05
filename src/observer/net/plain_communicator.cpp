@@ -278,6 +278,13 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
 
   if (rc == RC::RECORD_EOF) {
     rc = RC::SUCCESS;
+  } else {
+    // 如果不成功清空之前的输出，避免以下情况
+    /*
+    id | col1 | feat1
+    FAILURE
+    */
+    writer_->clear();
   }
 
   if (cell_num == 0 || rc != RC::SUCCESS) {

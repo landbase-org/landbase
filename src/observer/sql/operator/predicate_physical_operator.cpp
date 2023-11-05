@@ -15,10 +15,9 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/predicate_physical_operator.h"
 #include "common/log/log.h"
 #include "event/sql_debug.h"
+#include "sql/expr/do_expr.h"
 #include "sql/expr/sub_query_expr.h"
-#include "sql/stmt/filter_stmt.h"
-#include "storage/field/field.h"
-#include "storage/record/record.h"
+
 PredicatePhysicalOperator::PredicatePhysicalOperator(std::unique_ptr<Expression> expr) : expression_(std::move(expr))
 {
   ASSERT(expression_->value_type() == BOOLEANS, "predicate's expression should be BOOLEAN type");
@@ -30,83 +29,19 @@ RC PredicatePhysicalOperator::open(Trx *trx)
     sql_debug("predicate operator must has one child");
     return RC::INTERNAL;
   }
-
+  trx_  = trx;
   RC rc = children_[0]->open(trx);
-
-  switch (expression_->type()) {
-    case ExprType::CONJUNCTION: {
-      // TODO: 假设CONJUNCTION的children内没有CONJUNCTION
-      auto  conjunction_expr = static_cast<ConjunctionExpr *>(expression_.get());
-      auto &children         = conjunction_expr->children();
-      for (auto &child : children) {
-        if (child->type() == ExprType::SUBQUERY) {
-          auto subquery_expr = static_cast<SubQueryExpr *>(child.get());
-          rc                 = subquery_expr->executor(trx);
-          if (rc != RC::SUCCESS) {
-            sql_debug("failed to execute subquery expression");
-            return rc;
-          }
-        }
-      }
-    } break;
-    case ExprType::COMPARISON: {
-      auto  comp_expr  = static_cast<ComparisonExpr *>(expression_.get());
-      auto &left_expr  = comp_expr->left();
-      auto &right_expr = comp_expr->right();
-      if (left_expr->type() == ExprType::SUBQUERY) {
-        auto subquery_expr = static_cast<SubQueryExpr *>(left_expr.get());
-        rc                 = subquery_expr->executor(trx);
-        if (rc != RC::SUCCESS) {
-          sql_debug("failed to execute subquery expression");
-          return rc;
-        }
-      }
-      if (right_expr->type() == ExprType::SUBQUERY) {
-        auto subquery_expr = static_cast<SubQueryExpr *>(right_expr.get());
-        rc                 = subquery_expr->executor(trx);
-        if (rc != RC::SUCCESS) {
-          sql_debug("failed to execute subquery expression");
-          return rc;
-        }
-      }
-    } break;
-    case ExprType::IN: {
-      auto  in_expr    = static_cast<InExpr *>(expression_.get());
-      auto &left_expr  = in_expr->left();
-      auto &right_expr = in_expr->right();
-      if (left_expr->type() == ExprType::SUBQUERY) {
-        auto subquery_expr = static_cast<SubQueryExpr *>(left_expr.get());
-        rc                 = subquery_expr->executor(trx);
-        if (rc != RC::SUCCESS) {
-          sql_debug("failed to execute subquery expression");
-          return rc;
-        }
-      }
-      if (right_expr->type() == ExprType::SUBQUERY) {
-        auto subquery_expr = static_cast<SubQueryExpr *>(right_expr.get());
-        rc                 = subquery_expr->executor(trx);
-        if (rc != RC::SUCCESS) {
-          sql_debug("failed to execute subquery expression");
-          return rc;
-        }
-      }
-    } break;
-    case ExprType::EXISTS: {
-      auto  exists_expr    = static_cast<ExistsExpr *>(expression_.get());
-      auto &sub_query_expr = exists_expr->right();
-      if (sub_query_expr->type() == ExprType::SUBQUERY) {
-        auto subquery_expr = static_cast<SubQueryExpr *>(sub_query_expr.get());
-        rc                 = subquery_expr->executor(trx);
-        if (rc != RC::SUCCESS) {
-          sql_debug("failed to execute subquery expression");
-          return rc;
-        }
-      }
-    } break;
-    default: {
-      sql_debug("uninplemented ExprType");
-    } break;
+  if (rc != RC::SUCCESS) {
+    sql_debug("[open] failed to open child operator");
   }
+
+  // 尝试执行子查询，如果不需要父tuple就能执行成功
+  rc = do_expr(trx_, expression_.get(), nullptr);
+
+  if (rc != RC::SUCCESS) {
+    sql_debug("[open] failed to do expression");
+  }
+
   return rc;
 }
 
@@ -122,6 +57,18 @@ RC PredicatePhysicalOperator::next()
       rc = RC::INTERNAL;
       sql_debug("failed to get tuple from operator");
       break;
+    }
+
+    if (nullptr != parent_tuple_) {
+      CompoundTuple *tmp = new CompoundTuple(parent_tuple_, tuple);
+      tuple              = tmp;
+    }
+
+    // 执行子查询
+    rc = do_expr(trx_, expression_.get(), tuple);
+    if (rc != RC::SUCCESS) {
+      sql_debug("[open] failed to do expression");
+      return rc;
     }
 
     Value value;

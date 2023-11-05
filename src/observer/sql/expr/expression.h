@@ -345,12 +345,15 @@ public:
   RC       get_value(const Tuple &tuple, Value &value) const override { return try_get_value(value); }
   RC       try_get_value(Value &value) const override
   {
-    if (value_list_.size() == 1) {
+    if (value_list_.empty()) {
+      value = Value();
+    } else if (value_list_.size() == 1) {
       value = value_list_.front();
-      return RC::SUCCESS;
+    } else {
+      sql_debug("ValueListExpr::value_list_ size is %d", value_list_.size());
+      return RC::INTERNAL;
     }
-    sql_debug("ValueListExpr::value_list_ size is %d", value_list_.size());
-    return RC::INTERNAL;
+    return RC::SUCCESS;
   }
 
   bool has_values() { return !value_list_.empty(); }

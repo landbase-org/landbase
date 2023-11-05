@@ -78,6 +78,11 @@ public:
 
   virtual Tuple *current_tuple() = 0;
 
+  virtual void set_parent_tuple(Tuple *tuple)
+  {
+    if (!children_.empty())
+      children_[0]->set_parent_tuple(tuple);
+  }
   void add_child(std::unique_ptr<PhysicalOperator> oper) { children_.emplace_back(std::move(oper)); }
 
   std::vector<std::unique_ptr<PhysicalOperator>> &children() { return children_; }

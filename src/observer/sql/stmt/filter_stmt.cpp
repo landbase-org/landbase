@@ -53,6 +53,10 @@ RC FilterStmt::create(
   }
 
   stmt = tmp_stmt;
+  // 设置是否全为or
+  if (condition_num > 1) {
+    stmt->has_or_ = conditions[1].has_or;
+  }
   return rc;
 }
 
@@ -194,9 +198,9 @@ RC FilterStmt::create_filter_unit(
   }
 
   // 接下来分四种情况讨论
-  // 左侧字段，右侧值
   // 字符串与整数比较时会转成整数类型，字符串/整数与浮点数比较时会转成浮点数类型
   if (left_expr->type() == ExprType::FIELD && right_expr->type() == ExprType::VALUE) {
+    // 左侧字段，右侧值
     auto   tmp_expr = static_cast<ValueExpr *>(right_expr);
     Value &value    = tmp_expr->get_value();
 
@@ -227,8 +231,8 @@ RC FilterStmt::create_filter_unit(
           attr_type_to_string(right_expr->value_type())
       );
     }
-    // 左侧值，右侧值
   } else if (left_expr->type() == ExprType::VALUE && right_expr->type() == ExprType::VALUE) {
+    // 左侧值，右侧值
     // 如果一边出现了 null, 则可比较
     if (left_expr->value_type() == NULLS || right_expr->value_type() == NULLS) {
       return RC::SUCCESS;
@@ -242,15 +246,15 @@ RC FilterStmt::create_filter_unit(
         return RC::FAILURE;
       }
     }
-    // 左边字段，右边字段
   } else if (left_expr->type() == ExprType::FIELD && right_expr->type() == ExprType::FIELD) {
+    // 左边字段，右边字段
     sql_debug(
         "Compared Fields type dismatch %s with %s",
         attr_type_to_string(left_expr->value_type()),
         attr_type_to_string(right_expr->value_type())
     );
-    // 左边值，右边字段
   } else {
+    // 左边值，右边字段
     //  where exists (select id from user);
     if (right_expr->type() == ExprType::SUBQUERY) {
       return RC::SUCCESS;

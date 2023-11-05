@@ -301,7 +301,6 @@ class AggregationTuple : public Tuple
 {
 public:
   AggregationTuple() = default;
-  AggregationTuple(std::vector<std::unique_ptr<AggreExpression>> &aggre_exprs) : aggre_exprs_(&aggre_exprs) {}
   virtual ~AggregationTuple() {}
 
 public:
@@ -315,7 +314,8 @@ public:
   const auto &get_field_exprs() const { return field_exprs_; }
 
 public:
-  void init(std::vector<std::unique_ptr<AggreExpression>> *aggre_exprs);  // 默认构造的必须调用这个init
+  void init(std::vector<std::unique_ptr<AggreExpression>> aggre_exprs);  // 默认构造的必须调用这个init
+  void reinit();
   void do_aggregation_begin();
   void do_aggregation();
   void do_aggregation_end();
@@ -329,9 +329,9 @@ private:
   std::vector<Value>  field_results_;
 
 private:
-  std::vector<FieldExpr>                         field_exprs_;
-  Tuple                                         *tuple_ = nullptr;  // 从子算子中获取的tuple
-  std::vector<std::unique_ptr<AggreExpression>> *aggre_exprs_;      // 查询的所有tuple
+  std::vector<FieldExpr>                        field_exprs_;
+  Tuple                                        *tuple_ = nullptr;  // 从子算子中获取的tuple
+  std::vector<std::unique_ptr<AggreExpression>> aggre_exprs_;      // 查询的所有tuple
 };
 
 /**
@@ -408,6 +408,45 @@ public:
 
     return right_->find_cell(spec, value);
   }
+
+private:
+  Tuple *left_  = nullptr;
+  Tuple *right_ = nullptr;
+};
+
+/**
+ * @brief 用于复杂子查询，将两个tuple合并为一个tuple，方便使用 ComparisonExpr
+ *
+ */
+class CompoundTuple : public Tuple
+{
+public:
+  CompoundTuple(Tuple *left, Tuple *right) : left_(left), right_(right) {}
+  ~CompoundTuple() override = default;
+  int cell_num() const override { return left_->cell_num() + right_->cell_num(); }
+  RC  cell_at(int index, Value &cell) const override
+  {
+    if (index < left_->cell_num()) {
+      return left_->cell_at(index, cell);
+    } else {
+      return right_->cell_at(index - left_->cell_num(), cell);
+    }
+  }
+  RC find_cell(const TupleCellSpec &spec, Value &cell) const override
+  {
+    RC rc = left_->find_cell(spec, cell);
+    if (rc == RC::SUCCESS) {
+      return rc;
+    }
+    return right_->find_cell(spec, cell);
+  }
+
+public:
+  void set_left(Tuple *left) { left_ = left; }
+  void set_right(Tuple *right) { right_ = right; }
+
+  Tuple *left() const { return left_; }
+  Tuple *right() const { return right_; }
 
 private:
   Tuple *left_  = nullptr;

@@ -107,3 +107,10 @@ RC RingBuffer::write(const char *data, int32_t size, int32_t &write_size)
 
   return rc;
 }
+
+RC RingBuffer::clear()
+{
+  write_pos_ = 0;
+  data_size_ = 0;
+  return RC::SUCCESS;
+}

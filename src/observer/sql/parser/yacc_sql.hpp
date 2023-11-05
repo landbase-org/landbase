@@ -94,33 +94,34 @@ extern int yydebug;
     FROM = 295,                    /* FROM  */
     WHERE = 296,                   /* WHERE  */
     AND = 297,                     /* AND  */
-    SET = 298,                     /* SET  */
-    ON = 299,                      /* ON  */
-    LOAD = 300,                    /* LOAD  */
-    DATA = 301,                    /* DATA  */
-    INFILE = 302,                  /* INFILE  */
-    EXPLAIN = 303,                 /* EXPLAIN  */
-    EQ = 304,                      /* EQ  */
-    LT = 305,                      /* LT  */
-    GT = 306,                      /* GT  */
-    LE = 307,                      /* LE  */
-    GE = 308,                      /* GE  */
-    NE = 309,                      /* NE  */
-    SUM = 310,                     /* SUM  */
-    COUNT = 311,                   /* COUNT  */
-    AVG = 312,                     /* AVG  */
-    MIN = 313,                     /* MIN  */
-    MAX = 314,                     /* MAX  */
-    IS_ = 315,                     /* IS_  */
-    NOT = 316,                     /* NOT  */
-    LK = 317,                      /* LK  */
-    IN_OP = 318,                   /* IN_OP  */
-    EXISTS_OP = 319,               /* EXISTS_OP  */
-    NUMBER = 320,                  /* NUMBER  */
-    FLOAT = 321,                   /* FLOAT  */
-    ID = 322,                      /* ID  */
-    SSS = 323,                     /* SSS  */
-    UMINUS = 324                   /* UMINUS  */
+    OR = 298,                      /* OR  */
+    SET = 299,                     /* SET  */
+    ON = 300,                      /* ON  */
+    LOAD = 301,                    /* LOAD  */
+    DATA = 302,                    /* DATA  */
+    INFILE = 303,                  /* INFILE  */
+    EXPLAIN = 304,                 /* EXPLAIN  */
+    EQ = 305,                      /* EQ  */
+    LT = 306,                      /* LT  */
+    GT = 307,                      /* GT  */
+    LE = 308,                      /* LE  */
+    GE = 309,                      /* GE  */
+    NE = 310,                      /* NE  */
+    SUM = 311,                     /* SUM  */
+    COUNT = 312,                   /* COUNT  */
+    AVG = 313,                     /* AVG  */
+    MIN = 314,                     /* MIN  */
+    MAX = 315,                     /* MAX  */
+    IS_ = 316,                     /* IS_  */
+    NOT = 317,                     /* NOT  */
+    LK = 318,                      /* LK  */
+    IN_OP = 319,                   /* IN_OP  */
+    EXISTS_OP = 320,               /* EXISTS_OP  */
+    NUMBER = 321,                  /* NUMBER  */
+    FLOAT = 322,                   /* FLOAT  */
+    ID = 323,                      /* ID  */
+    SSS = 324,                     /* SSS  */
+    UMINUS = 325                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -129,7 +130,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 123 "yacc_sql.y"
+#line 124 "yacc_sql.y"
 
   ParsedSqlNode *                   sql_node;
   ConditionSqlNode *                condition;
@@ -163,7 +164,7 @@ union YYSTYPE
   float                             floats;
   bool                              nullable;
 
-#line 167 "yacc_sql.hpp"
+#line 168 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

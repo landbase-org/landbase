@@ -412,7 +412,7 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
   }
   rc = right_->get_value(tuple, right_value);
   if (rc != RC::SUCCESS) {
-    sql_debug("failed to get value of right expression. rc=%s", strrc(rc));
+    sql_debug("[ArithmeticExpr] failed to get value of right expression. rc=%s", strrc(rc));
     return rc;
   }
   return calc_value(left_value, right_value, value);
@@ -434,7 +434,7 @@ RC ArithmeticExpr::try_get_value(Value &value) const
   if (right_) {
     rc = right_->try_get_value(right_value);
     if (rc != RC::SUCCESS) {
-      sql_debug("failed to get value of right expression. rc=%s", strrc(rc));
+      sql_debug("[ArithmeticExpr] failed to get value of right expression. rc=%s", strrc(rc));
       return rc;
     }
   }

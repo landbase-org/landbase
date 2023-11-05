@@ -105,6 +105,8 @@ struct ConditionSqlNode
   ParseExpr *left = nullptr;
   CompOp     comp{CompOp::NO_OP};  ///< comparison operator
   ParseExpr *right = nullptr;
+  // 为什么将or放在这里，因为官方说只有and和or,没有两者混合的情况，为了最小化改动，方便以后重构，就先写在这里了
+  bool has_or = false;
 };
 
 /**
@@ -133,7 +135,6 @@ struct OrderSqlNode
  * where 条件 conditions，这里表示使用AND串联起来多个条件。正常的SQL语句会有OR，NOT等，
  * 甚至可以包含复杂的表达式。
  */
-
 struct SelectSqlNode
 {
   std::vector<RelAttrSqlNode>   attributes;    ///< attributes in select clause
