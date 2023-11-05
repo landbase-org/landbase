@@ -37,7 +37,7 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 bool FieldExpr::is_null(char *data) const { return field_.is_null(data); }
 
 RC FieldExpr::create(
-    const std::vector<RelAttrSqlNode> &nodes, const std::unordered_map<std::string, Table *> &table_map,
+    const SelectSqlNode &select_sql_node, const std::unordered_map<std::string, Table *> &table_map,
     const std::vector<Table *> &tables, std::vector<Expression *> &res_expr, Db *db
 )
 {
@@ -50,10 +50,12 @@ RC FieldExpr::create(
     }
   };
 
-  for (auto &relation_attr : nodes) {
-    const auto table_name = relation_attr.relation_name;
-    const auto field_name = relation_attr.attribute_name;
-    const auto aggre_type = AGGRE_NONE;
+  for (auto &field : select_sql_node.attributes) {
+    const auto &table_name  = field.relation_name;
+    const auto &table_alias = field.table_alias;
+    const auto &field_name  = field.attribute_name;
+    const auto &field_alias = field.field_alias;
+
     if (table_name == "*" || field_name == "") {
       sql_debug("no fields type err=%s.%s", table_name.c_str(), field_name.c_str());
       return RC::SCHEMA_FIELD_MISSING;
@@ -65,17 +67,17 @@ RC FieldExpr::create(
       }
     } else if (table_name == "" && field_name != "*") {  // field_name != "*"
       if (tables.size() != 1) {
-        sql_debug("invalid. I do not know the attr's table. attr=%s", relation_attr.attribute_name.c_str());
+        sql_debug("invalid. I do not know the attr's table. attr=%s", field_name.c_str());
         return RC::SCHEMA_FIELD_MISSING;
       }
 
       Table           *table      = tables[0];
-      const FieldMeta *field_meta = table->table_meta().field(relation_attr.attribute_name.c_str());
+      const FieldMeta *field_meta = table->table_meta().field(field_name.c_str());
       if (nullptr == field_meta) {
-        sql_debug("no such field. field=%s.%s.%s", db->name(), table->name(), relation_attr.attribute_name.c_str());
+        sql_debug("no such field. field=%s.%s.%s", db->name(), table->name(), field.attribute_name.c_str());
         return RC::SCHEMA_FIELD_MISSING;
       }
-      res_expr.push_back(new FieldExpr(table, field_meta));
+      res_expr.push_back(new FieldExpr(table, "", field_meta, field_alias));
     } else {  // table_name != "*"
       auto iter = table_map.find(table_name);
       if (iter == table_map.end()) {
@@ -92,7 +94,7 @@ RC FieldExpr::create(
           sql_debug("no such field. field=%s.%s.%s", db->name(), table->name(), field_name.c_str());
           return RC::SCHEMA_FIELD_MISSING;
         }
-        res_expr.push_back(new FieldExpr(table, field_meta));
+        res_expr.push_back(new FieldExpr(table, table_alias, field_meta, field_alias));
       }
     }
   }
@@ -102,12 +104,24 @@ RC FieldExpr::create(
     auto        x = dynamic_cast<FieldExpr *>(expr);
     std::string name;
     if (tables.size() == 1) {
-      name = x->field_name();
+      if (x->field_alias() != "")
+        name = x->field_alias();
+      else
+        name = x->field_name();
     } else {
-      name += x->table_name();
+      if (x->table_alias() != "")
+        name += x->table_alias();
+      else
+        name += x->table_name();
+
       name += ".";
-      name += x->field_name();
+
+      if (x->field_alias() != "")
+        name += x->field_alias();
+      else
+        name += x->field_name();
     }
+
     x->set_name(name);
   }
   return RC::SUCCESS;
@@ -118,7 +132,8 @@ RC FieldExpr::create(
     const std::vector<Table *> &tables, Expression *&res_expr
 )
 {
-  const auto &[table_name, field_name] = node;
+  const auto      &table_name = node.relation_name;
+  const auto      &field_name = node.attribute_name;
   const Table     *table;
   const FieldMeta *field_meta;
 
@@ -149,7 +164,7 @@ RC FieldExpr::create(
     }
   }
 
-  res_expr = new FieldExpr(table, field_meta);
+  res_expr = new FieldExpr(table, node.table_alias, field_meta, node.field_alias);
   return RC::SUCCESS;
 }
 
@@ -483,13 +498,29 @@ std::string AggreExpression::name() const
   std::string name_str = "";
   if (full_table_name_) {
     name_str += get_aggre_type_str() + "(";
-    name_str += table_name();
+
+    if (table_alias() != "")
+      name_str += table_alias();
+    else
+      name_str += table_name();
+
     name_str += ".";
-    name_str += field_name();
+
+    if (field_alias() != "")
+      name_str += field_alias();
+    else
+      name_str += field_name();
+
     name_str += ')';
   } else {
     name_str += get_aggre_type_str() + "(";
-    name_str += has_param_value() ? value_->get_value().to_string() : field_->field_name();
+
+    if (field_alias() != "") {
+      name_str += has_param_value() ? value_->get_value().to_string() : field_->field_name();
+    } else {
+      name_str += has_param_value() ? value_->get_value().to_string() : field_->field_alias();
+    }
+
     name_str += ')';
   }
   return name_str;
@@ -511,8 +542,9 @@ RC AggreExpression::create(
   RC     rc    = RC::SUCCESS;
   Table *table = tables.front();
 
-  const auto &rel_attr             = aggre_node.attribute_name;
-  const auto &[rel, attr]          = rel_attr;
+  const auto      &rel_attr        = aggre_node.attribute_name;
+  const auto      &rel             = rel_attr.relation_name;
+  const auto      &attr            = rel_attr.attribute_name;
   const auto      &aggre_type      = aggre_node.aggre_type;
   Expression      *field_expr      = nullptr;  // FieldExpr 表达式
   AggreExpression *aggre_expr      = nullptr;

@@ -99,6 +99,7 @@ SELECT                                  RETURN_TOKEN(SELECT);
 INNER                                   RETURN_TOKEN(INNER);
 JOIN                                    RETURN_TOKEN(JOIN);
 CALC                                    RETURN_TOKEN(CALC);
+AS                                      RETURN_TOKEN(AS);
 FROM                                    RETURN_TOKEN(FROM);
 WHERE                                   RETURN_TOKEN(WHERE);
 AND                                     RETURN_TOKEN(AND);

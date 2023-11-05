@@ -25,6 +25,96 @@ See the Mulan PSL v2 for more details. */
 #include <algorithm>
 #include <cstddef>
 #include <vector>
+
+void handle_where_alias(std::vector<ConditionSqlNode> &conditions, std::vector<AttrSqlNode> &table_names);
+
+void handle_sub_query_alias(ParseSubQueryExpr *expr, std::vector<AttrSqlNode> &parent_table_names)
+{
+  auto &sub_query   = expr->sub_query();
+  auto  table_names = sub_query->relations;
+  auto &fields      = sub_query->attributes;
+  // 处理字段
+  for (auto &node : table_names) {
+    if (node.table_alias != "") {
+      for (auto &field : fields) {
+        if (field.relation_name == node.table_alias) {
+          field.relation_name = node.relation_name;
+          field.table_alias   = node.table_alias;
+        }
+      }
+    }
+  }
+  // 合并上级表名
+  parent_table_names.insert(parent_table_names.end(), table_names.begin(), table_names.end());
+  // 只处理where中的子查询
+  handle_where_alias(sub_query->conditions, parent_table_names);
+}
+
+void handle_where_alias(std::vector<ConditionSqlNode> &conditions, std::vector<AttrSqlNode> &table_names)
+{
+  for (auto &cond : conditions) {
+    switch (cond.left->expr_type()) {
+      case ParseExprType::FIELD: {
+        auto left_expr = static_cast<ParseFieldExpr *>(cond.left);
+        if (left_expr->table_name() != "") {
+          for (auto &node : table_names) {
+            if (node.table_alias != "") {
+              if (left_expr->table_name() == node.table_alias) {
+                left_expr->set_table_name(node.relation_name);
+                break;
+              }
+            }
+          }
+        }
+      } break;
+      case ParseExprType::SUBQUERY: {
+        auto left_expr = static_cast<ParseSubQueryExpr *>(cond.left);
+        auto tmp       = table_names;
+        handle_sub_query_alias(left_expr, tmp);
+      } break;
+    }
+    switch (cond.right->expr_type()) {
+      case ParseExprType::FIELD: {
+        auto right_expr = static_cast<ParseFieldExpr *>(cond.right);
+        if (right_expr->table_name() != "") {
+          for (auto &node : table_names) {
+            if (node.table_alias != "") {
+              if (right_expr->table_name() == node.table_alias) {
+                right_expr->set_table_name(node.relation_name);
+                break;
+              }
+            }
+          }
+        }
+      } break;
+      case ParseExprType::SUBQUERY: {
+        auto right_expr = static_cast<ParseSubQueryExpr *>(cond.right);
+        auto tmp        = table_names;
+        handle_sub_query_alias(right_expr, tmp);
+      } break;
+    }
+  }
+}
+
+void handle_alias(SelectSqlNode &select_sql)
+{
+  auto  table_names = select_sql.relations;
+  auto &fields      = select_sql.attributes;
+  // 处理字段
+  for (auto &node : table_names) {
+    if (node.table_alias != "") {
+      for (auto &field : fields) {
+        if (field.relation_name == node.table_alias) {
+          field.relation_name = node.relation_name;
+          field.table_alias   = node.table_alias;
+        }
+      }
+    }
+  }
+  // 只处理where中的子查询
+  handle_where_alias(select_sql.conditions, table_names);
+}
+
 SelectStmt::~SelectStmt()
 {
   if (nullptr != filter_stmt_) {
@@ -49,7 +139,7 @@ static RC get_expressions(
   // 如果只是普通的查询列表数据
   RC rc = RC::SUCCESS;
   if (!sql_node.attributes.empty()) {
-    return FieldExpr::create(sql_node.attributes, table_map, tables, res_expressions, db);
+    return FieldExpr::create(sql_node, table_map, tables, res_expressions, db);
   }
 
   // aggregation的情况
@@ -66,7 +156,7 @@ static RC get_expressions(
   return rc;
 }
 
-RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
+RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 {
   if (nullptr == db) {
     sql_debug("invalid argument. db is null");
@@ -78,7 +168,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   std::unordered_map<std::string, Table *> table_map;
   std::vector<OrderSqlNode>                orderbys = select_sql.orders;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const char *table_name = select_sql.relations[i].c_str();
+    const char *table_name = select_sql.relations[i].relation_name.c_str();
     if (nullptr == table_name) {
       sql_debug("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
@@ -111,6 +201,9 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     tables.push_back(table);
     table_map.insert(std::pair<std::string, Table *>(table_name, table));
   }
+
+  // 处理别名
+  handle_alias(select_sql);
 
   // get the expression 聚合函数, 和查询的列在这里转化
   std::vector<Expression *> expressions;

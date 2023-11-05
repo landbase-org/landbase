@@ -117,6 +117,9 @@ class FieldExpr : public Expression
 public:
   FieldExpr() = default;
   FieldExpr(const Table *table, const FieldMeta *field) : field_(table, field) {}
+  FieldExpr(const Table *table, const std::string table_alias, const FieldMeta *field, std::string field_alias)
+      : field_(table, table_alias, field, field_alias)
+  {}
   FieldExpr(const Field &field) : field_(field) {}
 
   virtual ~FieldExpr() = default;
@@ -129,8 +132,9 @@ public:
   const Field &field() const { return field_; }
 
   const char *table_name() const { return field_.table_name(); }
-
+  const auto &table_alias() const { return field_.table_alias(); }
   const char *field_name() const { return field_.field_name(); }
+  const auto &field_alias() const { return field_.field_alias(); }
 
   const AggreType aggre_type() const { return field_.aggre_type(); }
 
@@ -142,7 +146,7 @@ public:
    * 用于初始化field_meta的时候， 例如rel.attr, rel.*, *, attr的情况
    */
   static RC create(
-      const std::vector<RelAttrSqlNode> &nodes, const std::unordered_map<std::string, Table *> &table_map,
+      const SelectSqlNode &select_sql_node, const std::unordered_map<std::string, Table *> &table_map,
       const std::vector<Table *> &tables, std::vector<Expression *> &res_expr, Db *db
   );
 
@@ -466,7 +470,9 @@ public:
   const FieldExpr &fieldexpr() const { return *field_; }
 
   const char *table_name() const { return field_->table_name(); }
+  const auto &table_alias() const { return field_->table_alias(); }
   const char *field_name() const { return field_->field_name(); }
+  const auto &field_alias() const { return field_->field_alias(); }
   AggreType   get_aggre_type() const { return type_; }
   std::string get_aggre_type_str() const { return aggreType2str(type_); };
   void        set_full_table_name(bool flag) { full_table_name_ = flag; }

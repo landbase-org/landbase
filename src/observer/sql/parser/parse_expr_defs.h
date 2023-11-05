@@ -62,13 +62,24 @@ class ParseFieldExpr : public ParseExpr
 {
 public:
   ParseFieldExpr(std::string table_name, std::string field_name) : table_name_(table_name), field_name_(field_name) {}
+  ParseFieldExpr(std::string table_name, std::string table_alias, std::string field_alias, std::string field_name)
+      : table_name_(table_name),
+        table_alias_(table_alias),
+        field_name_(field_name),
+        field_alias_(field_alias)
+  {}
   ParseExprType expr_type() { return ParseExprType::FIELD; }
 
 public:
+  void  set_table_name(std::string &table_name) { table_name_ = table_name; }
   auto &table_name() const { return table_name_; }
+  auto &table_alias() const { return table_alias_; }
   auto &field_name() const { return field_name_; }
+  auto &field_alias() const { return field_alias_; }
 
 private:
   std::string table_name_;
+  std::string table_alias_;
   std::string field_name_;
+  std::string field_alias_;
 };
