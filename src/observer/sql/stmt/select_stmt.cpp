@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/stmt/filter_stmt.h"
+#include "sql/stmt/groupby_stml.h"
 #include "sql/stmt/order_by_stmt.h"
 #include "storage/db/db.h"
 #include "storage/field/field.h"
@@ -38,7 +39,9 @@ SelectStmt::~SelectStmt()
 }
 
 /**
- * @description: 解析要查询到字段, 转换到Field中去
+ * @description: 解析要查询到字段, 如果Express中全是FieldExpr那么就是普通的查询
+ * @description:                如果Express中全是AggreExpr那么就是普通的聚合查询
+ * @description:                否则就是聚合查询
  * @return {RC} 查询的状况
  */
 static RC get_expressions(
@@ -46,19 +49,31 @@ static RC get_expressions(
     const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables, Db *db
 )
 {
-  // 如果只是普通的查询列表数据
   RC rc = RC::SUCCESS;
-  if (!sql_node.attributes.empty()) {
-    return FieldExpr::create(sql_node.attributes, table_map, tables, res_expressions, db);
+  // 没有聚合函数， 直接返回普通的类型
+  if (sql_node.aggres.empty()) {
+    return FieldExpr::create(sql_node.rel_attrs, table_map, tables, res_expressions, db);
   }
 
-  // aggregation的情况
-
-  for (auto &expr_node : sql_node.aggregations) {
+  /**************************
+   *    聚合函数， GROUP BY   *
+   **************************/
+  // 解析聚合函数
+  for (auto &expr_node : sql_node.aggres) {
     Expression *tmp_expression;
     rc = AggreExpression::create(expr_node, table_map, tables, tmp_expression, db);
     if (rc != RC::SUCCESS) {
-      sql_debug("create expression err");
+      sql_debug("create aggregation expression err");
+      return rc;
+    }
+    res_expressions.push_back(tmp_expression);
+  }
+  // 解析field
+  for (auto &expr_node : sql_node.rel_attrs) {
+    Expression *tmp_expression;
+    rc = FieldExpr::create(expr_node, table_map, tables, tmp_expression);
+    if (rc != RC::SUCCESS) {
+      sql_debug("create Field expression err");
       return rc;
     }
     res_expressions.push_back(tmp_expression);
@@ -76,7 +91,13 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // parse the tables;
   std::vector<Table *>                     tables;
   std::unordered_map<std::string, Table *> table_map;
-  std::vector<OrderSqlNode>                orderbys = select_sql.orders;
+  const std::vector<OrderSqlNode>         &orderbys = select_sql.orders;
+  const std::vector<GroupBySqlNode>       &groupbys = select_sql.groupbys;
+  std::vector<OrderSqlNode>                groupbys_order;  // 转化为OrderSqlNode节点的
+  std::for_each(groupbys.begin(), groupbys.end(), [&groupbys_order](const GroupBySqlNode &node) {
+    groupbys_order.push_back({static_cast<RelAttrSqlNode>(node)});
+  });
+
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const char *table_name = select_sql.relations[i].c_str();
     if (nullptr == table_name) {
@@ -156,13 +177,38 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     return rc;
   }
 
+  // 创建GROUP BY, 因为需要分组， 所以在他之前加一个order算子， 这样获取结果的时候就是连续的
+  OrderByStmt *orderby_stmt_before_group = nullptr;
+  GroupByStmt *groupby_stmt              = nullptr;
+  if (!groupbys.empty()) {
+    rc = OrderByStmt::create(
+        db, default_table, &table_map, groupbys_order.data(), static_cast<int>(orderbys.size()), orderby_stmt
+    );
+    rc = GroupByStmt::create(db, table_map, tables, groupbys, groupby_stmt);
+    if (RC::SUCCESS == rc) {
+      LOG_INFO("create group by success");
+      LOG_INFO("create group by success");
+    }
+  }
+
+  // 创建Having
+  HavingStmt *having_stmt = nullptr;
+  if (!select_sql.havings.empty()) {
+    rc = HavingStmt::create(
+        db, default_table, &table_map, select_sql.havings.data(), select_sql.havings.size(), having_stmt
+    );
+    LOG_INFO("create having success");
+  }
+
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
   // TODO add expression copy
   select_stmt->tables_.swap(tables);
   select_stmt->expressions_.swap(expressions);
-  select_stmt->filter_stmt_ = filter_stmt;
-  select_stmt->order_stmt_  = orderby_stmt;
-  stmt                      = select_stmt;
+  select_stmt->filter_stmt_  = filter_stmt;
+  select_stmt->order_stmt_   = orderby_stmt;
+  select_stmt->groupby_stmt_ = groupby_stmt;
+  select_stmt->having_stmt_  = having_stmt;
+  stmt                       = select_stmt;
   return RC::SUCCESS;
 }

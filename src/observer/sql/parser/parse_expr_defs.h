@@ -1,5 +1,6 @@
 #pragma once
 
+#include "sql/parser//aggregation.h"
 #include "sql/parser/value.h"
 #include <memory>
 #include <vector>
@@ -9,6 +10,7 @@ enum class ParseExprType
   VALUE,
   VALUE_LIST,
   SUBQUERY,
+  AGGREGATION,
 };
 
 class ParseExpr
@@ -71,4 +73,25 @@ public:
 private:
   std::string table_name_;
   std::string field_name_;
+};
+
+class ParseAggreExpr : public ParseExpr
+{
+public:
+  ParseAggreExpr(std::string table_name, std::string field_name, AggreType aggre_type)
+      : table_name_(table_name),
+        field_name_(field_name),
+        aggre_type_(aggre_type)
+  {}
+  ParseExprType expr_type() { return ParseExprType::AGGREGATION; }
+
+public:
+  auto &table_name() const { return table_name_; }
+  auto &field_name() const { return field_name_; }
+  auto &aggre_type() const { return aggre_type_; }
+
+private:
+  std::string table_name_;
+  std::string field_name_;
+  AggreType   aggre_type_;
 };

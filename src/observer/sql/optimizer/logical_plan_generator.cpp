@@ -92,7 +92,7 @@ RC LogicalPlanGenerator::create_plan(CalcStmt *calc_stmt, std::unique_ptr<Logica
 // select stmt的逻辑计划生成器
 RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  // Project -> aggre -> (Orderby) -> (predicate) -> table_scan
+  // Project -> aggre -> (Orderby) -> (predicate（过滤）) -> table_scan
   // 因为是从根节点开始执行， 所以执行的顺序是从table_scan开始
   unique_ptr<LogicalOperator> root_oper(nullptr);  // 根
 
