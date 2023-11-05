@@ -80,7 +80,15 @@ static std::string aggreType2str(AggreType aggre)
 struct RelAttrSqlNode
 {
   std::string relation_name;   ///< relation name (may be NULL) 表名
+  std::string table_alias;     ///< table alias (may be NULL)  表别名
   std::string attribute_name;  ///< attribute name              属性名
+  std::string field_alias;     ///< field alias (may be NULL)   属性别名
+};
+
+struct AttrSqlNode
+{
+  std::string relation_name;  ///< relation name (may be NULL) 表名
+  std::string table_alias;    ///< table alias (may be NULL)  表别名
 };
 
 /**
@@ -90,6 +98,7 @@ struct AggreSqlNode
 {
   RelAttrSqlNode attribute_name;          ///< 查询的字段
   AggreType      aggre_type{AGGRE_NONE};  ///< 聚合类型
+  std::string    alias;                   ///< 别名
 };
 
 // TODO: 内存泄漏
@@ -137,9 +146,9 @@ struct OrderSqlNode
  */
 struct SelectSqlNode
 {
-  std::vector<RelAttrSqlNode>   attributes;    ///< attributes in select clause
+  std::vector<RelAttrSqlNode>   attributes;    ///< 字段
   std::vector<AggreSqlNode>     aggregations;  ///< aggregations
-  std::vector<std::string>      relations;     ///< 查询的表
+  std::vector<AttrSqlNode>      relations;     ///< 查询的表
   std::vector<ConditionSqlNode> conditions;    ///< 查询条件，使用AND串联起来多个条件
   std::vector<JoinSqlNode>      joinctions;    ///< Join-list
   std::vector<OrderSqlNode>     orders;        ///< Order-requirements

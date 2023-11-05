@@ -93,6 +93,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         DOT //QUOTE
         INTO
         VALUES
+        AS
         FROM
         WHERE
         AND
@@ -145,7 +146,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   std::vector<std::string> *        id_list;
   std::pair<std::vector<std::string>, std::vector<ParseExpr *>> * update_list;
   std::vector<ConditionSqlNode> *   condition_list;
-  std::vector<std::string> *        relation_list;
+  AttrSqlNode                     * rel_node;
+  std::vector<AttrSqlNode> *        relation_list;
   std::vector<std::string> *        aggre_attr_list;
   std::vector<JoinSqlNode> *        join_list;
   std::vector<OrderSqlNode> *       order_list;
@@ -186,6 +188,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <update_list>         update_list
 %type <condition_list>      where
 %type <condition_list>      condition_list
+%type <rel_node>            rel_node
 %type <relation_list>       rel_list
 %type <id_list>             id_list
 %type <expression>          expression
@@ -614,10 +617,36 @@ aggre_node:
       aggre_type LBRACE rel_attr RBRACE
     {
       $$ = new AggreSqlNode;
-      $$->aggre_type = $1; 
+      $$->aggre_type = $1;
       if ($3 != nullptr) {
         $$->attribute_name = *$3; 
         delete $3; 
+      }
+    }
+    | aggre_type LBRACE rel_attr RBRACE AS rel_name
+    {
+      $$ = new AggreSqlNode;
+      $$->aggre_type = $1;
+      if ($3 != nullptr) {
+        $$->attribute_name = *$3; 
+        delete $3; 
+      }
+      if($6 != nullptr){
+        $$->alias = $6;
+        free($6);
+      }
+    }
+    | aggre_type LBRACE rel_attr RBRACE rel_name
+    {
+      $$ = new AggreSqlNode;
+      $$->aggre_type = $1;
+      if ($3 != nullptr) {
+        $$->attribute_name = *$3; 
+        delete $3; 
+      }
+      if($5 != nullptr){
+        $$->alias = $5;
+        free($5);
       }
     }
     ;
@@ -649,14 +678,40 @@ rel_attr_list:
 rel_attr:
      attr_name
     {
-      $$ = new RelAttrSqlNode{"", $1};
+      $$ = new RelAttrSqlNode{"","", $1,""};
       free($1);
+    }
+    | attr_name attr_name
+    {
+      $$ = new RelAttrSqlNode{"","", $1,$2};
+      free($1);
+      free($2);
+    }
+    | attr_name AS attr_name
+    {
+      $$ = new RelAttrSqlNode{"","", $1,$3};
+      free($1);
+      free($3);
     }
     | rel_name DOT attr_name
     {
-      $$ = new RelAttrSqlNode{$1, $3};
+      $$ = new RelAttrSqlNode{$1,$1,$3,""};
       free($1);
       free($3);
+    }
+    | rel_name DOT attr_name attr_name
+    {
+      $$ = new RelAttrSqlNode{$1,$1,$3,$4};
+      free($1);
+      free($3);
+      free($4);
+    }
+    | rel_name DOT attr_name AS attr_name
+    {
+      $$ = new RelAttrSqlNode{$1,$1,$3,$5};
+      free($1);
+      free($3);
+      free($5);
     }
     ;
 
@@ -747,6 +802,26 @@ order_type:
     | DESC { $$ = ORDER_DESC; }
     ;
 
+rel_node:
+    rel_name
+    {
+      $$ = new AttrSqlNode{$1,""};
+      free($1);
+    }
+    | rel_name rel_name
+    {
+      $$ = new AttrSqlNode{$1,$2};
+      free($1);
+      free($2);
+    }
+    | rel_name AS rel_name
+    {
+      $$ = new AttrSqlNode{$1,$3};
+      free($1);
+      free($3);
+    }
+    ;
+
 /**
  * @description: 获取表名的列表
  * @return {std::vector<std::string>*} 
@@ -756,15 +831,15 @@ rel_list:
     {
       $$ = nullptr;
     }
-    | rel_name
+    | rel_node
     {
-      $$ = new std::vector<std::string>{$1};
-      free($1); 
+      $$ = new std::vector<AttrSqlNode>{*$1};
+      delete $1; 
     }
-    | rel_list COMMA rel_name
+    | rel_list COMMA rel_node
     {
-      $$->emplace_back($3); 
-      free($3);
+      $$->emplace_back(*$3); 
+      delete $3;
     }
     ;
 
@@ -988,7 +1063,12 @@ id_list:
     }
     ;
 
-rel_name: ID { $$ = $1; }
+rel_name: 
+    ID 
+    {
+       $$ = $1; 
+    }
+    ;
 
 /**
  * @description: 返回列名, 列名可能为 `*`, 在此进行特判

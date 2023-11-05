@@ -13,18 +13,174 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/select_stmt.h"
-#include "common/log/log.h"
 #include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/stmt/filter_stmt.h"
 #include "sql/stmt/order_by_stmt.h"
 #include "storage/db/db.h"
-#include "storage/field/field.h"
 #include "storage/table/table.h"
 #include <algorithm>
 #include <cstddef>
 #include <vector>
+
+RC handle_where_alias(std::vector<ConditionSqlNode> &conditions, std::vector<AttrSqlNode> &table_names);
+
+RC handle_sub_query_alias(ParseSubQueryExpr *expr, std::vector<AttrSqlNode> &parent_table_names)
+{
+  auto &sub_query   = expr->sub_query();
+  auto  table_names = sub_query->relations;
+  auto &fields      = sub_query->attributes;
+  auto &aggres      = sub_query->aggregations;
+
+  // select * from csq_1 t, csq_2 t;
+  auto iter = std::unique(table_names.begin(), table_names.end(), [](const AttrSqlNode &a, const AttrSqlNode &b) {
+    if (a.table_alias != "" && b.table_alias != "") {
+      return a.table_alias == b.table_alias;
+    }
+    return false;
+  });
+
+  if (iter != table_names.end()) {
+    sql_debug("invalid argument. table alias cannot be repeated");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // 检查非法情况：select * as alias from table_name_1 t1;
+  for (auto &field : fields) {
+    if (field.attribute_name == "*" && field.field_alias != "") {
+      sql_debug("invalid argument. field alias cannot be used with *");
+      return RC::INVALID_ARGUMENT;
+    }
+  }
+
+  // 处理字段
+  for (auto &node : table_names) {
+    if (node.table_alias != "") {
+      for (auto &field : fields) {
+        if (field.relation_name == node.table_alias) {
+          field.relation_name = node.relation_name;
+          field.table_alias   = node.table_alias;
+        }
+      }
+      for (auto &aggre : aggres) {
+        if (aggre.attribute_name.table_alias == node.table_alias) {
+          aggre.attribute_name.relation_name = node.relation_name;
+          aggre.attribute_name.table_alias   = node.table_alias;
+        }
+      }
+    }
+  }
+  // 合并上级表名
+  parent_table_names.insert(parent_table_names.end(), table_names.begin(), table_names.end());
+  // 只处理where中的子查询
+  return handle_where_alias(sub_query->conditions, parent_table_names);
+}
+
+RC handle_where_alias(std::vector<ConditionSqlNode> &conditions, std::vector<AttrSqlNode> &table_names)
+{
+  RC rc = RC::SUCCESS;
+  for (auto &cond : conditions) {
+    switch (cond.left->expr_type()) {
+      case ParseExprType::FIELD: {
+        auto left_expr = static_cast<ParseFieldExpr *>(cond.left);
+        if (left_expr->table_name() != "") {
+          for (auto &node : table_names) {
+            if (node.table_alias != "") {
+              if (left_expr->table_name() == node.table_alias) {
+                left_expr->set_table_name(node.relation_name);
+                break;
+              }
+            }
+          }
+        }
+      } break;
+      case ParseExprType::SUBQUERY: {
+        auto left_expr = static_cast<ParseSubQueryExpr *>(cond.left);
+        auto tmp       = table_names;
+        rc             = handle_sub_query_alias(left_expr, tmp);
+        if (rc != RC::SUCCESS) {
+          sql_debug("handle sub query alias err");
+          return rc;
+        }
+      } break;
+    }
+    switch (cond.right->expr_type()) {
+      case ParseExprType::FIELD: {
+        auto right_expr = static_cast<ParseFieldExpr *>(cond.right);
+        if (right_expr->table_name() != "") {
+          for (auto &node : table_names) {
+            if (node.table_alias != "") {
+              if (right_expr->table_name() == node.table_alias) {
+                right_expr->set_table_name(node.relation_name);
+                break;
+              }
+            }
+          }
+        }
+      } break;
+      case ParseExprType::SUBQUERY: {
+        auto right_expr = static_cast<ParseSubQueryExpr *>(cond.right);
+        auto tmp        = table_names;
+        rc              = handle_sub_query_alias(right_expr, tmp);
+        if (rc != RC::SUCCESS) {
+          sql_debug("handle sub query alias err");
+          return rc;
+        }
+      } break;
+    }
+  }
+  return rc;
+}
+
+RC handle_alias(SelectSqlNode &select_sql)
+{
+  auto  table_names = select_sql.relations;
+  auto &fields      = select_sql.attributes;
+  auto &aggres      = select_sql.aggregations;
+
+  // select * from csq_1 t, csq_2 t;
+  auto iter = std::unique(table_names.begin(), table_names.end(), [](const AttrSqlNode &a, const AttrSqlNode &b) {
+    if (a.table_alias != "" && b.table_alias != "") {
+      return a.table_alias == b.table_alias;
+    }
+    return false;
+  });
+
+  if (iter != table_names.end()) {
+    sql_debug("invalid argument. table alias cannot be repeated");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // 检查非法情况：select * as alias from table_name_1 t1;
+  for (auto &field : fields) {
+    if (field.attribute_name == "*" && field.field_alias != "") {
+      sql_debug("invalid argument. field alias cannot be used with *");
+      return RC::INVALID_ARGUMENT;
+    }
+  }
+
+  // 处理字段
+  for (auto &node : table_names) {
+    if (node.table_alias != "") {
+      for (auto &field : fields) {
+        if (field.relation_name == node.table_alias) {
+          field.relation_name = node.relation_name;
+          field.table_alias   = node.table_alias;
+        }
+      }
+      for (auto &aggre : aggres) {
+        if (aggre.attribute_name.table_alias == node.table_alias) {
+          aggre.attribute_name.relation_name = node.relation_name;
+          aggre.attribute_name.table_alias   = node.table_alias;
+        }
+      }
+    }
+  }
+  // 只处理where中的子查询
+  return handle_where_alias(select_sql.conditions, table_names);
+}
+
 SelectStmt::~SelectStmt()
 {
   if (nullptr != filter_stmt_) {
@@ -49,7 +205,7 @@ static RC get_expressions(
   // 如果只是普通的查询列表数据
   RC rc = RC::SUCCESS;
   if (!sql_node.attributes.empty()) {
-    return FieldExpr::create(sql_node.attributes, table_map, tables, res_expressions, db);
+    return FieldExpr::create(sql_node, table_map, tables, res_expressions, db);
   }
 
   // aggregation的情况
@@ -66,19 +222,20 @@ static RC get_expressions(
   return rc;
 }
 
-RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
+RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 {
   if (nullptr == db) {
     sql_debug("invalid argument. db is null");
     return RC::INVALID_ARGUMENT;
   }
+  RC rc = RC::SUCCESS;
 
   // parse the tables;
   std::vector<Table *>                     tables;
   std::unordered_map<std::string, Table *> table_map;
   std::vector<OrderSqlNode>                orderbys = select_sql.orders;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const char *table_name = select_sql.relations[i].c_str();
+    const char *table_name = select_sql.relations[i].relation_name.c_str();
     if (nullptr == table_name) {
       sql_debug("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
@@ -112,9 +269,15 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     table_map.insert(std::pair<std::string, Table *>(table_name, table));
   }
 
+  // 处理别名
+  rc = handle_alias(select_sql);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
   // get the expression 聚合函数, 和查询的列在这里转化
   std::vector<Expression *> expressions;
-  auto                      rc = get_expressions(select_sql, expressions, table_map, tables, db);
+  rc = get_expressions(select_sql, expressions, table_map, tables, db);
   if (rc != RC::SUCCESS) {
     sql_debug("cannot parse express");
     return rc;

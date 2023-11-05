@@ -91,37 +91,38 @@ extern int yydebug;
     DOT = 292,                     /* DOT  */
     INTO = 293,                    /* INTO  */
     VALUES = 294,                  /* VALUES  */
-    FROM = 295,                    /* FROM  */
-    WHERE = 296,                   /* WHERE  */
-    AND = 297,                     /* AND  */
-    OR = 298,                      /* OR  */
-    SET = 299,                     /* SET  */
-    ON = 300,                      /* ON  */
-    LOAD = 301,                    /* LOAD  */
-    DATA = 302,                    /* DATA  */
-    INFILE = 303,                  /* INFILE  */
-    EXPLAIN = 304,                 /* EXPLAIN  */
-    EQ = 305,                      /* EQ  */
-    LT = 306,                      /* LT  */
-    GT = 307,                      /* GT  */
-    LE = 308,                      /* LE  */
-    GE = 309,                      /* GE  */
-    NE = 310,                      /* NE  */
-    SUM = 311,                     /* SUM  */
-    COUNT = 312,                   /* COUNT  */
-    AVG = 313,                     /* AVG  */
-    MIN = 314,                     /* MIN  */
-    MAX = 315,                     /* MAX  */
-    IS_ = 316,                     /* IS_  */
-    NOT = 317,                     /* NOT  */
-    LK = 318,                      /* LK  */
-    IN_OP = 319,                   /* IN_OP  */
-    EXISTS_OP = 320,               /* EXISTS_OP  */
-    NUMBER = 321,                  /* NUMBER  */
-    FLOAT = 322,                   /* FLOAT  */
-    ID = 323,                      /* ID  */
-    SSS = 324,                     /* SSS  */
-    UMINUS = 325                   /* UMINUS  */
+    AS = 295,                      /* AS  */
+    FROM = 296,                    /* FROM  */
+    WHERE = 297,                   /* WHERE  */
+    AND = 298,                     /* AND  */
+    OR = 299,                      /* OR  */
+    SET = 300,                     /* SET  */
+    ON = 301,                      /* ON  */
+    LOAD = 302,                    /* LOAD  */
+    DATA = 303,                    /* DATA  */
+    INFILE = 304,                  /* INFILE  */
+    EXPLAIN = 305,                 /* EXPLAIN  */
+    EQ = 306,                      /* EQ  */
+    LT = 307,                      /* LT  */
+    GT = 308,                      /* GT  */
+    LE = 309,                      /* LE  */
+    GE = 310,                      /* GE  */
+    NE = 311,                      /* NE  */
+    SUM = 312,                     /* SUM  */
+    COUNT = 313,                   /* COUNT  */
+    AVG = 314,                     /* AVG  */
+    MIN = 315,                     /* MIN  */
+    MAX = 316,                     /* MAX  */
+    IS_ = 317,                     /* IS_  */
+    NOT = 318,                     /* NOT  */
+    LK = 319,                      /* LK  */
+    IN_OP = 320,                   /* IN_OP  */
+    EXISTS_OP = 321,               /* EXISTS_OP  */
+    NUMBER = 322,                  /* NUMBER  */
+    FLOAT = 323,                   /* FLOAT  */
+    ID = 324,                      /* ID  */
+    SSS = 325,                     /* SSS  */
+    UMINUS = 326                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -130,7 +131,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 124 "yacc_sql.y"
+#line 125 "yacc_sql.y"
 
   ParsedSqlNode *                   sql_node;
   ConditionSqlNode *                condition;
@@ -155,7 +156,8 @@ union YYSTYPE
   std::vector<std::string> *        id_list;
   std::pair<std::vector<std::string>, std::vector<ParseExpr *>> * update_list;
   std::vector<ConditionSqlNode> *   condition_list;
-  std::vector<std::string> *        relation_list;
+  AttrSqlNode                     * rel_node;
+  std::vector<AttrSqlNode> *        relation_list;
   std::vector<std::string> *        aggre_attr_list;
   std::vector<JoinSqlNode> *        join_list;
   std::vector<OrderSqlNode> *       order_list;
@@ -164,7 +166,7 @@ union YYSTYPE
   float                             floats;
   bool                              nullable;
 
-#line 168 "yacc_sql.hpp"
+#line 170 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

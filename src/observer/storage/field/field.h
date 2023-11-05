@@ -27,29 +27,25 @@ class Field
 public:
   Field() = default;
   Field(const Table *table, const FieldMeta *field) : table_(table), field_(field) {}
-  Field(const Table *table, const FieldMeta *field, const AggreType &aggre_type)  // AggreType
+  Field(const Table *table, const std::string &table_alias, const FieldMeta *field, const std::string &field_alias)
       : table_(table),
+        table_alias_(table_alias),
         field_(field),
-        aggre_type_(aggre_type)
-  {}
-  Field(const Table *table, const FieldMeta *field, const AggreType &aggre_type, const std::string &alias)  // AggreType
-      : table_(table),
-        field_(field),
-        aggre_type_(aggre_type),
-        alias_(alias)
+        field_alias_(field_alias)
   {}
   Field(const Field &) = default;
 
   const Table     *table() const { return table_; }
   const FieldMeta *meta() const { return field_; }
 
-  const AggreType   aggre_type() const { return aggre_type_; }
-  const void        set_aggre_type(AggreType aggre_type) { aggre_type_ = aggre_type; }
-  const std::string alias() const { return alias_; }
-  AttrType          attr_type() const { return field_->type(); }
+  const AggreType aggre_type() const { return aggre_type_; }
+  const void      set_aggre_type(AggreType aggre_type) { aggre_type_ = aggre_type; }
+  AttrType        attr_type() const { return field_->type(); }
 
   const char *table_name() const { return table_->name(); }
+  const auto &table_alias() const { return table_alias_; }
   const char *field_name() const { return field_->name(); }
+  const auto &field_alias() const { return field_alias_; }
 
   void set_table(const Table *table) { this->table_ = table; }
   void set_field(const FieldMeta *field) { this->field_ = field; }
@@ -72,5 +68,6 @@ private:
   const Table     *table_ = nullptr;
   const FieldMeta *field_ = nullptr;
   AggreType        aggre_type_{AGGRE_NONE};
-  std::string      alias_;  // COUNT的时候, COUNT(123)都可能, 用这个字段存储
+  std::string      table_alias_;
+  std::string      field_alias_;  // COUNT的时候, COUNT(123)都可能, 用这个字段存储
 };

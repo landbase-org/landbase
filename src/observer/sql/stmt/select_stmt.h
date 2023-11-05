@@ -21,7 +21,6 @@ See the Mulan PSL v2 for more details. */
 #include "order_by_stmt.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/stmt/stmt.h"
-#include "storage/field/field.h"
 
 class FieldMeta;
 class FilterStmt;
@@ -42,7 +41,7 @@ public:
   StmtType type() const override { return StmtType::SELECT; }
 
 public:
-  static RC create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt);
+  static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt);
 
 public:
   const std::vector<Table *>      &tables() const { return tables_; }
