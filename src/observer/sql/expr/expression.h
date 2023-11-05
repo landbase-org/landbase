@@ -381,8 +381,8 @@ public:
 
   ExprType type() const override { return ExprType::FUNCTION; }
   FuncType func_type() const { return functype_; }
-  RC       get_value(const Tuple &tuple, Value &value) const override { return RC::UNIMPLENMENT; }
-  RC       try_get_value(Value &value) const override;
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC       try_get_value(Value &value) const override { return RC::UNIMPLENMENT; }
 
   static RC create(
       const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map,

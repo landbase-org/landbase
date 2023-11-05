@@ -195,7 +195,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <join_list>           select_join_list
 %type <func_node>           func_node
 %type <func_list>           func_list
-/* %type <func_list>           func_list_opt */
+%type <func_list>           func_list_opt
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -551,7 +551,7 @@ update_list:
     ;
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT rel_attr_list_opt aggre_node_list_opt FROM rel_list select_join_list where select_order_list
+    SELECT rel_attr_list_opt aggre_node_list_opt func_list_opt FROM rel_list select_join_list where select_order_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -562,35 +562,35 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.aggregations.swap(*$3);
         delete $3;
       }
-      // if ($4 != nullptr) {
-      //   $$->selection.functions.swap(*$4);
-      //   delete $4;
-      // }
-      if ($5 != nullptr) {
-        $$->selection.relations.swap(*$5);
-        delete $5;
+      if ($4 != nullptr) {
+        $$->selection.functions.swap(*$4);
+        delete $4;
       }
       if ($6 != nullptr) {
-        $$->selection.joinctions.swap(*$6);
+        $$->selection.relations.swap(*$6);
         delete $6;
       }
       if ($7 != nullptr) {
-        $$->selection.conditions.swap(*$7);
+        $$->selection.joinctions.swap(*$7);
         delete $7;
       }
       if ($8 != nullptr) {
-        $$->selection.orders.swap(*$8);
+        $$->selection.conditions.swap(*$8);
         delete $8;
       }
+      if ($9 != nullptr) {
+        $$->selection.orders.swap(*$9);
+        delete $9;
+      }
     }
-    | SELECT func_list
+    /* | SELECT func_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
         $$->selection.functions.swap(*$2);
         delete $2;
       }
-    }
+    } */
     ;
 
 func_node:
@@ -664,6 +664,17 @@ func_list:
     {
       $$->emplace_back(*$3);
       delete $3;
+    }
+    ;
+
+func_list_opt:
+      /* empty */
+    {
+        $$ = nullptr;
+    }
+    | func_list
+    {
+      $$ = $1;
     }
     ;
 

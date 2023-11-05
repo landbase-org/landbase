@@ -280,21 +280,26 @@ public:
     }
 
     const Expression *expr = expressions_[index].get();
-    return expr->try_get_value(cell);
+    return expr->get_value(*row_, cell);
   }
 
   RC find_cell(const TupleCellSpec &spec, Value &cell) const override
   {
     for (const std::unique_ptr<Expression> &expr : expressions_) {
+      // 此处如果是函数那么传入的是alias，否则就是Field的名字
       if (0 == strcmp(spec.alias(), expr->name().c_str())) {
-        return expr->try_get_value(cell);
+        return expr->get_value(*row_, cell);
+      } else if (0 == strcmp(spec.field_name(), expr->name().c_str())) {
+        return expr->get_value(*row_, cell);
       }
     }
     return RC::NOTFOUND;
   }
+  void set_tuple(Tuple *tuple) { row_ = tuple; }
 
 private:
   const std::vector<std::unique_ptr<Expression>> &expressions_;
+  Tuple                                          *row_;
 };
 
 class AggregationTuple : public Tuple

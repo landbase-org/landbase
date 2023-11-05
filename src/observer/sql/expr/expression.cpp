@@ -617,12 +617,12 @@ RC AggreExpression::create(
 
 FuncExpr::FuncExpr(FuncType tp, Expression *left, Expression *right) : functype_(tp), left_(left), right_(right) {}
 
-RC FuncExpr::try_get_value(Value &value) const
+RC FuncExpr::get_value(const Tuple &tuple, Value &value) const
 {
   switch (functype_) {
     case FuncType::LENGTH_: {
       Value temp;
-      if (RC::SUCCESS != left_->try_get_value(temp) || temp.attr_type() != AttrType::CHARS) {
+      if (RC::SUCCESS != left_->get_value(tuple, temp) || temp.attr_type() != AttrType::CHARS) {
         sql_debug("fail to get a chars parameter");
         return RC::FAILURE;
       }
@@ -668,7 +668,7 @@ RC FuncExpr::create(
     return rc;
   } else {
     Expression *fexpr_ptr = new FieldExpr();
-    FieldExpr::create(ExprNode(node.rel_attr_), table_map, tables, fexpr_ptr);
+    FieldExpr::create(ExprNode(func_node.rel_attr), table_map, tables, fexpr_ptr);
     res_expr = new FuncExpr(func_node.f_type, fexpr_ptr, func_node.right);
     res_expr->set_name(func_node.res_name);
     return rc;
