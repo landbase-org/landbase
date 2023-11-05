@@ -161,7 +161,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   // 4. 检查字段的
   GroupByStmt *groupby_stmt = select_stmt->groupby_stmt();
-  if (!aggre_exprs.empty() && !aggre_exprs.empty()) {  // 都不为空表示当前为聚合查询
+  if (!aggre_exprs.empty() && !field_exprs.empty()) {  // 都不为空表示当前为聚合查询
     if (nullptr == groupby_stmt) {
       return RC::SQL_SYNTAX;
     }
@@ -184,7 +184,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   if (!aggre_exprs.empty()) {
     unique_ptr<LogicalOperator> groupby_oper = nullptr;
     if (nullptr == groupby_stmt) {
-      groupby_oper.reset(new AggreLogicalOperator(std::move(aggre_exprs), std::move(field_exprs)));
+      groupby_oper.reset(new AggreLogicalOperator(std::move(aggre_exprs), std::move(field_exprs), new GroupByStmt()));
     } else {
       groupby_oper.reset(new AggreLogicalOperator(std::move(aggre_exprs), std::move(field_exprs), groupby_stmt));
     }

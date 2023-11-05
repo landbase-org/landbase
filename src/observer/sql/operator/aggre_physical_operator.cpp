@@ -45,8 +45,7 @@ RC AggrePhysicalOperator::next()
       return RC::SUCCESS;
     }
     tuple_.set_tuple(oper->current_tuple());  // 初始化alue
-    son_tuple = oper->current_tuple();
-    tuple_.update_field_values();
+    son_tuple   = oper->current_tuple();
     is_started_ = true;
 
     for (const auto &unit : *groupby_units) {
@@ -71,7 +70,6 @@ RC AggrePhysicalOperator::next()
 
     if (is_new_group_) {  // 如果是新的group要初始化aggre数据
       tuple_.do_aggregation_begin();
-      tuple_.update_field_values();
       is_new_group_ = false;
     }
 
