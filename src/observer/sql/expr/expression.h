@@ -139,7 +139,7 @@ public:
    */
   static RC create(
       const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map,
-      const std::vector<Table *> &tables, Expression *&res_expr
+      const std::vector<Table *> &tables, Expression *&res_expr,Db* db
   );
 
 private:

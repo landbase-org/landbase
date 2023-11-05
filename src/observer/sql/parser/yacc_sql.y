@@ -128,10 +128,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   enum OrderType                    order_type;
   enum FuncType                     func_type;
   AggreSqlNode *                    aggre_node;
-  std::vector<AggreSqlNode> *       aggre_node_list;
-  std::vector<AggreSqlNode> *       aggre_node_list_opt;  // opt表示可以选择，可以有也可以没有
   RelAttrSqlNode *                  rel_attr;
-  std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
@@ -139,7 +136,6 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   OrderSqlNode *                    order_node;
   FunctionNode *                    func_node;
   SelectorNode *                    selector_node;
-  std::vector<FunctionNode> *       func_list;
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
@@ -174,11 +170,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <order_type>          order_type
 %type <func_type>           func_type
 %type <aggre_node>          aggre_node
-%type <aggre_node_list>     aggre_node_list
-%type <aggre_node_list>     aggre_node_list_opt
 %type <rel_attr>            rel_attr        // (table column)
-%type <rel_attr_list>       rel_attr_list
-%type <rel_attr_list>       rel_attr_list_opt
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <nullable>            nullable // 用于标识字段是否可以为 null
@@ -200,8 +192,6 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <func_node>           func_node
 %type <selector_node>       selector_node;
 %type <selector_list>       selector_list;
-%type <func_list>           func_list
-%type <func_list>           func_list_opt
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -598,62 +588,6 @@ selector_list:
 
 
 select_stmt:        /*  select 语句的语法解析树*/
-      /* SELECT rel_attr_list_opt aggre_node_list_opt FROM rel_list select_join_list where select_order_list
-    {
-      $$ = new ParsedSqlNode(SCF_SELECT);
-      if ($2 != nullptr) {
-        $$->selection.attributes.swap(*$2);
-        delete $2;
-      }
-      if ($3 != nullptr) {
-        $$->selection.aggregations.swap(*$3);
-        delete $3;
-      }
-      if ($5 != nullptr) {
-        $$->selection.relations.swap(*$5);
-        delete $5;
-      }
-      if ($6 != nullptr) {
-        $$->selection.joinctions.swap(*$6);
-        delete $6;
-      }
-      if ($7 != nullptr) {
-        $$->selection.conditions.swap(*$7);
-        delete $7;
-      }
-      if ($8 != nullptr) {
-        $$->selection.orders.swap(*$8);
-        delete $8;
-      }
-    }
-    | SELECT rel_attr_list_opt func_list_opt FROM rel_list select_join_list where select_order_list
-    {
-      $$ = new ParsedSqlNode(SCF_SELECT);
-      if ($2 != nullptr) {
-        $$->selection.attributes.swap(*$2);
-        delete $2;
-      }
-      if ($3 != nullptr) {
-        $$->selection.functions.swap(*$3);
-        delete $3;
-      }
-      if ($5 != nullptr) {
-        $$->selection.relations.swap(*$5);
-        delete $5;
-      }
-      if ($6 != nullptr) {
-        $$->selection.joinctions.swap(*$6);
-        delete $6;
-      }
-      if ($7 != nullptr) {
-        $$->selection.conditions.swap(*$7);
-        delete $7;
-      }
-      if ($8 != nullptr) {
-        $$->selection.orders.swap(*$8);
-        delete $8;
-      }
-    } */
     SELECT selector_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
@@ -729,53 +663,6 @@ func_node:
     }
     ;
 
-func_list:
-      func_node
-    {
-      $$ = new std::vector<FunctionNode>{*$1};
-      delete $1;
-    }
-    | func_list COMMA func_node
-    {
-      $$->emplace_back(*$3);
-      delete $3;
-    }
-    ;
-
-func_list_opt:
-    {
-        $$ = nullptr;
-    }
-    | func_list
-    {
-      $$ = $1;
-    }
-    ;
-
-
-aggre_node_list_opt:
-      aggre_node_list
-    {
-      $$ = $1;
-    }
-    | /* empty */
-    {
-      $$ = nullptr;
-    }
-    ;
-
-aggre_node_list:
-      aggre_node
-    {
-      $$ = new std::vector<AggreSqlNode>{*$1}; 
-      delete $1; 
-    }
-    | aggre_node_list COMMA aggre_node
-    {
-      $$->emplace_back(*$3); 
-      delete $3; 
-    }
-    ;
 
 aggre_node:
       aggre_type LBRACE rel_attr RBRACE
@@ -786,30 +673,6 @@ aggre_node:
         $$->attribute_name = *$3; 
         delete $3; 
       }
-    }
-    ;
-
-rel_attr_list_opt:
-      rel_attr_list
-    {
-      $$ = $1;
-    }
-    | /* empty */
-    {
-      $$ = nullptr; 
-    }
-    ;
-
-rel_attr_list:
-      rel_attr
-    {
-      $$ = new std::vector<RelAttrSqlNode>{*$1}; 
-      delete $1; 
-    }
-    | rel_attr_list COMMA rel_attr
-    {
-      $$->emplace_back(*$3); 
-      delete $3; 
     }
     ;
 

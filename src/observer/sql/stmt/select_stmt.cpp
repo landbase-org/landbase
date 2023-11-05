@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/stmt/select_stmt.h"
 #include "common/log/log.h"
+#include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/stmt/filter_stmt.h"
@@ -46,28 +47,44 @@ static RC get_expressions(
     const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables, Db *db
 )
 {
-  std::vector<ExprNode> expr_nodes;
-  // 如果只是普通的查询列表数据
-  RC rc = RC::SUCCESS;
-  if (sql_node.attributes.size()) {
-    rc = FieldExpr::create(sql_node.attributes, table_map, tables, res_expressions, db);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("Err at make field expr");
+  RC                               rc = RC::SUCCESS;
+  std::vector<ExprNode>            expr_nodes;
+  std::vector<SelectorNode> const &selector_nodes = sql_node.selectors;
+
+  // 因为*的原因，直接处理所有的RelAttr
+  std::vector<RelAttrSqlNode> explicit_attrs;
+  for (auto const &node : sql_node.selectors) {
+    if (node.nodetype == RELATTR) {
+      explicit_attrs.emplace_back(node.rel_attr);
+    }
+  }
+  if (!explicit_attrs.empty()) {
+    rc = FieldExpr::create(explicit_attrs, table_map, tables, res_expressions, db);
+    if (rc != RC::SUCCESS){
+      sql_debug("Err at attrs->exprs");
       return rc;
     }
   }
 
-  // aggregation的情况
-  for (auto aggre : sql_node.aggregations) {
-    expr_nodes.push_back(ExprNode(aggre));
-  }
-
-  // Functions的情况
-  for (auto func : sql_node.functions) {
-    if (func.left == nullptr && func.rel_attr.attribute_name.empty()) {
-      return RC::FAILURE;
-    } else {
-      expr_nodes.emplace_back(ExprNode(func));
+  // 处理除了RelAttr的其他Selectors
+  for (auto &node : selector_nodes) {
+    switch (node.nodetype) {
+      case RELATTR: {
+        // 已经提前处理，此处什么也不做
+      } break;
+      case AGGRE: {
+        expr_nodes.emplace_back(ExprNode(node.aggretion));
+      } break;
+      case FUNCTION: {
+        if (node.function.left == nullptr && node.function.rel_attr.attribute_name.empty()) {
+          LOG_WARN("Error at function node");
+          return RC::FAILURE;
+        }
+        expr_nodes.emplace_back(ExprNode(node.function));
+      } break;
+      case EXPRESSION: {
+        return RC::UNIMPLENMENT;
+      } break;
     }
   }
 
@@ -93,8 +110,10 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // parse the tables;
   std::vector<Table *>                     tables;
   std::unordered_map<std::string, Table *> table_map;
+  std::vector<SelectorNode>                selectors  = select_sql.selectors;
   std::vector<ConditionSqlNode>            conditions = select_sql.conditions;
   std::vector<OrderSqlNode>                orderbys   = select_sql.orders;
+  // 处理显式给出的表
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const char *table_name = select_sql.relations[i].c_str();
     if (nullptr == table_name) {
@@ -112,7 +131,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     table_map.insert(std::pair<std::string, Table *>(table_name, table));
   }
 
-  // add the join's table to the tables
+  // 处理联结需要的表
   for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
     const char *table_name = select_sql.joinctions[i].join_relation.c_str();
     if (nullptr == table_name) {
@@ -131,6 +150,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   }
 
   // get the expression 聚合函数, 三个函数、和查询的列在这里转化
+  // 处理Selectors：聚合、列、函数、（表达式）
   std::vector<Expression *> expressions;
   auto                      rc = get_expressions(select_sql, expressions, table_map, tables, db);
   if (rc != RC::SUCCESS) {
@@ -144,14 +164,14 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     default_table = tables[0];
   }
 
-  // add up the join's conditions
+  // 处理联结需要的条件
   for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
     std::vector<ConditionSqlNode> const &tmp_vec_condi = select_sql.joinctions[i].join_conditions;
     for (auto j : tmp_vec_condi)
       conditions.emplace_back(j);
   }
 
-  // create filter statement in `where` statement
+  // 创建where条件的STMT
   // 有关 where 条件的处理, 过滤出需要的数据
   FilterStmt *filter_stmt = nullptr;
   rc                      = FilterStmt::create(
@@ -162,7 +182,6 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     return rc;
   }
 
-  // create orderby stmt for ORDER BY
   // 创建ORDER_BY的STMT
   OrderByStmt *orderby_stmt = nullptr;
   rc                        = OrderByStmt::create(

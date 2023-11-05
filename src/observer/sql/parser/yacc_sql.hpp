@@ -139,10 +139,10 @@ union YYSTYPE
   enum OrderType                    order_type;
   enum FuncType                     func_type;
   AggreSqlNode *                    aggre_node;
-  std::vector<AggreSqlNode> *       aggre_node_list;
-  std::vector<AggreSqlNode> *       aggre_node_list_opt;  // opt表示可以选择，可以有也可以没有
+  // std::vector<AggreSqlNode> *       aggre_node_list;
+  // std::vector<AggreSqlNode> *       aggre_node_list_opt;  // opt表示可以选择，可以有也可以没有
   RelAttrSqlNode *                  rel_attr;
-  std::vector<RelAttrSqlNode> *     rel_attr_list;
+  // std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
@@ -150,7 +150,7 @@ union YYSTYPE
   OrderSqlNode *                    order_node;
   FunctionNode *                    func_node;
   SelectorNode *                    selector_node;
-  std::vector<FunctionNode> *       func_list;
+  // std::vector<FunctionNode> *       func_list;
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 

@@ -38,7 +38,7 @@ RC Expression::create(
 {
   switch (node.type_) {
     case ExprType::FIELD: {
-      return FieldExpr::create(node, table_map, tables, res_expr);
+      return FieldExpr::create(node, table_map, tables, res_expr, db);
     } break;
     case ExprType::AGGREGATION: {
       return AggreExpression::create(node, table_map, tables, res_expr);
@@ -147,7 +147,7 @@ RC FieldExpr::create(
 
 RC FieldExpr::create(
     const ExprNode &node, const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables,
-    Expression *&res_expr
+    Expression *&res_expr, Db *db
 )
 {
   assert(node.type_ == ExprType::FIELD);
@@ -668,7 +668,7 @@ RC FuncExpr::create(
     return rc;
   } else {
     Expression *fexpr_ptr = new FieldExpr();
-    FieldExpr::create(ExprNode(func_node.rel_attr), table_map, tables, fexpr_ptr);
+    FieldExpr::create(ExprNode(func_node.rel_attr), table_map, tables, fexpr_ptr, db);
     res_expr = new FuncExpr(func_node.f_type, fexpr_ptr, func_node.right);
     res_expr->set_name(func_node.res_name);
     return rc;

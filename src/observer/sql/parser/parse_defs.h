@@ -173,7 +173,7 @@ enum SelectorType
   RELATTR,
   AGGRE,
   FUNCTION,
-  EXPRESSIONS
+  EXPRESSION
 };
 
 /**
@@ -193,13 +193,13 @@ struct SelectorNode
 
 struct SelectSqlNode
 {
-  std::vector<RelAttrSqlNode>   attributes;    ///< attributes in select clause
-  std::vector<AggreSqlNode>     aggregations;  ///< aggregations
+  // std::vector<RelAttrSqlNode>   attributes;    ///< attributes in select clause
+  // std::vector<AggreSqlNode>     aggregations;  ///< aggregations
+  // std::vector<FunctionNode>     functions;     ///< functions
   std::vector<std::string>      relations;     ///< 查询的表
   std::vector<ConditionSqlNode> conditions;    ///< 查询条件，使用AND串联起来多个条件
   std::vector<JoinSqlNode>      joinctions;    ///< Join-list
   std::vector<OrderSqlNode>     orders;        ///< Order-requirements
-  std::vector<FunctionNode>     functions;     ///< functions
   std::vector<SelectorNode>     selectors;     ///< 查询语句的对象
 };
 
@@ -396,9 +396,9 @@ enum class ExprType
 struct ExprNode
 {
   explicit ExprNode() = default;
-  ExprNode(AggreSqlNode aggre) : aggre_(aggre), type_(ExprType::AGGREGATION) {}
+  ExprNode(const AggreSqlNode aggre) : aggre_(aggre), type_(ExprType::AGGREGATION) {}
   ExprNode(const RelAttrSqlNode rel_attr) : rel_attr_(rel_attr), type_(ExprType::FIELD) {}
-  ExprNode(FunctionNode &func) : func_(func), type_(ExprType::FUNCTION) {}
+  ExprNode(const FunctionNode &func) : func_(func), type_(ExprType::FUNCTION) {}
   AggreSqlNode   aggre_;
   RelAttrSqlNode rel_attr_;
   FunctionNode   func_;
