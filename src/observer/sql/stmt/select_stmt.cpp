@@ -57,6 +57,9 @@ static RC get_expressions(
       aggre_size++;
     }
   }
+  if (aggre_size != 0 && aggre_size != sql_node.rel_attr_aggres.size() && sql_node.groupbys.size() == 0) {
+    return RC::FAILURE;
+  }
   if (aggre_size == 0) {
     std::vector<RelAttrSqlNode> rel_attrs;
     for (auto node : sql_node.rel_attr_aggres) {
