@@ -46,14 +46,18 @@ static RC get_expressions(
     const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables, Db *db
 )
 {
+  std::vector<ExprNode> expr_nodes;
   // 如果只是普通的查询列表数据
   RC rc = RC::SUCCESS;
   if (sql_node.attributes.size()) {
-    return FieldExpr::create(sql_node.attributes, table_map, tables, res_expressions, db);
+    rc = FieldExpr::create(sql_node.attributes, table_map, tables, res_expressions, db);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("Err at make field expr");
+      return rc;
+    }
   }
 
   // aggregation的情况
-  std::vector<ExprNode> expr_nodes;
   for (auto aggre : sql_node.aggregations) {
     expr_nodes.push_back(ExprNode(aggre));
   }
@@ -66,7 +70,7 @@ static RC get_expressions(
       expr_nodes.emplace_back(ExprNode(func));
     }
   }
-  
+
   for (auto &expr_node : expr_nodes) {
     Expression *tmp_expression;
     rc = Expression::create(expr_node, table_map, tables, tmp_expression, db);

@@ -137,6 +137,7 @@ union YYSTYPE
   enum CompOp                       comp;
   enum AggreType                    aggre_type;
   enum OrderType                    order_type;
+  enum FuncType                     func_type;
   AggreSqlNode *                    aggre_node;
   std::vector<AggreSqlNode> *       aggre_node_list;
   std::vector<AggreSqlNode> *       aggre_node_list_opt;  // opt表示可以选择，可以有也可以没有
@@ -164,7 +165,7 @@ union YYSTYPE
   float                             floats;
   bool                              nullable;
 
-#line 168 "yacc_sql.hpp"
+#line 169 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

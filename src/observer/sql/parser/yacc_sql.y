@@ -126,6 +126,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   enum CompOp                       comp;
   enum AggreType                    aggre_type;
   enum OrderType                    order_type;
+  enum FuncType                     func_type;
   AggreSqlNode *                    aggre_node;
   std::vector<AggreSqlNode> *       aggre_node_list;
   std::vector<AggreSqlNode> *       aggre_node_list_opt;  // opt表示可以选择，可以有也可以没有
@@ -169,6 +170,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <comp>                comp_op
 %type <aggre_type>          aggre_type
 %type <order_type>          order_type
+%type <func_type>           func_type
 %type <aggre_node>          aggre_node
 %type <aggre_node_list>     aggre_node_list
 %type <aggre_node_list>     aggre_node_list_opt
@@ -551,7 +553,7 @@ update_list:
     ;
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT rel_attr_list_opt aggre_node_list_opt func_list_opt FROM rel_list select_join_list where select_order_list
+      SELECT rel_attr_list_opt aggre_node_list_opt FROM rel_list select_join_list where select_order_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -562,63 +564,76 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.aggregations.swap(*$3);
         delete $3;
       }
-      if ($4 != nullptr) {
-        $$->selection.functions.swap(*$4);
-        delete $4;
+      if ($5 != nullptr) {
+        $$->selection.relations.swap(*$5);
+        delete $5;
       }
       if ($6 != nullptr) {
-        $$->selection.relations.swap(*$6);
+        $$->selection.joinctions.swap(*$6);
         delete $6;
       }
       if ($7 != nullptr) {
-        $$->selection.joinctions.swap(*$7);
+        $$->selection.conditions.swap(*$7);
         delete $7;
       }
       if ($8 != nullptr) {
-        $$->selection.conditions.swap(*$8);
+        $$->selection.orders.swap(*$8);
         delete $8;
       }
-      if ($9 != nullptr) {
-        $$->selection.orders.swap(*$9);
-        delete $9;
+    }
+    | SELECT rel_attr_list_opt func_list_opt FROM rel_list select_join_list where select_order_list
+    {
+      $$ = new ParsedSqlNode(SCF_SELECT);
+      if ($2 != nullptr) {
+        $$->selection.attributes.swap(*$2);
+        delete $2;
+      }
+      if ($3 != nullptr) {
+        $$->selection.functions.swap(*$3);
+        delete $3;
+      }
+      if ($5 != nullptr) {
+        $$->selection.relations.swap(*$5);
+        delete $5;
+      }
+      if ($6 != nullptr) {
+        $$->selection.joinctions.swap(*$6);
+        delete $6;
+      }
+      if ($7 != nullptr) {
+        $$->selection.conditions.swap(*$7);
+        delete $7;
+      }
+      if ($8 != nullptr) {
+        $$->selection.orders.swap(*$8);
+        delete $8;
       }
     }
-    /* | SELECT func_list
+    | SELECT func_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
         $$->selection.functions.swap(*$2);
         delete $2;
       }
-    } */
+    }
     ;
 
 func_node:
-      LENGTH LBRACE expression RBRACE ID
+      func_type expression ID
     {
       $$ = new FunctionNode;
-      $$->f_type = FuncType::LENGTH_;
-      $$->left = $3;
-      if ($5 != nullptr) {
-        $$->res_name = $5;
-        delete $5;
+      $$->f_type = $1;
+      $$->left = $2;
+      if ($3 != nullptr) {
+        $$->res_name = $3;
+        delete $3;
       }
     }
-    | ROUND LBRACE expression COMMA expression RBRACE ID
+    | func_type LBRACE expression COMMA expression RBRACE ID
     {
       $$ = new FunctionNode;
-      $$->f_type = FuncType::ROUND_;
-      $$->left = $3;
-      $$->right = $5;
-      if ($7 != nullptr) {
-        $$->res_name = $7;
-        delete $7;
-      }
-    }
-    | DATE_FORMAT LBRACE expression COMMA expression RBRACE ID
-    {
-      $$ = new FunctionNode;
-      $$->f_type = FuncType::DATE_FORMAT_;
+      $$->f_type = $1;
       $$->left = $3;
       $$->right = $5;
       if ($7 != nullptr) {
@@ -626,28 +641,19 @@ func_node:
         delete $7;
       }
     }
-    | LENGTH LBRACE rel_attr RBRACE
+    | func_type LBRACE rel_attr RBRACE
     {
       $$ = new FunctionNode;
       $$->res_name = token_name(sql_string,&@$);
-      $$->f_type = FuncType::LENGTH_;
+      $$->f_type = $1;
       $$->rel_attr = *$3;
       delete $3;
     }
-    | ROUND LBRACE rel_attr COMMA expression RBRACE 
+    | func_type LBRACE rel_attr COMMA expression RBRACE 
     {
       $$ = new FunctionNode;
       $$->res_name = token_name(sql_string,&@$);
-      $$->f_type = FuncType::ROUND_;
-      $$->rel_attr = *$3;
-      $$->right = $5;
-      delete $3;
-    }
-    | DATE_FORMAT LBRACE rel_attr COMMA expression RBRACE
-    {
-      $$ = new FunctionNode;
-      $$->res_name = token_name(sql_string,&@$);
-      $$->f_type = FuncType::DATE_FORMAT_;
+      $$->f_type = $1;
       $$->rel_attr = *$3;
       $$->right = $5;
       delete $3;
@@ -1011,6 +1017,10 @@ aggre_type:
     | MAX   { $$ = AGGRE_MAX; }
     | MIN   { $$ = AGGRE_MIN; }
 
+func_type:
+      LENGTH     {$$ = LENGTH_;}
+    | ROUND       {$$ = ROUND_;}
+    | DATE_FORMAT {$$ = DATE_FORMAT_;}
 
 
 load_data_stmt:
