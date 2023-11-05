@@ -70,7 +70,7 @@ RC ExecuteStage::handle_request_with_physical_operator(SQLStageEvent *sql_event)
       SelectStmt *select_stmt     = static_cast<SelectStmt *>(stmt);
       bool        with_table_name = select_stmt->tables().size() > 1;
       for (const auto &expr : select_stmt->expressions()) {
-        schema.append_cell(expr->name().c_str());
+        schema.append_cell(expr->name(with_table_name).c_str());
       }
     } break;
 

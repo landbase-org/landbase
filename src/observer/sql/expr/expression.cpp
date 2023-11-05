@@ -113,6 +113,28 @@ RC FieldExpr::create(
   return RC::SUCCESS;
 }
 
+RC FieldExpr::get_field_express(Expression *expr, std::vector<std::unique_ptr<FieldExpr>> &field_exprs)
+{
+  if (auto x = dynamic_cast<FieldExpr *>(expr)) {
+    field_exprs.push_back(std::unique_ptr<FieldExpr>(new FieldExpr(*x)));
+    LOG_INFO("succ to get field expr");
+  }
+  LOG_INFO("failed to  get field expr");
+  return RC::SUCCESS;
+}
+bool FieldExpr::in_group_by(const std::vector<std::unique_ptr<GroupByUnit>> *field_exprs)
+{
+  for (const auto &expr : *field_exprs) {
+    if (auto x = dynamic_cast<FieldExpr *>(expr->expr()->get())) {
+      auto flag = x->table_name() == field_.table_name() && x->field_name() == field_.field_name();
+      if (flag) {
+        return true;
+      }
+    }
+  }
+  LOG_WARN("cur expression can't to FieldExpr");
+  return false;
+}
 RC FieldExpr::create(
     const RelAttrSqlNode &node, const std::unordered_map<std::string, Table *> &table_map,
     const std::vector<Table *> &tables, Expression *&res_expr
@@ -477,11 +499,11 @@ RC AggreExpression::get_value(const Tuple &tuple, Value &value) const
   return tuple.find_cell(spec, value);
 }
 
-std::string AggreExpression::name() const
+std::string AggreExpression::name(bool with_table_name) const
 {
   // 之后的alias在这里修改
   std::string name_str = "";
-  if (full_table_name_) {
+  if (with_table_name) {
     name_str += get_aggre_type_str() + "(";
     name_str += table_name();
     name_str += ".";
@@ -511,12 +533,11 @@ RC AggreExpression::create(
   RC     rc    = RC::SUCCESS;
   Table *table = tables.front();
 
-  const auto &rel_attr             = aggre_node.attribute_name;
-  const auto &[rel, attr]          = rel_attr;
-  const auto      &aggre_type      = aggre_node.aggre_type;
-  Expression      *field_expr      = nullptr;  // FieldExpr 表达式
-  AggreExpression *aggre_expr      = nullptr;
-  bool             full_table_name = tables.size() > 1;  // 当前默认是两张表及以上显示rel.attr
+  const auto &rel_attr        = aggre_node.attribute_name;
+  const auto &[rel, attr]     = rel_attr;
+  const auto      &aggre_type = aggre_node.aggre_type;
+  Expression      *field_expr = nullptr;  // FieldExpr 表达式
+  AggreExpression *aggre_expr = nullptr;
 
   // attr为“*”但是attr_type不为COUNT
   if (attr == "*" && aggre_type != AGGRE_COUNT) {
@@ -527,9 +548,7 @@ RC AggreExpression::create(
   // aggre_type 为COUNT 需要特判
   if (aggre_type == AGGRE_COUNT) {  // 如果是COUNT的情况， 那么COUNT（attr)可以为任何字符，使用Value存储该字符
     if (attr == "*") {  // 如果是COUNT（*）那么是查询所有包括空的表， 否则之查询当前列
-      aggre_expr = new AggreExpression(
-          AGGRE_COUNT_ALL, new FieldExpr(tables[0], tables[0]->table_meta().field(1)), full_table_name
-      );
+      aggre_expr = new AggreExpression(AGGRE_COUNT_ALL, new FieldExpr(tables[0], tables[0]->table_meta().field(1)));
       auto value_expr = new ValueExpr(Value("*"));
       aggre_expr->set_param_value(value_expr);
 
@@ -543,7 +562,7 @@ RC AggreExpression::create(
       sql_debug("Aggregation attr name:%s not created succ.", attr.c_str());
       return rc;
     }
-    aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr), full_table_name);
+    aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr));
     res_expr   = aggre_expr;
     return rc;
   }
@@ -555,7 +574,7 @@ RC AggreExpression::create(
     return rc;
   }
 
-  aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr), full_table_name);
+  aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr));
   res_expr   = aggre_expr;
   return rc;
 }

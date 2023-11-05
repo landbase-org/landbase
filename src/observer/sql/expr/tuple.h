@@ -301,7 +301,6 @@ class AggregationTuple : public Tuple
 {
 public:
   AggregationTuple() = default;
-  AggregationTuple(std::vector<std::unique_ptr<AggreExpression>> &aggre_exprs) : aggre_exprs_(&aggre_exprs) {}
   virtual ~AggregationTuple() {}
 
 public:
@@ -315,10 +314,13 @@ public:
   const auto &get_field_exprs() const { return field_exprs_; }
 
 public:
-  void init(std::vector<std::unique_ptr<AggreExpression>> *aggre_exprs);  // 默认构造的必须调用这个init
+  void init(
+      std::vector<std::unique_ptr<AggreExpression>> &&aggre_exprs, std::vector<std::unique_ptr<FieldExpr>> &&field_exprs
+  );  // 默认构造的必须调用这个init
   void do_aggregation_begin();
   void do_aggregation();
   void do_aggregation_end();
+  void update_field_values();
 
 private:
   int                 count_{0};  // COUNT(*)的时候使用， 返回所有的数据，包括NULL
@@ -329,9 +331,9 @@ private:
   std::vector<Value>  field_results_;
 
 private:
-  std::vector<FieldExpr>                         field_exprs_;
-  Tuple                                         *tuple_ = nullptr;  // 从子算子中获取的tuple
-  std::vector<std::unique_ptr<AggreExpression>> *aggre_exprs_;      // 查询的所有tuple
+  Tuple                                        *tuple_ = nullptr;  // 从子算子中获取的tuple
+  std::vector<std::unique_ptr<AggreExpression>> aggre_exprs_;      // 查询的所有tuple
+  std::vector<std::unique_ptr<FieldExpr>>       field_exprs_;
 };
 
 /**

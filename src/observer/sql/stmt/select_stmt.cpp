@@ -51,29 +51,34 @@ static RC get_expressions(
 {
   RC rc = RC::SUCCESS;
   // 没有聚合函数， 直接返回普通的类型
-  if (sql_node.aggres.empty()) {
-    return FieldExpr::create(sql_node.rel_attrs, table_map, tables, res_expressions, db);
+  int aggre_size = 0;
+  for (auto node : sql_node.rel_attr_aggres) {
+    if (node.is_aggre()) {
+      aggre_size++;
+    }
+  }
+  if (aggre_size == 0) {
+    std::vector<RelAttrSqlNode> rel_attrs;
+    for (auto node : sql_node.rel_attr_aggres) {
+      rel_attrs.push_back(node);
+    }
+    return FieldExpr::create(rel_attrs, table_map, tables, res_expressions, db);
   }
 
   /**************************
    *    聚合函数， GROUP BY   *
    **************************/
   // 解析聚合函数
-  for (auto &expr_node : sql_node.aggres) {
+  for (auto &expr_node : sql_node.rel_attr_aggres) {
     Expression *tmp_expression;
-    rc = AggreExpression::create(expr_node, table_map, tables, tmp_expression, db);
+    if (expr_node.is_aggre()) {
+      rc = AggreExpression::create(expr_node, table_map, tables, tmp_expression, db);
+    } else {
+      rc = FieldExpr::create(expr_node, table_map, tables, tmp_expression);
+    }
+
     if (rc != RC::SUCCESS) {
       sql_debug("create aggregation expression err");
-      return rc;
-    }
-    res_expressions.push_back(tmp_expression);
-  }
-  // 解析field
-  for (auto &expr_node : sql_node.rel_attrs) {
-    Expression *tmp_expression;
-    rc = FieldExpr::create(expr_node, table_map, tables, tmp_expression);
-    if (rc != RC::SUCCESS) {
-      sql_debug("create Field expression err");
       return rc;
     }
     res_expressions.push_back(tmp_expression);
@@ -182,7 +187,12 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   GroupByStmt *groupby_stmt              = nullptr;
   if (!groupbys.empty()) {
     rc = OrderByStmt::create(
-        db, default_table, &table_map, groupbys_order.data(), static_cast<int>(orderbys.size()), orderby_stmt
+        db,
+        default_table,
+        &table_map,
+        groupbys_order.data(),
+        static_cast<int>(groupbys_order.size()),
+        orderby_stmt_before_group
     );
     rc = GroupByStmt::create(db, table_map, tables, groupbys, groupby_stmt);
     if (RC::SUCCESS == rc) {
@@ -205,10 +215,11 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // TODO add expression copy
   select_stmt->tables_.swap(tables);
   select_stmt->expressions_.swap(expressions);
-  select_stmt->filter_stmt_  = filter_stmt;
-  select_stmt->order_stmt_   = orderby_stmt;
-  select_stmt->groupby_stmt_ = groupby_stmt;
-  select_stmt->having_stmt_  = having_stmt;
-  stmt                       = select_stmt;
+  select_stmt->filter_stmt_               = filter_stmt;
+  select_stmt->order_stmt_                = orderby_stmt;
+  select_stmt->orderby_stmt_before_group_ = orderby_stmt_before_group;
+  select_stmt->groupby_stmt_              = groupby_stmt;
+  select_stmt->having_stmt_               = having_stmt;
+  stmt                                    = select_stmt;
   return RC::SUCCESS;
 }

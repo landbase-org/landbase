@@ -564,7 +564,7 @@ select_stmt:        /*  select 语句的语法解析树*/
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
-        parse_rel_attr_aggre($$->selection, *$2); // 将其解析为rel_attr_node 和 aggre_type_node
+        $$->selection.rel_attr_aggres.swap(*$2);
         delete $2;
       }
       if ($4 != nullptr) {

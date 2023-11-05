@@ -34,11 +34,13 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/delete_stmt.h"
 #include "sql/stmt/explain_stmt.h"
 #include "sql/stmt/filter_stmt.h"
+#include "sql/stmt/groupby_stml.h"
 #include "sql/stmt/insert_stmt.h"
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/stmt.h"
 #include "sql/stmt/update_stmt.h"
 #include "storage/field/field.h"
+#include <cassert>
 #include <memory>
 #include <utility>
 using std::unique_ptr;
@@ -92,11 +94,13 @@ RC LogicalPlanGenerator::create_plan(CalcStmt *calc_stmt, std::unique_ptr<Logica
 // select stmt的逻辑计划生成器
 RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  // Project -> aggre -> (Orderby) -> (predicate（过滤）) -> table_scan
+  // Project -> (Orderby) -> (goupby -> orderby for group) -> (predicate（过滤）) -> table_scan
   // 因为是从根节点开始执行， 所以执行的顺序是从table_scan开始
   unique_ptr<LogicalOperator> root_oper(nullptr);  // 根
 
-  // 创建table_scan算子
+  /*************************
+   *    创建TABLE_SCAN算子  *
+   *************************/
   unique_ptr<LogicalOperator> table_oper(nullptr);
   const std::vector<Table *> &tables = select_stmt->tables();
   for (Table *table : tables) {
@@ -113,7 +117,9 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   }
   root_oper = std::move(table_oper);
 
-  // 创建filter算子
+  /*********************
+   *    创建FILTER算子  *
+   *********************/
   unique_ptr<LogicalOperator> predicate_oper;
   RC                          rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
   if (rc != RC::SUCCESS) {
@@ -125,18 +131,72 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     root_oper = std::move(predicate_oper);
   }
 
-  // 创建aggre算子
+  /*******************
+   * 创建GROUP BY算子 *
+   *******************/
+  // 1. 创建order算子
+  unique_ptr<LogicalOperator> orderby_oper_before_group;
+  if (nullptr != select_stmt->order_by_stmt_before_group()) {
+    rc = create_plan(select_stmt->order_by_stmt_before_group(), orderby_oper_before_group);
+    orderby_oper_before_group->add_child(std::move(root_oper));
+    root_oper = std::move(orderby_oper_before_group);
+  }
+  // 2. 将expression转化为对应的expr
   std::vector<std::unique_ptr<AggreExpression>> aggre_exprs;
+  std::vector<std::unique_ptr<FieldExpr>>       field_exprs;
   for (auto expr : select_stmt->expressions()) {
     AggreExpression::get_aggre_expression(expr, aggre_exprs);
+    FieldExpr::get_field_express(expr, field_exprs);
   }
-  if (!aggre_exprs.empty()) {
-    unique_ptr<LogicalOperator> aggre_oper(new AggreLogicalOperator(std::move(aggre_exprs)));
-    aggre_oper->add_child(std::move(root_oper));
-    root_oper = std::move(aggre_oper);
+  // 3. 从having中获取需要聚合的字段
+  HavingStmt *having_stmt = select_stmt->having_stmt();
+  if (nullptr != having_stmt) {
+    for (auto unit : having_stmt->filter_units()) {
+      for (auto node : {unit->left(), unit->right()}) {
+        AggreExpression::get_aggre_expression(node, aggre_exprs);
+        FieldExpr::get_field_express(node, field_exprs);
+      }
+    }
   }
 
-  // 创建order算子
+  // 4. 检查字段的
+  GroupByStmt *groupby_stmt = select_stmt->groupby_stmt();
+  if (!aggre_exprs.empty() && !aggre_exprs.empty()) {  // 都不为空表示当前为聚合查询
+    if (nullptr == groupby_stmt) {
+      return RC::SQL_SYNTAX;
+    }
+
+    // 判断field字段是否是全都是在groupby中
+    for (const auto &field_expr : field_exprs) {
+      bool in_groupby = false;
+      if (field_expr->in_group_by(groupby_stmt->groupby_units())) {
+        in_groupby = true;
+        break;
+      }
+      if (!in_groupby) {
+        return RC::SQL_SYNTAX;
+      }
+    }
+  }
+
+  // 5. 生成groupby 算子
+  GroupByStmt *empty_groupby_stmt = nullptr;
+  if (!aggre_exprs.empty()) {
+    unique_ptr<LogicalOperator> groupby_oper = nullptr;
+    if (nullptr == groupby_stmt) {
+      groupby_oper.reset(new AggreLogicalOperator(std::move(aggre_exprs), std::move(field_exprs)));
+    } else {
+      groupby_oper.reset(new AggreLogicalOperator(std::move(aggre_exprs), std::move(field_exprs), groupby_stmt));
+    }
+
+    assert(groupby_oper.get() != nullptr);
+    groupby_oper->add_child(std::move(root_oper));
+    root_oper = std::move(groupby_oper);
+  }
+
+  /******************
+   * 创建ORDER算子  *
+   ******************/
   unique_ptr<LogicalOperator> orderby_oper;
   rc = create_plan(select_stmt->order_by_stmt(), orderby_oper);
   if (rc != RC::SUCCESS) {
@@ -148,7 +208,9 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     root_oper = std::move(orderby_oper);
   }
 
-  // 生成project算子
+  /**********************
+   *    生成PROJECT算子  *
+   **********************/
   unique_ptr<LogicalOperator> project_oper(new ProjectLogicalOperator(select_stmt->expressions()));
   project_oper->add_child(std::move(root_oper));
 

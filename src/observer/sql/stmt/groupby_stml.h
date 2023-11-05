@@ -14,9 +14,9 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
-#include "sql/expr/expression.h"
 #include "stmt.h"
 #include "storage/db/db.h"
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -31,12 +31,12 @@ public:
   GroupByUnit(std::unique_ptr<Expression> expr) : expr_(std::move(expr)) {}
   ~GroupByUnit() = default;
 
-  void        set_expr(std::unique_ptr<Expression> expr) { expr_ = std::move(expr); }
-  Expression *expr() const { return expr_.get(); }
-  static RC   create(
-        Db *db, const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables,
-        const GroupBySqlNode &groupby, std::unique_ptr<GroupByUnit> *groupby_unit
-    );
+  void                         set_expr(std::unique_ptr<Expression> expr) { expr_ = std::move(expr); }
+  std::unique_ptr<Expression> *expr() { return &expr_; }
+  static RC                    create(
+                         Db *db, const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables,
+                         const GroupBySqlNode &groupby, std::unique_ptr<GroupByUnit> *groupby_unit
+                     );
 
 private:
   std::unique_ptr<Expression> expr_;
@@ -50,7 +50,7 @@ public:
 
   StmtType    type() const override { return StmtType::GROUP_BY; }
   void        add_unit(std::unique_ptr<GroupByUnit> unit) { groupby_units_.push_back(std::move(unit)); }
-  const auto &groupby_units() const { return groupby_units_; }
+  const auto *groupby_units() const { return &groupby_units_; }
   static RC   create(
         Db *db, const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables,
         const std::vector<GroupBySqlNode> &groupby_nodes, GroupByStmt *&stmt

@@ -435,7 +435,9 @@ RC PhysicalPlanGenerator::create_plan(AggreLogicalOperator &aggre_oper, std::uni
   vector<unique_ptr<LogicalOperator>> &child_opers = aggre_oper.children();
   assert(child_opers.size() <= 1);
 
-  unique_ptr<AggrePhysicalOperator> aggre_phy_oper(new AggrePhysicalOperator(std::move(aggre_oper.get_aggre_exprs())));
+  unique_ptr<AggrePhysicalOperator> aggre_phy_oper(new AggrePhysicalOperator(
+      std::move(aggre_oper.aggre_exprs()), std::move(aggre_oper.field_exprs()), aggre_oper.groupby_stmt()
+  ));
   unique_ptr<PhysicalOperator>      child_phy_oper;
 
   if (!child_opers.empty()) {

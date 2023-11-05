@@ -156,31 +156,14 @@ struct GroupByHavingSqlNode
  */
 struct SelectSqlNode
 {
-  std::vector<RelAttrSqlNode>   rel_attrs;   ///< 包含了rel_att和aggre的节点
-  std::vector<AggreSqlNode>     aggres;      ///< 包含了rel_att和aggre的节点
-  std::vector<std::string>      relations;   ///< 查询的表
-  std::vector<ConditionSqlNode> conditions;  ///< 查询条件，使用AND串联起来多个条件
-  std::vector<JoinSqlNode>      joinctions;  ///< Join-list
-  std::vector<OrderSqlNode>     orders;      ///< Order-requirements
-  std::vector<GroupBySqlNode>   groupbys;    ///< goupby的元素
-  std::vector<HavingSqlNode>    havings;     ///< having过滤的条件
+  std::vector<RelAttrAggreSqlNode> rel_attr_aggres;  /// 聚合和普通查询
+  std::vector<std::string>         relations;        ///< 查询的表
+  std::vector<ConditionSqlNode>    conditions;       ///< 查询条件，使用AND串联起来多个条件
+  std::vector<JoinSqlNode>         joinctions;       ///< Join-list
+  std::vector<OrderSqlNode>        orders;           ///< Order-requirements
+  std::vector<GroupBySqlNode>      groupbys;         ///< goupby的元素
+  std::vector<HavingSqlNode>       havings;          ///< having过滤的条件
 };
-
-static void parse_rel_attr_aggre(SelectSqlNode &sql_node, std::vector<RelAttrAggreSqlNode> &nodes)
-{
-  std::vector<RelAttrSqlNode> rel_attrs;
-  std::vector<AggreSqlNode>   aggres;
-  for (auto node : nodes) {
-    auto rel_attr = static_cast<RelAttrSqlNode>(node);
-    if (node.is_aggre()) {
-      aggres.push_back(AggreSqlNode{rel_attr, node.aggre_type});
-    } else {
-      rel_attrs.push_back(rel_attr);
-    }
-  }
-  sql_node.rel_attrs.swap(rel_attrs);
-  sql_node.aggres.swap(aggres);
-}
 
 class ParseSubQueryExpr : public ParseExpr
 {

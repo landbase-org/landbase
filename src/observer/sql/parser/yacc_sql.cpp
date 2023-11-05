@@ -2249,7 +2249,7 @@ yyreduce:
     {
       (yyval.sql_node) = new ParsedSqlNode(SCF_SELECT);
       if ((yyvsp[-6].rel_attr_aggre_list) != nullptr) {
-        parse_rel_attr_aggre((yyval.sql_node)->selection, *(yyvsp[-6].rel_attr_aggre_list)); // 将其解析为rel_attr_node 和 aggre_type_node
+        (yyval.sql_node)->selection.rel_attr_aggres.swap(*(yyvsp[-6].rel_attr_aggre_list));
         delete (yyvsp[-6].rel_attr_aggre_list);
       }
       if ((yyvsp[-4].relation_list) != nullptr) {

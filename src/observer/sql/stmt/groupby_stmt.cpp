@@ -1,4 +1,5 @@
 #include "groupby_stml.h"
+#include "sql/expr/expression.h"
 RC GroupByUnit::create(
     Db *db, const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables,
     const GroupBySqlNode &groupby, std::unique_ptr<GroupByUnit> *groupby_unit

@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <string.h>
@@ -26,6 +27,7 @@ See the Mulan PSL v2 for more details. */
 #include "event/sql_debug.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
+#include "sql/stmt/groupby_stml.h"
 #include "storage/db/db.h"
 #include "storage/field/field.h"
 #include "storage/field/field_meta.h"
@@ -101,7 +103,8 @@ public:
   /**
    * @brief 表达式的名字，比如是字段名称，或者用户在执行SQL语句时输入的内容
    */
-  virtual std::string name() const { return name_; }  // 这里是输出结果显示的table_name
+  virtual std::string name() const { return name_; }
+  virtual std::string name(bool with_table_name) const { return name_; }
   virtual void        set_name(std::string name) { name_ = name; }
 
 private:
@@ -134,9 +137,19 @@ public:
 
   const AggreType aggre_type() const { return field_.aggre_type(); }
 
-  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC          get_value(const Tuple &tuple, Value &value) const override;
+  std::string name(bool with_table_name) const override
+  {
+    if (with_table_name) {
+      return std::string(table_name()) + '.' + std::string(field_name());
+    }
+    return field_name();
+  }
 
   bool is_null(char *data) const;
+
+  static RC get_field_express(Expression *expr, std::vector<std::unique_ptr<FieldExpr>> &field_exprs);
+  bool      in_group_by(const std::vector<std::unique_ptr<GroupByUnit>> *field_exprs);
 
   /**
    * 用于初始化field_meta的时候， 例如rel.attr, rel.*, *, attr的情况
@@ -491,7 +504,7 @@ public:
    * @brief 返回列表的名字
    * @example MAX(id), COUNT(*) 等字段
    */
-  std::string name() const override;
+  std::string name(bool with_table_name) const override;
 
 public:
   static void get_aggre_expression(Expression *expr, std::vector<std::unique_ptr<AggreExpression>> &aggrfunc_exprs);
