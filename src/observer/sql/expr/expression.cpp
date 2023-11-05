@@ -494,6 +494,9 @@ RC AggreExpression::get_value(const Tuple &tuple, Value &value) const
 
 std::string AggreExpression::name() const
 {
+  if (alias_ != "")
+    return alias_;
+
   // 之后的alias在这里修改
   std::string name_str = "";
   if (full_table_name_) {
@@ -546,6 +549,7 @@ RC AggreExpression::create(
   const auto      &rel             = rel_attr.relation_name;
   const auto      &attr            = rel_attr.attribute_name;
   const auto      &aggre_type      = aggre_node.aggre_type;
+  const auto      &alias           = aggre_node.alias;
   Expression      *field_expr      = nullptr;  // FieldExpr 表达式
   AggreExpression *aggre_expr      = nullptr;
   bool             full_table_name = tables.size() > 1;  // 当前默认是两张表及以上显示rel.attr
@@ -560,7 +564,7 @@ RC AggreExpression::create(
   if (aggre_type == AGGRE_COUNT) {  // 如果是COUNT的情况， 那么COUNT（attr)可以为任何字符，使用Value存储该字符
     if (attr == "*") {  // 如果是COUNT（*）那么是查询所有包括空的表， 否则之查询当前列
       aggre_expr = new AggreExpression(
-          AGGRE_COUNT_ALL, new FieldExpr(tables[0], tables[0]->table_meta().field(1)), full_table_name
+          alias, AGGRE_COUNT_ALL, new FieldExpr(tables[0], tables[0]->table_meta().field(1)), full_table_name
       );
       auto value_expr = new ValueExpr(Value("*"));
       aggre_expr->set_param_value(value_expr);
@@ -575,7 +579,7 @@ RC AggreExpression::create(
       sql_debug("Aggregation attr name:%s not created succ.", attr.c_str());
       return rc;
     }
-    aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr), full_table_name);
+    aggre_expr = new AggreExpression(alias, aggre_type, static_cast<FieldExpr *>(field_expr), full_table_name);
     res_expr   = aggre_expr;
     return rc;
   }
@@ -587,7 +591,7 @@ RC AggreExpression::create(
     return rc;
   }
 
-  aggre_expr = new AggreExpression(aggre_type, static_cast<FieldExpr *>(field_expr), full_table_name);
+  aggre_expr = new AggreExpression(alias, aggre_type, static_cast<FieldExpr *>(field_expr), full_table_name);
   res_expr   = aggre_expr;
   return rc;
 }

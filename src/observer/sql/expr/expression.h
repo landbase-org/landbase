@@ -453,8 +453,9 @@ class AggreExpression : public Expression
 public:
   AggreExpression() = default;
   AggreExpression(AggreExpression &expr);
-  AggreExpression(AggreType type, const FieldExpr *field, bool full_table_name = false)
-      : type_(type),
+  AggreExpression(const std::string &alias, AggreType type, const FieldExpr *field, bool full_table_name = false)
+      : alias_(alias),
+        type_(type),
         full_table_name_(full_table_name),
         field_(field)
   {}
@@ -501,6 +502,7 @@ public:
    * @example MAX(id), COUNT(*) 等字段
    */
   std::string name() const override;
+  const auto &alias() const { return alias_; }
 
 public:
   static void get_aggre_expression(Expression *expr, std::vector<std::unique_ptr<AggreExpression>> &aggrfunc_exprs);
@@ -514,4 +516,5 @@ private:
   bool             full_table_name_{false};  // 是否需要显示完整的表名， 用于子查询
   const FieldExpr *field_ = nullptr;
   const ValueExpr *value_ = nullptr;  // 用来存储COUNT（attr）的值
+  std::string      alias_;
 };

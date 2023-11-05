@@ -33,6 +33,7 @@ void handle_sub_query_alias(ParseSubQueryExpr *expr, std::vector<AttrSqlNode> &p
   auto &sub_query   = expr->sub_query();
   auto  table_names = sub_query->relations;
   auto &fields      = sub_query->attributes;
+  auto &aggres      = sub_query->aggregations;
   // 处理字段
   for (auto &node : table_names) {
     if (node.table_alias != "") {
@@ -40,6 +41,12 @@ void handle_sub_query_alias(ParseSubQueryExpr *expr, std::vector<AttrSqlNode> &p
         if (field.relation_name == node.table_alias) {
           field.relation_name = node.relation_name;
           field.table_alias   = node.table_alias;
+        }
+      }
+      for (auto &aggre : aggres) {
+        if (aggre.attribute_name.table_alias == node.table_alias) {
+          aggre.attribute_name.relation_name = node.relation_name;
+          aggre.attribute_name.table_alias   = node.table_alias;
         }
       }
     }
@@ -100,6 +107,7 @@ void handle_alias(SelectSqlNode &select_sql)
 {
   auto  table_names = select_sql.relations;
   auto &fields      = select_sql.attributes;
+  auto &aggres      = select_sql.aggregations;
   // 处理字段
   for (auto &node : table_names) {
     if (node.table_alias != "") {
@@ -107,6 +115,12 @@ void handle_alias(SelectSqlNode &select_sql)
         if (field.relation_name == node.table_alias) {
           field.relation_name = node.relation_name;
           field.table_alias   = node.table_alias;
+        }
+      }
+      for (auto &aggre : aggres) {
+        if (aggre.attribute_name.table_alias == node.table_alias) {
+          aggre.attribute_name.relation_name = node.relation_name;
+          aggre.attribute_name.table_alias   = node.table_alias;
         }
       }
     }

@@ -617,10 +617,36 @@ aggre_node:
       aggre_type LBRACE rel_attr RBRACE
     {
       $$ = new AggreSqlNode;
-      $$->aggre_type = $1; 
+      $$->aggre_type = $1;
       if ($3 != nullptr) {
         $$->attribute_name = *$3; 
         delete $3; 
+      }
+    }
+    | aggre_type LBRACE rel_attr RBRACE AS rel_name
+    {
+      $$ = new AggreSqlNode;
+      $$->aggre_type = $1;
+      if ($3 != nullptr) {
+        $$->attribute_name = *$3; 
+        delete $3; 
+      }
+      if($6 != nullptr){
+        $$->alias = $6;
+        free($6);
+      }
+    }
+    | aggre_type LBRACE rel_attr RBRACE rel_name
+    {
+      $$ = new AggreSqlNode;
+      $$->aggre_type = $1;
+      if ($3 != nullptr) {
+        $$->attribute_name = *$3; 
+        delete $3; 
+      }
+      if($5 != nullptr){
+        $$->alias = $5;
+        free($5);
       }
     }
     ;

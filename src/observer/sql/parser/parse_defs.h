@@ -98,6 +98,7 @@ struct AggreSqlNode
 {
   RelAttrSqlNode attribute_name;          ///< 查询的字段
   AggreType      aggre_type{AGGRE_NONE};  ///< 聚合类型
+  std::string    alias;                   ///< 别名
 };
 
 // TODO: 内存泄漏
