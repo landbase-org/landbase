@@ -35,7 +35,10 @@ RC handle_sub_query_alias(ParseSubQueryExpr *expr, std::vector<AttrSqlNode> &par
 
   // select * from csq_1 t, csq_2 t;
   auto iter = std::unique(table_names.begin(), table_names.end(), [](const AttrSqlNode &a, const AttrSqlNode &b) {
-    return a.table_alias == b.table_alias;
+    if (a.table_alias != "" && b.table_alias != "") {
+      return a.table_alias == b.table_alias;
+    }
+    return false;
   });
 
   if (iter != table_names.end()) {
@@ -138,7 +141,10 @@ RC handle_alias(SelectSqlNode &select_sql)
 
   // select * from csq_1 t, csq_2 t;
   auto iter = std::unique(table_names.begin(), table_names.end(), [](const AttrSqlNode &a, const AttrSqlNode &b) {
-    return a.table_alias == b.table_alias;
+    if (a.table_alias != "" && b.table_alias != "") {
+      return a.table_alias == b.table_alias;
+    }
+    return false;
   });
 
   if (iter != table_names.end()) {
