@@ -655,16 +655,37 @@ rel_attr:
       $$ = new RelAttrSqlNode{"","", $1,""};
       free($1);
     }
+    | attr_name attr_name
+    {
+      $$ = new RelAttrSqlNode{"","", $1,$2};
+      free($1);
+      free($2);
+    }
+    | attr_name AS attr_name
+    {
+      $$ = new RelAttrSqlNode{"","", $1,$3};
+      free($1);
+      free($3);
+    }
     | rel_name DOT attr_name
     {
       $$ = new RelAttrSqlNode{$1,$1,$3,""};
       free($1);
       free($3);
     }
-    | attr_name AS attr_name
+    | rel_name DOT attr_name attr_name
     {
-      $$ = new RelAttrSqlNode{"","", $1,$3};
+      $$ = new RelAttrSqlNode{$1,$1,$3,$4};
       free($1);
+      free($3);
+      free($4);
+    }
+    | rel_name DOT attr_name AS attr_name
+    {
+      $$ = new RelAttrSqlNode{$1,$1,$3,$5};
+      free($1);
+      free($3);
+      free($5);
     }
     ;
 
