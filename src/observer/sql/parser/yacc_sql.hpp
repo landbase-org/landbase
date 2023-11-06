@@ -131,7 +131,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 125 "yacc_sql.y"
+#line 136 "yacc_sql.y"
 
   ParsedSqlNode *                   sql_node;
   ConditionSqlNode *                condition;
@@ -139,11 +139,9 @@ union YYSTYPE
   enum CompOp                       comp;
   enum AggreType                    aggre_type;
   enum OrderType                    order_type;
-  AggreSqlNode *                    aggre_node;
-  std::vector<AggreSqlNode> *       aggre_node_list;
-  std::vector<AggreSqlNode> *       aggre_node_list_opt;  // opt表示可以选择，可以有也可以没有
-  RelAttrSqlNode *                  rel_attr;
-  std::vector<RelAttrSqlNode> *     rel_attr_list;
+  ParseFieldExpr *                  parse_field_expr;
+  ParseArithmeticExpr *             parse_math_expr;
+  std::vector<ParseFieldExpr> *     rel_attr_list;
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
@@ -151,6 +149,7 @@ union YYSTYPE
   JoinSqlNode *                     join_node;
   OrderSqlNode *                    order_node;
   std::vector<Expression *> *       expression_list;
+  std::vector<ParseExpr *> *        parse_expr_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
   std::vector<std::string> *        id_list;
@@ -166,7 +165,7 @@ union YYSTYPE
   float                             floats;
   bool                              nullable;
 
-#line 170 "yacc_sql.hpp"
+#line 169 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

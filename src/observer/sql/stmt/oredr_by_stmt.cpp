@@ -6,28 +6,28 @@
 #include "storage/field/field_meta.h"
 #include "storage/table/table.h"
 RC get_unit_info(
-    Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables, const RelAttrSqlNode &attr,
+    Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables, const ParseFieldExpr &attr,
     Table *&table, const FieldMeta *&field
 )
 {
-  if (common::is_blank(attr.relation_name.c_str())) {
+  if (common::is_blank(attr.table_name().c_str())) {
     table = default_table;
   } else if (nullptr != tables) {
-    auto iter = tables->find(attr.relation_name);
+    auto iter = tables->find(attr.table_name());
     if (iter != tables->end()) {
       table = iter->second;
     }
   } else {
-    table = db->find_table(attr.relation_name.c_str());
+    table = db->find_table(attr.table_name().c_str());
   }
   if (nullptr == table) {
-    sql_debug("No such table: attr.relation_name: %s", attr.relation_name.c_str());
+    sql_debug("No such table: attr.relation_name: %s", attr.table_name().c_str());
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  field = table->table_meta().field(attr.attribute_name.c_str());
+  field = table->table_meta().field(attr.field_name().c_str());
   if (nullptr == field) {
-    sql_debug("no such field in table: table %s, field %s", table->name(), attr.attribute_name.c_str());
+    sql_debug("no such field in table: table %s, field %s", table->name(), attr.field_name().c_str());
     table = nullptr;
     return RC::SCHEMA_FIELD_NOT_EXIST;
   }
@@ -75,7 +75,7 @@ RC OrderByStmt::create_orderby_unit(
 {
   Table           *table_tmp = nullptr;
   const FieldMeta *field_mt  = nullptr;
-  RC               rc        = get_unit_info(db, default_table, tables, orderby.rel_attr, table_tmp, field_mt);
+  RC               rc        = get_unit_info(db, default_table, tables, orderby.field, table_tmp, field_mt);
   if (rc != RC::SUCCESS) {
     sql_debug("Order field not found");
     return rc;

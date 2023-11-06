@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/expr/expression.h"
 #include "event/sql_debug.h"
+#include "sql/expr/sub_query_expr.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/tuple_cell.h"
 #include "sql/parser/parse_defs.h"
@@ -28,6 +29,56 @@ using namespace std;
 //////////////////////////////!Expression/////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
+RC Expression::create(
+    const ParseExpr *node, const std::unordered_map<std::string, Table *> &table_map,
+    const std::vector<Table *> &tables, Expression *&res_expr, Db *db
+)
+{
+  RC rc = RC::SUCCESS;
+  switch (node->expr_type()) {
+    case ParseExprType::FIELD: {
+      auto expr = static_cast<const ParseFieldExpr *>(node);
+      rc        = FieldExpr::create(*expr, table_map, tables, res_expr);
+    } break;
+    case ParseExprType::AGGREGATION: {
+      auto expr = static_cast<const ParseAggreExpr *>(node);
+      rc        = AggreExpression::create(*expr, table_map, tables, res_expr);
+    } break;
+    case ParseExprType::VALUE: {
+      auto expr = static_cast<const ParseValueExpr *>(node);
+      res_expr  = new ValueExpr(expr->value());
+    } break;
+    case ParseExprType::VALUE_LIST: {
+      auto expr = static_cast<const ParseValueListExpr *>(node);
+      res_expr  = new ValueListExpr(expr->value_list());
+    } break;
+    case ParseExprType::SUBQUERY: {
+      if (db == nullptr) {
+        sql_debug("db is null");
+        return RC::INTERNAL;
+      }
+
+      auto  expr = static_cast<const ParseSubQueryExpr *>(node);
+      Stmt *stmt = nullptr;
+      rc         = SelectStmt::create(db, *expr->sub_query(), stmt);
+      if (rc != RC::SUCCESS) {
+        sql_debug("create sub query select stmt failed");
+        return rc;
+      }
+      auto select_stmt = static_cast<SelectStmt *>(stmt);
+      res_expr         = new SubQueryExpr(select_stmt);
+    } break;
+    case ParseExprType::ARITHMETIC: {
+      auto expr = static_cast<const ParseArithmeticExpr *>(node);
+      rc        = ArithmeticExpr::create(*expr, table_map, tables, res_expr, db);
+    } break;
+  }
+  if (rc != RC::SUCCESS) {
+    sql_debug("create expression failed. rc=%s", strrc(rc));
+  }
+  return rc;
+}
+
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 {
   return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
@@ -35,9 +86,34 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 
 bool FieldExpr::is_null(char *data) const { return field_.is_null(data); }
 
+void FieldExpr::set_name(bool full_name)
+{
+  std::string name;
+  if (full_name) {
+    if (table_alias() != "")
+      name += table_alias();
+    else
+      name += table_name();
+
+    name += ".";
+
+    if (field_alias() != "")
+      name += field_alias();
+    else
+      name += field_name();
+  } else {
+    if (field_alias() != "")
+      name = field_alias();
+    else
+      name = field_name();
+  }
+
+  Expression::set_name(name);
+}
+
 RC FieldExpr::create(
-    const SelectSqlNode &select_sql_node, const std::unordered_map<std::string, Table *> &table_map,
-    const std::vector<Table *> &tables, std::vector<Expression *> &res_expr, Db *db
+    const ParseFieldExpr &parse_field_expr, const std::unordered_map<std::string, Table *> &table_map,
+    const std::vector<Table *> &tables, std::vector<Expression *> &res_expr
 )
 {
   // 获取所有的wildcard
@@ -49,90 +125,69 @@ RC FieldExpr::create(
     }
   };
 
-  for (auto &field : select_sql_node.attributes) {
-    const auto &table_name  = field.relation_name;
-    const auto &table_alias = field.table_alias;
-    const auto &field_name  = field.attribute_name;
-    const auto &field_alias = field.field_alias;
+  const auto &table_name  = parse_field_expr.table_name();
+  const auto &table_alias = parse_field_expr.table_alias();
+  const auto &field_name  = parse_field_expr.field_name();
+  const auto &field_alias = parse_field_expr.field_alias();
+  if (table_name == "*" || field_name == "") {
+    sql_debug("no fields type err=%s.%s", table_name.c_str(), field_name.c_str());
+    return RC::SCHEMA_FIELD_MISSING;
+  }
 
-    if (table_name == "*" || field_name == "") {
-      sql_debug("no fields type err=%s.%s", table_name.c_str(), field_name.c_str());
+  if (table_name == "" && field_name == "*") {
+    for (const auto table : tables) {
+      wildcard_fields(table, res_expr);
+    }
+  } else if (table_name == "" && field_name != "*") {  // field_name != "*"
+    if (tables.size() != 1) {
+      sql_debug("invalid. I do not know the attr's table. attr=%s", field_name.c_str());
       return RC::SCHEMA_FIELD_MISSING;
     }
 
-    if (table_name == "" && field_name == "*") {
-      for (const auto table : tables) {
-        wildcard_fields(table, res_expr);
-      }
-    } else if (table_name == "" && field_name != "*") {  // field_name != "*"
-      if (tables.size() != 1) {
-        sql_debug("invalid. I do not know the attr's table. attr=%s", field_name.c_str());
-        return RC::SCHEMA_FIELD_MISSING;
-      }
+    Table           *table      = tables[0];
+    const FieldMeta *field_meta = table->table_meta().field(field_name.c_str());
+    if (nullptr == field_meta) {
+      sql_debug("no such field. field=%s.%s", table->name(), field_name.c_str());
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    res_expr.push_back(new FieldExpr(table, "", field_meta, field_alias));
+  } else {
+    auto iter = table_map.find(table_name);
+    if (iter == table_map.end()) {
+      sql_debug("no such table in from list: %s", table_name.c_str());
+      return RC::SCHEMA_FIELD_MISSING;
+    }
 
-      Table           *table      = tables[0];
+    Table *table = iter->second;
+    if (field_name == "*") {
+      wildcard_fields(table, res_expr);
+    } else {
       const FieldMeta *field_meta = table->table_meta().field(field_name.c_str());
       if (nullptr == field_meta) {
-        sql_debug("no such field. field=%s.%s.%s", db->name(), table->name(), field.attribute_name.c_str());
+        sql_debug("no such field. field=%s.%s", table->name(), field_name.c_str());
         return RC::SCHEMA_FIELD_MISSING;
       }
-      res_expr.push_back(new FieldExpr(table, "", field_meta, field_alias));
-    } else {  // table_name != "*"
-      auto iter = table_map.find(table_name);
-      if (iter == table_map.end()) {
-        sql_debug("no such table in from list: %s", table_name.c_str());
-        return RC::SCHEMA_FIELD_MISSING;
-      }
-
-      Table *table = iter->second;
-      if (field_name == "*") {
-        wildcard_fields(table, res_expr);
-      } else {
-        const FieldMeta *field_meta = table->table_meta().field(field_name.c_str());
-        if (nullptr == field_meta) {
-          sql_debug("no such field. field=%s.%s.%s", db->name(), table->name(), field_name.c_str());
-          return RC::SCHEMA_FIELD_MISSING;
-        }
-        res_expr.push_back(new FieldExpr(table, table_alias, field_meta, field_alias));
-      }
+      res_expr.push_back(new FieldExpr(table, table_alias, field_meta, field_alias));
     }
   }
-
-  // 设置输出的表名
   for (auto expr : res_expr) {
-    auto        x = dynamic_cast<FieldExpr *>(expr);
-    std::string name;
-    if (tables.size() == 1) {
-      if (x->field_alias() != "")
-        name = x->field_alias();
-      else
-        name = x->field_name();
+    auto field_expr = static_cast<FieldExpr *>(expr);
+    if (tables.size() > 1) {
+      field_expr->set_name(true);
     } else {
-      if (x->table_alias() != "")
-        name += x->table_alias();
-      else
-        name += x->table_name();
-
-      name += ".";
-
-      if (x->field_alias() != "")
-        name += x->field_alias();
-      else
-        name += x->field_name();
+      field_expr->set_name(false);
     }
-
-    x->set_name(name);
   }
   return RC::SUCCESS;
 }
 
 RC FieldExpr::create(
-    const RelAttrSqlNode &node, const std::unordered_map<std::string, Table *> &table_map,
+    const ParseFieldExpr &node, const std::unordered_map<std::string, Table *> &table_map,
     const std::vector<Table *> &tables, Expression *&res_expr
 )
 {
-  const auto      &table_name = node.relation_name;
-  const auto      &field_name = node.attribute_name;
+  const auto      &table_name = node.table_name();
+  const auto      &field_name = node.field_name();
   const Table     *table;
   const FieldMeta *field_meta;
 
@@ -163,7 +218,7 @@ RC FieldExpr::create(
     }
   }
 
-  res_expr = new FieldExpr(table, node.table_alias, field_meta, node.field_alias);
+  res_expr = new FieldExpr(table, node.table_alias(), field_meta, node.field_alias());
   return RC::SUCCESS;
 }
 
@@ -379,17 +434,13 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     case Type::DIV: {
       if (target_type == AttrType::INTS) {
         if (right_value.get_int() == 0) {
-          // NOTE:
-          // 设置为整数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为整数最大值。
-          value.set_int(numeric_limits<int>::max());
+          value.set_null();
         } else {
           value.set_int(left_value.get_int() / right_value.get_int());
         }
       } else {
         if (right_value.get_float() > -EPSILON && right_value.get_float() < EPSILON) {
-          // NOTE:
-          // 设置为浮点数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为浮点数最大值。
-          value.set_float(numeric_limits<float>::max());
+          value.set_null();
         } else {
           value.set_float(left_value.get_float() / right_value.get_float());
         }
@@ -456,6 +507,31 @@ RC ArithmeticExpr::try_get_value(Value &value) const
   return calc_value(left_value, right_value, value);
 }
 
+RC ArithmeticExpr::create(
+    const ParseArithmeticExpr &node, const std::unordered_map<std::string, Table *> &table_map,
+    const std::vector<Table *> &tables, Expression *&res_expr, Db *db
+)
+{
+  RC          rc    = RC::SUCCESS;
+  Expression *left  = nullptr;
+  Expression *right = nullptr;
+
+  auto left_expr = node.left();
+  rc             = Expression::create(left_expr, table_map, tables, left, db);
+  if (rc != RC::SUCCESS) {
+    sql_debug("[Arith Expr] left expr create failed. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  auto right_expr = node.right();
+  rc              = Expression::create(right_expr, table_map, tables, right, db);
+  if (rc != RC::SUCCESS) {
+    sql_debug("[Arith Expr] right expr create failed. rc=%s", strrc(rc));
+    return rc;
+  }
+  return rc;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //////!aggregation/////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -493,35 +569,26 @@ RC AggreExpression::get_value(const Tuple &tuple, Value &value) const
 
 std::string AggreExpression::name() const
 {
-  if (alias_ != "")
-    return alias_;
+  if (alias_ != "") {
+    return get_aggre_type_str() + "(" + alias_ + ")";
+  }
 
   // 之后的alias在这里修改
   std::string name_str = "";
   if (full_table_name_) {
     name_str += get_aggre_type_str() + "(";
 
-    if (table_alias() != "")
-      name_str += table_alias();
-    else
-      name_str += table_name();
+    name_str += table_name();
 
     name_str += ".";
 
-    if (field_alias() != "")
-      name_str += field_alias();
-    else
-      name_str += field_name();
+    name_str += field_name();
 
     name_str += ')';
   } else {
     name_str += get_aggre_type_str() + "(";
 
-    if (field_alias() != "") {
-      name_str += has_param_value() ? value_->get_value().to_string() : field_->field_name();
-    } else {
-      name_str += has_param_value() ? value_->get_value().to_string() : field_->field_alias();
-    }
+    name_str += has_param_value() ? value_->get_value().to_string() : field_->field_name();
 
     name_str += ')';
   }
@@ -530,38 +597,38 @@ std::string AggreExpression::name() const
 
 void AggreExpression::get_aggre_expression(Expression *expr, std::vector<unique_ptr<AggreExpression>> &aggrfunc_exprs)
 {
-  if (auto x = dynamic_cast<AggreExpression *>(expr)) {
-    // deep_copy一个aggre对象
-    aggrfunc_exprs.push_back(std::make_unique<AggreExpression>(*x));
+  if (expr->type() == ExprType::AGGREGATION) {
+    auto aggre_expr = static_cast<AggreExpression *>(expr);
+    aggrfunc_exprs.push_back(std::make_unique<AggreExpression>(*aggre_expr));
   }
 }
 
 RC AggreExpression::create(
-    const AggreSqlNode &aggre_node, const std::unordered_map<std::string, Table *> &table_map,
+    const ParseAggreExpr &parse_aggre_expr, const std::unordered_map<std::string, Table *> &table_map,
     const std::vector<Table *> &tables, Expression *&res_expr, Db *db
 )
 {
   RC     rc    = RC::SUCCESS;
   Table *table = tables.front();
 
-  const auto      &rel_attr        = aggre_node.attribute_name;
-  const auto      &rel             = rel_attr.relation_name;
-  const auto      &attr            = rel_attr.attribute_name;
-  const auto      &aggre_type      = aggre_node.aggre_type;
-  const auto      &alias           = aggre_node.alias;
+  const auto      &table_name = parse_aggre_expr.table_name();
+  const auto      &field_name = parse_aggre_expr.field_name();
+  const auto      &aggre_type = parse_aggre_expr.aggre_type();
+  const auto      &alias      = parse_aggre_expr.alias();
+  ParseFieldExpr   parse_field_expr(table_name, field_name);
   Expression      *field_expr      = nullptr;  // FieldExpr 表达式
   AggreExpression *aggre_expr      = nullptr;
   bool             full_table_name = tables.size() > 1;  // 当前默认是两张表及以上显示rel.attr
 
   // attr为“*”但是attr_type不为COUNT
-  if (attr == "*" && aggre_type != AGGRE_COUNT) {
+  if (field_name == "*" && aggre_type != AGGRE_COUNT && aggre_type != AGGRE_COUNT_ALL) {
     sql_debug("Aggregation type %s cannot match parameters '*'", aggreType2str(aggre_type).c_str());
     return RC::FAILURE;
   }
 
   // aggre_type 为COUNT 需要特判
   if (aggre_type == AGGRE_COUNT) {  // 如果是COUNT的情况， 那么COUNT（attr)可以为任何字符，使用Value存储该字符
-    if (attr == "*") {  // 如果是COUNT（*）那么是查询所有包括空的表， 否则之查询当前列
+    if (field_name == "*") {  // 如果是COUNT（*）那么是查询所有包括空的表， 否则之查询当前列
       aggre_expr = new AggreExpression(
           alias, AGGRE_COUNT_ALL, new FieldExpr(tables[0], tables[0]->table_meta().field(1)), full_table_name
       );
@@ -573,9 +640,9 @@ RC AggreExpression::create(
     }
 
     // attr 字段不为“*”
-    rc = FieldExpr::create(rel_attr, table_map, tables, field_expr);
+    rc = FieldExpr::create(parse_field_expr, table_map, tables, field_expr);
     if (rc != RC::SUCCESS) {
-      sql_debug("Aggregation attr name:%s not created succ.", attr.c_str());
+      sql_debug("Aggregation attr name:%s not created succ.", field_name.c_str());
       return rc;
     }
     aggre_expr = new AggreExpression(alias, aggre_type, static_cast<FieldExpr *>(field_expr), full_table_name);
@@ -584,7 +651,7 @@ RC AggreExpression::create(
   }
 
   // aggre_type 为其他
-  rc = FieldExpr::create(rel_attr, table_map, tables, field_expr);
+  rc = FieldExpr::create(parse_field_expr, table_map, tables, field_expr);
   if (rc != RC::SUCCESS) {
     sql_debug("AggreExpression Create Param Expression Failed. RC = %d:%s", rc, strrc(rc));
     return rc;

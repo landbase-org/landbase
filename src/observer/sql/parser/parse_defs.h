@@ -43,62 +43,10 @@ enum OrderType
   ORDER_DESC  // 降序
 };
 
-/**
- * @description: 聚合类型
- */
-enum AggreType
-{
-  AGGRE_NONE,
-  AGGRE_MAX,
-  AGGRE_MIN,
-  AGGRE_COUNT,
-  AGGRE_COUNT_ALL,
-  AGGRE_AVG,
-  AGGRE_SUM
-};
-static std::string aggreType2str(AggreType aggre)
-{
-  static std::unordered_map<AggreType, std::string> m{
-      {AGGRE_NONE, "NONE"},
-      {AGGRE_MAX, "MAX"},
-      {AGGRE_MIN, "MIN"},
-      {AGGRE_COUNT, "COUNT"},
-      {AGGRE_COUNT_ALL, "COUNT"},
-      {AGGRE_AVG, "AVG"},
-      {AGGRE_SUM, "SUM"},
-  };
-  return m.at(aggre);
-}
-
-/**
- * @brief 描述一个属性
- * @ingroup SQLParser
- * @details 属性，或者说字段(column, field)
- * Rel -> Relation
- * Attr -> Attribute
- */
-struct RelAttrSqlNode
-{
-  std::string relation_name;   ///< relation name (may be NULL) 表名
-  std::string table_alias;     ///< table alias (may be NULL)  表别名
-  std::string attribute_name;  ///< attribute name              属性名
-  std::string field_alias;     ///< field alias (may be NULL)   属性别名
-};
-
 struct AttrSqlNode
 {
   std::string relation_name;  ///< relation name (may be NULL) 表名
   std::string table_alias;    ///< table alias (may be NULL)  表别名
-};
-
-/**
- * @description: aggretion 节点
- */
-struct AggreSqlNode
-{
-  RelAttrSqlNode attribute_name;          ///< 查询的字段
-  AggreType      aggre_type{AGGRE_NONE};  ///< 聚合类型
-  std::string    alias;                   ///< 别名
 };
 
 // TODO: 内存泄漏
@@ -130,7 +78,7 @@ struct JoinSqlNode
 
 struct OrderSqlNode
 {
-  RelAttrSqlNode rel_attr;
+  ParseFieldExpr field;
   OrderType      order_type = OrderType::ORDER_ASC;
 };
 
@@ -146,12 +94,11 @@ struct OrderSqlNode
  */
 struct SelectSqlNode
 {
-  std::vector<RelAttrSqlNode>   attributes;    ///< 字段
-  std::vector<AggreSqlNode>     aggregations;  ///< aggregations
-  std::vector<AttrSqlNode>      relations;     ///< 查询的表
-  std::vector<ConditionSqlNode> conditions;    ///< 查询条件，使用AND串联起来多个条件
-  std::vector<JoinSqlNode>      joinctions;    ///< Join-list
-  std::vector<OrderSqlNode>     orders;        ///< Order-requirements
+  std::vector<ParseExpr *>      attributes;  /// 字段
+  std::vector<AttrSqlNode>      relations;   ///< 查询的表
+  std::vector<ConditionSqlNode> conditions;  ///< 查询条件，使用AND串联起来多个条件
+  std::vector<JoinSqlNode>      joinctions;  ///< Join-list
+  std::vector<OrderSqlNode>     orders;      ///< Order-requirements
 };
 
 class ParseSubQueryExpr : public ParseExpr
@@ -161,7 +108,7 @@ public:
   {
     sub_query_ = std::unique_ptr<SelectSqlNode>(new SelectSqlNode(sub_query));
   }
-  ParseExprType expr_type() { return ParseExprType::SUBQUERY; }
+  ParseExprType expr_type() const override { return ParseExprType::SUBQUERY; }
 
 public:
   auto &sub_query() const { return sub_query_; }

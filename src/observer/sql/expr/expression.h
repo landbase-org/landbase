@@ -104,6 +104,12 @@ public:
   virtual std::string name() const { return name_; }  // 这里是输出结果显示的table_name
   virtual void        set_name(std::string name) { name_ = name; }
 
+public:
+  static RC create(
+      const ParseExpr *node, const std::unordered_map<std::string, Table *> &table_map,
+      const std::vector<Table *> &tables, Expression *&res_expr, Db *db
+  );
+
 private:
   std::string name_;
 };
@@ -130,11 +136,11 @@ public:
   Field &field() { return field_; }
 
   const Field &field() const { return field_; }
-
-  const char *table_name() const { return field_.table_name(); }
-  const auto &table_alias() const { return field_.table_alias(); }
-  const char *field_name() const { return field_.field_name(); }
-  const auto &field_alias() const { return field_.field_alias(); }
+  void         set_name(bool full_name = false);
+  const char  *table_name() const { return field_.table_name(); }
+  const auto  &table_alias() const { return field_.table_alias(); }
+  const char  *field_name() const { return field_.field_name(); }
+  const auto  &field_alias() const { return field_.field_alias(); }
 
   const AggreType aggre_type() const { return field_.aggre_type(); }
 
@@ -146,15 +152,15 @@ public:
    * 用于初始化field_meta的时候， 例如rel.attr, rel.*, *, attr的情况
    */
   static RC create(
-      const SelectSqlNode &select_sql_node, const std::unordered_map<std::string, Table *> &table_map,
-      const std::vector<Table *> &tables, std::vector<Expression *> &res_expr, Db *db
+      const ParseFieldExpr &select_sql_node, const std::unordered_map<std::string, Table *> &table_map,
+      const std::vector<Table *> &tables, std::vector<Expression *> &res_expr
   );
 
   /**
    * 用于知道rel_attr的情况下构建对应的FieldExpr;
    */
   static RC create(
-      const RelAttrSqlNode &node, const std::unordered_map<std::string, Table *> &table_map,
+      const ParseFieldExpr &node, const std::unordered_map<std::string, Table *> &table_map,
       const std::vector<Table *> &tables, Expression *&res_expr
   );
 
@@ -329,6 +335,12 @@ public:
 
   std::unique_ptr<Expression> &left() { return left_; }
   std::unique_ptr<Expression> &right() { return right_; }
+
+public:
+  static RC create(
+      const ParseArithmeticExpr &node, const std::unordered_map<std::string, Table *> &table_map,
+      const std::vector<Table *> &tables, Expression *&res_expr, Db *db
+  );
 
 private:
   RC calc_value(const Value &left_value, const Value &right_value, Value &value) const;
@@ -507,7 +519,7 @@ public:
 public:
   static void get_aggre_expression(Expression *expr, std::vector<std::unique_ptr<AggreExpression>> &aggrfunc_exprs);
   static RC   create(
-        const AggreSqlNode &node, const std::unordered_map<std::string, Table *> &table_map,
+        const ParseAggreExpr &node, const std::unordered_map<std::string, Table *> &table_map,
         const std::vector<Table *> &tables, Expression *&res_expr, Db *db = nullptr
     );
 

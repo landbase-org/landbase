@@ -43,6 +43,17 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   return expr;
 }
 
+ParseArithmeticExpr *create_arithmetic_expression(ParseArithmeticExpr::Type type,
+                                             ParseExpr *left,
+                                             ParseExpr *right,
+                                             const char *sql_string,
+                                             YYLTYPE *llocp)
+{
+  ParseArithmeticExpr *expr = new ParseArithmeticExpr(left, type, right);
+  expr->set_name(token_name(sql_string, llocp));
+  return expr;
+}
+
 %}
 
 %define api.pure full
@@ -129,11 +140,9 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   enum CompOp                       comp;
   enum AggreType                    aggre_type;
   enum OrderType                    order_type;
-  AggreSqlNode *                    aggre_node;
-  std::vector<AggreSqlNode> *       aggre_node_list;
-  std::vector<AggreSqlNode> *       aggre_node_list_opt;  // opt表示可以选择，可以有也可以没有
-  RelAttrSqlNode *                  rel_attr;
-  std::vector<RelAttrSqlNode> *     rel_attr_list;
+  ParseFieldExpr *                  parse_field_expr;
+  ParseArithmeticExpr *             parse_math_expr;
+  std::vector<ParseFieldExpr> *     rel_attr_list;
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
@@ -141,6 +150,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   JoinSqlNode *                     join_node;
   OrderSqlNode *                    order_node;
   std::vector<Expression *> *       expression_list;
+  std::vector<ParseExpr *> *        parse_expr_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
   std::vector<std::string> *        id_list;
@@ -174,18 +184,18 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <comp>                exists_op
 %type <aggre_type>          aggre_type
 %type <order_type>          order_type
-%type <aggre_node>          aggre_node
-%type <aggre_node_list>     aggre_node_list
-%type <aggre_node_list>     aggre_node_list_opt
-%type <rel_attr>            rel_attr        // (table column)
-%type <rel_attr_list>       rel_attr_list
-%type <rel_attr_list>       rel_attr_list_opt
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <nullable>            nullable // 用于标识字段是否可以为 null
 %type <value_list>          value_list
 %type <value_list_list>     value_list_list
 %type <update_list>         update_list
+%type <parse_field_expr>    rel_attr
+%type <parse_expr>          field_expr
+%type <parse_math_expr>     math_expr
+%type <parse_expr>          expr
+%type <parse_expr>          select_expr
+%type <parse_expr_list>     select_expr_list
 %type <condition_list>      where
 %type <condition_list>      condition_list
 %type <rel_node>            rel_node
@@ -193,7 +203,6 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <id_list>             id_list
 %type <expression>          expression
 %type <expression_list>     expression_list
-%type <parse_expr>          parse_expr;
 %type <join_node>           join_node
 %type <join_list>           join_list
 %type <order_node>          order_node
@@ -224,6 +233,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <sql_node>            command_wrapper
 %type <string>              rel_name  // 表名
 %type <string>              attr_name // 列名
+%type <string>              opt_as_alias // 别名
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
 
@@ -540,7 +550,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     ;
 
 update_list:
-    ID EQ parse_expr
+    ID EQ expr
     {
       $$ = new std::pair<std::vector<std::string>, std::vector<ParseExpr *>>;
       $$->first.emplace_back($1);
@@ -548,7 +558,7 @@ update_list:
 
       delete $1;
     }
-    | update_list COMMA ID EQ parse_expr
+    | update_list COMMA ID EQ expr
     {
       $$ = $1;
       $$->first.emplace_back($3);
@@ -558,160 +568,153 @@ update_list:
     ;
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT rel_attr_list_opt aggre_node_list_opt FROM rel_list select_join_list where select_order_list
+    SELECT select_expr_list FROM rel_list select_join_list where select_order_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
         $$->selection.attributes.swap(*$2);
         delete $2;
       }
-      if ($3 != nullptr) {
-        $$->selection.aggregations.swap(*$3);
-        delete $3;
+      if ($4 != nullptr) {
+        $$->selection.relations.swap(*$4);
+        delete $4;
       }
       if ($5 != nullptr) {
-        $$->selection.relations.swap(*$5);
+        $$->selection.joinctions.swap(*$5);
         delete $5;
       }
       if ($6 != nullptr) {
-        $$->selection.joinctions.swap(*$6);
+        $$->selection.conditions.swap(*$6);
         delete $6;
       }
       if ($7 != nullptr) {
-        $$->selection.conditions.swap(*$7);
+        $$->selection.orders.swap(*$7);
         delete $7;
-      }
-      if ($8 != nullptr) {
-        $$->selection.orders.swap(*$8);
-        delete $8;
       }
     }
     ;
 
-
-aggre_node_list_opt:
-      aggre_node_list
+field_expr:
+    rel_attr
     {
       $$ = $1;
     }
-    | /* empty */
+    | aggre_type LBRACE rel_attr RBRACE
     {
-      $$ = nullptr;
+      $$ = new ParseAggreExpr($3, $1);
+      delete $3;
     }
     ;
 
-aggre_node_list:
-      aggre_node
+math_expr:
+    expr '+' expr
     {
-      $$ = new std::vector<AggreSqlNode>{*$1}; 
-      delete $1; 
+      $$ = create_arithmetic_expression(ParseArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
     }
-    | aggre_node_list COMMA aggre_node
+    | expr '-' expr
     {
-      $$->emplace_back(*$3); 
-      delete $3; 
+      $$ = create_arithmetic_expression(ParseArithmeticExpr::Type::SUB, $1, $3, sql_string, &@$);
+    }
+    | expr '*' expr
+    {
+      $$ = create_arithmetic_expression(ParseArithmeticExpr::Type::MUL, $1, $3, sql_string, &@$);
+    }
+    | expr '/' expr
+    {
+      $$ = create_arithmetic_expression(ParseArithmeticExpr::Type::DIV, $1, $3, sql_string, &@$);
+    }
+    | '-' expr %prec UMINUS 
+    {
+      $$ = create_arithmetic_expression(ParseArithmeticExpr::Type::NEGATIVE, $2, nullptr, sql_string, &@$);
+    }
+    | LBRACE math_expr RBRACE {
+      $$ = $2;
+      $$->set_name(token_name(sql_string, &@$));
+    }
+
+expr:
+    math_expr
+    {
+      $$ = $1;
+    }
+    | LBRACE select_stmt RBRACE
+    {
+      $$ = new ParseSubQueryExpr($2->selection);
+    }
+    | LBRACE value_list RBRACE
+    {
+      $$ = new ParseValueListExpr(*$2);
+      delete $2;
+    }
+    | value
+    {
+      $$ = new ParseValueExpr(*$1);
+      $$->set_name(token_name(sql_string, &@$));
+      delete $1;
+    }
+    | field_expr
+    {
+      $$ = $1;
     }
     ;
 
-aggre_node:
-      aggre_type LBRACE rel_attr RBRACE
+opt_as_alias:
+    AS ID
     {
-      $$ = new AggreSqlNode;
-      $$->aggre_type = $1;
-      if ($3 != nullptr) {
-        $$->attribute_name = *$3; 
-        delete $3; 
-      }
+      $$ = $2;
     }
-    | aggre_type LBRACE rel_attr RBRACE AS rel_name
+    | ID
     {
-      $$ = new AggreSqlNode;
-      $$->aggre_type = $1;
-      if ($3 != nullptr) {
-        $$->attribute_name = *$3; 
-        delete $3; 
-      }
-      if($6 != nullptr){
-        $$->alias = $6;
-        free($6);
-      }
-    }
-    | aggre_type LBRACE rel_attr RBRACE rel_name
-    {
-      $$ = new AggreSqlNode;
-      $$->aggre_type = $1;
-      if ($3 != nullptr) {
-        $$->attribute_name = *$3; 
-        delete $3; 
-      }
-      if($5 != nullptr){
-        $$->alias = $5;
-        free($5);
-      }
+      $$ = $1;
     }
     ;
 
-rel_attr_list_opt:
-      rel_attr_list
+select_expr:
+    field_expr opt_as_alias
     {
-      $$ = $1; 
+      // 如果有别名
+      if ($2 != nullptr) {
+        if($1->expr_type()==ParseExprType::FIELD){
+          auto tmp = static_cast<ParseFieldExpr*>($1);
+          tmp->set_alias($2);
+        }else if($1->expr_type()==ParseExprType::AGGREGATION){
+          auto tmp = static_cast<ParseAggreExpr*>($1);
+          tmp->set_alias($2);
+        }
+        free($2);
+      }
+      $$ = $1;
     }
-    | /* empty */
+    | expr
     {
-      $$ = nullptr; 
+      $$ = $1;
     }
     ;
 
-rel_attr_list:
-      rel_attr
+select_expr_list:
+    select_expr
     {
-      $$ = new std::vector<RelAttrSqlNode>{*$1}; 
-      delete $1; 
+      $$ = new std::vector<ParseExpr *>;
+      $$->emplace_back($1);
     }
-    | rel_attr_list COMMA rel_attr
+    | select_expr_list COMMA select_expr
     {
-      $$->emplace_back(*$3); 
-      delete $3; 
+      $$ = $1;
+      $$->emplace_back($3);
     }
     ;
 
 rel_attr:
      attr_name
     {
-      $$ = new RelAttrSqlNode{"","", $1,""};
+      $$ = new ParseFieldExpr("",$1);
       free($1);
-    }
-    | attr_name attr_name
-    {
-      $$ = new RelAttrSqlNode{"","", $1,$2};
-      free($1);
-      free($2);
-    }
-    | attr_name AS attr_name
-    {
-      $$ = new RelAttrSqlNode{"","", $1,$3};
-      free($1);
-      free($3);
     }
     | rel_name DOT attr_name
     {
-      $$ = new RelAttrSqlNode{$1,$1,$3,""};
+      $$ = new ParseFieldExpr($1,$3);
       free($1);
       free($3);
-    }
-    | rel_name DOT attr_name attr_name
-    {
-      $$ = new RelAttrSqlNode{$1,$1,$3,$4};
-      free($1);
-      free($3);
-      free($4);
-    }
-    | rel_name DOT attr_name AS attr_name
-    {
-      $$ = new RelAttrSqlNode{$1,$1,$3,$5};
-      free($1);
-      free($3);
-      free($5);
     }
     ;
 
@@ -743,7 +746,7 @@ select_join_list:
  * @description: 递归解析所有的join
  * @return {std::vector<JoinSqlNode>*} 
  */
- join_list:
+join_list:
      join_node
     {
       $$ = new std::vector<JoinSqlNode>{*$1};
@@ -843,29 +846,6 @@ rel_list:
     }
     ;
 
-parse_expr: 
-    value
-    {
-      $$ = new ParseValueExpr(*$1);
-      delete $1;
-    }
-    | rel_attr
-    {
-      std::string &table_name = $1->relation_name;
-      std::string &field_name = $1->attribute_name;
-      $$ = new ParseFieldExpr(table_name,field_name);
-      delete $1;
-    }
-    | LBRACE select_stmt RBRACE
-    {
-      $$ = new ParseSubQueryExpr($2->selection);
-    }
-    | LBRACE value_list RBRACE 
-    {
-      $$ = new ParseValueListExpr(*$2);
-      delete $2;
-    }
-
 where:
     /* empty */
     {
@@ -908,7 +888,7 @@ condition_list:
     }
     ;
 condition:
-    parse_expr comp_op parse_expr
+    expr comp_op expr
     {
       $$ = new ConditionSqlNode;
       $$->left = $1;
@@ -917,7 +897,7 @@ condition:
 
       $$->right = $3;
     }
-    | parse_expr in_op parse_expr
+    | expr in_op expr
     {
       $$ = new ConditionSqlNode;
       $$->left = $1;
@@ -1075,7 +1055,7 @@ rel_name:
  * @return {*} char *
  */
 attr_name:
-      ID // ID 返回的是一个new的数据
+    ID // ID 返回的是一个new的数据
     {
       $$ = $1;
     }

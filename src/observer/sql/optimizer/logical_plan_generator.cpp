@@ -181,6 +181,9 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       case ExprType::SUBQUERY: {
         left = std::unique_ptr<Expression>(filter_unit_left);
       } break;
+      case ExprType::ARITHMETIC: {
+        left = std::unique_ptr<Expression>(filter_unit_left);
+      } break;
       default: {
         sql_debug("unimplement expr: %d", filter_unit_left->type());
       } break;
@@ -203,8 +206,11 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       case ExprType::SUBQUERY: {
         right = unique_ptr<Expression>(filter_unit_right);
       } break;
+      case ExprType::ARITHMETIC: {
+        right = std::unique_ptr<Expression>(filter_unit_right);
+      } break;
       default: {
-        sql_debug("unimplement expr: %d", filter_unit_left->type());
+        sql_debug("unimplement expr: %d", filter_unit_right->type());
       } break;
     }
 

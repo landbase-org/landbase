@@ -71,10 +71,22 @@ void ProjectPhysicalOperator::add_projection(const Expression *expr)
   // 对于聚合查询来说， 需要有aggre_type
   TupleCellSpec *spec = nullptr;
 
-  if (auto x = dynamic_cast<const FieldExpr *>(expr)) {
-    spec = new TupleCellSpec(x->table_name(), x->field_name());
-  } else if (auto x = dynamic_cast<const AggreExpression *>(expr)) {
-    spec = new TupleCellSpec(x->table_name(), x->field_name(), x->get_aggre_type());
+  switch (expr->type()) {
+    case ExprType::FIELD: {
+      auto x = static_cast<const FieldExpr *>(expr);
+      spec   = new TupleCellSpec(x->table_name(), x->field_name());
+    } break;
+    case ExprType::ARITHMETIC: {
+      auto x = static_cast<const ArithmeticExpr *>(expr);
+      spec   = new TupleCellSpec(x->name().c_str());
+    } break;
+    case ExprType::AGGREGATION: {
+      auto x = static_cast<const AggreExpression *>(expr);
+      spec   = new TupleCellSpec(x->table_name(), x->field_name(), x->get_aggre_type());
+    } break;
+    default: {
+      sql_debug("not support expr type: %d", expr->type());
+    } break;
   }
 
   tuple_.add_cell_spec(spec);

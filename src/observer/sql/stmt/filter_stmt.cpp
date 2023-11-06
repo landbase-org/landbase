@@ -138,7 +138,11 @@ RC FilterStmt::create_filter_unit(
       auto select_stmt = static_cast<SelectStmt *>(stmt);
       left_expr        = new SubQueryExpr(select_stmt);
     } break;
-    default: {
+
+    case ParseExprType::ARITHMETIC: {
+      auto                 math_expr = static_cast<const ParseArithmeticExpr *>(condition.left);
+      std::vector<Table *> tmp_tables{default_table};
+      rc = ArithmeticExpr::create(*math_expr, *tables, tmp_tables, left_expr, db);
     } break;
   }
   if (left_expr == nullptr) {
@@ -180,7 +184,10 @@ RC FilterStmt::create_filter_unit(
       auto select_stmt = static_cast<SelectStmt *>(stmt);
       right_expr       = new SubQueryExpr(select_stmt);
     } break;
-    default: {
+    case ParseExprType::ARITHMETIC: {
+      auto                 math_expr = static_cast<const ParseArithmeticExpr *>(condition.right);
+      std::vector<Table *> tmp_tables{default_table};
+      rc = ArithmeticExpr::create(*math_expr, *tables, tmp_tables, right_expr, db);
     } break;
   }
   if (right_expr == nullptr) {
