@@ -15,7 +15,7 @@ RC AggrePhysicalOperator::open(Trx *trx)
   if (children_.size() != 1) {
     return RC::SUCCESS;
   }
-
+  tuple_.do_aggregation_begin();  // 初始化初始的值
   return children_[0]->open(trx);
 }
 
@@ -39,7 +39,7 @@ RC AggrePhysicalOperator::next()
 
   if (!is_started_) {
     rc = oper->next();
-    if (rc != RC::SUCCESS) {
+    if (rc != RC::SUCCESS || oper->current_tuple() == nullptr) {
       LOG_INFO("aggregation a empty table");
       is_record_eof_ = true;
       return RC::SUCCESS;
@@ -48,6 +48,7 @@ RC AggrePhysicalOperator::next()
     son_tuple   = oper->current_tuple();
     is_started_ = true;
 
+    values_.clear();
     for (const auto &unit : *groupby_units) {
       Value value;
       unit->expr()->get()->get_value(*son_tuple, value);

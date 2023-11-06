@@ -78,7 +78,9 @@ void AggregationTuple::init(
     std::vector<std::unique_ptr<AggreExpression>> &&aggre_exprs, std::vector<std::unique_ptr<FieldExpr>> &&field_exprs
 )
 {
-  count_ = 0;
+  count_      = 0;
+  aggre_size_ = aggre_exprs.size();
+  field_size_ = field_exprs.size();
   counts_.resize(aggre_exprs.size());
   all_null_.resize(aggre_exprs.size());
   aggre_results_.resize(aggre_exprs.size());
@@ -96,9 +98,7 @@ void AggregationTuple::init(
 void AggregationTuple::do_aggregation_begin()
 {
   // 初始化count_和all_null_
-  count_      = 0;
-  aggre_size_ = aggre_exprs_.size();
-  field_size_ = field_exprs_.size();
+  count_ = 0;
   for (size_t i = 0; i < all_null_.size(); i++) {
     all_null_[i] = true;
     counts_[i]   = 0;
