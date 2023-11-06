@@ -170,6 +170,83 @@ RC FieldExpr::create(
   return RC::SUCCESS;
 }
 
+RC FieldExpr::create(
+    const std::vector<RelAttrSqlNode> &nodes, const std::unordered_map<std::string, Table *> &table_map,
+    const std::vector<Table *> &tables, std::vector<Expression *> &res_expr, Db *db
+)
+{
+  // 获取所有的wildcard
+  auto wildcard_fields = [](Table *table, std::vector<Expression *> &field_metas) {
+    const TableMeta &table_meta = table->table_meta();
+    const int        field_num  = table_meta.field_num();
+    for (int i = table_meta.sys_field_num(); i < field_num; i++) {
+      field_metas.push_back(new FieldExpr(table, table_meta.field(i)));
+    }
+  };
+
+  for (auto &relation_attr : nodes) {
+    const auto table_name = relation_attr.relation_name;
+    const auto field_name = relation_attr.attribute_name;
+    const auto aggre_type = AGGRE_NONE;
+    if (table_name == "*" || field_name == "") {
+      LOG_WARN("no fields type err=%s.%s", table_name.c_str(), field_name.c_str());
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+
+    if (table_name == "" && field_name == "*") {
+      for (const auto table : tables) {
+        wildcard_fields(table, res_expr);
+      }
+    } else if (table_name == "" && field_name != "*") {  // field_name != "*"
+      if (tables.size() != 1) {
+        LOG_WARN("invalid. I do not know the attr's table. attr=%s", relation_attr.attribute_name.c_str());
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+
+      Table           *table      = tables[0];
+      const FieldMeta *field_meta = table->table_meta().field(relation_attr.attribute_name.c_str());
+      if (nullptr == field_meta) {
+        LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), relation_attr.attribute_name.c_str());
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+      res_expr.push_back(new FieldExpr(table, field_meta));
+    } else {  // table_name != "*"
+      auto iter = table_map.find(table_name);
+      if (iter == table_map.end()) {
+        LOG_WARN("no such table in from list: %s", table_name.c_str());
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+
+      Table *table = iter->second;
+      if (field_name == "*") {
+        wildcard_fields(table, res_expr);
+      } else {
+        const FieldMeta *field_meta = table->table_meta().field(field_name.c_str());
+        if (nullptr == field_meta) {
+          LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), field_name.c_str());
+          return RC::SCHEMA_FIELD_MISSING;
+        }
+        res_expr.push_back(new FieldExpr(table, field_meta));
+      }
+    }
+  }
+
+  // 设置输出的表名
+  for (auto expr : res_expr) {
+    auto        x = dynamic_cast<FieldExpr *>(expr);
+    std::string name;
+    if (tables.size() == 1) {
+      name = x->field_name();
+    } else {
+      name += x->table_name();
+      name += ".";
+      name += x->field_name();
+    }
+    x->set_name(name);
+  }
+  return RC::SUCCESS;
+}
+
 RC ValueExpr::get_value(const Tuple &tuple, Value &value) const
 {
   value = value_;
@@ -660,13 +737,20 @@ RC FuncExpr::create(
     auto           left = dynamic_cast<ParseFieldExpr *>(func_parse_expr->get_left());
     RelAttrSqlNode temp{left->table_name(), left->table_alias(), left->field_name(), left->field_alias()};
     Expression    *t_left = nullptr;
+    // 创建左侧的字段表达式
     if (FieldExpr::create(temp, table_map, tables, t_left) != RC::SUCCESS) {
       return RC::FAILURE;
     }
-    auto        right   = dynamic_cast<ParseValueExpr *>(func_parse_expr->get_right());
-    Expression *t_right = new ValueExpr(right->value());
-    res_expr            = new FuncExpr(func_parse_expr->get_func_type(), t_left, t_right);
-    res_expr->set_name(func_parse_expr->get_res_name());
+    // 判断右侧是否需要创建
+    if (func_parse_expr->get_func_type() != FuncType::LENGTH_) {
+      auto        right   = dynamic_cast<ParseValueExpr *>(func_parse_expr->get_right());
+      Expression *t_right = new ValueExpr(right->value());
+      res_expr            = new FuncExpr(func_parse_expr->get_func_type(), t_left, t_right);
+      res_expr->set_name(func_parse_expr->get_res_name());
+    } else {
+      res_expr = new FuncExpr(func_parse_expr->get_func_type(), t_left, nullptr);
+      res_expr->set_name(func_parse_expr->get_res_name());
+    }
     return RC::SUCCESS;
   }
 }

@@ -607,7 +607,7 @@ func_expr:
     ;
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT rel_attr_list_opt aggre_node_list_opt FROM rel_list select_join_list where select_order_list
+    /* SELECT rel_attr_list_opt aggre_node_list_opt FROM rel_list select_join_list where select_order_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -634,14 +634,38 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.orders.swap(*$8);
         delete $8;
       }
-    }
-    | SELECT parse_expr_list
+    } */
+    SELECT parse_expr_list
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
         $$->selection.expressions.swap(*$2);
         delete $2;
       }
+    }
+    | SELECT parse_expr_list FROM rel_list select_join_list where select_order_list
+    {
+        $$ = new ParsedSqlNode(SCF_SELECT);
+        if ($2 != nullptr) {
+            $$->selection.expressions.swap(*$2);
+            delete $2;
+        }
+        if ($4 != nullptr) {
+            $$->selection.relations.swap(*$4);
+            delete $4;
+        }
+        if ($5 != nullptr) {
+            $$->selection.joinctions.swap(*$5);
+            delete $5;
+        }
+        if ($6 != nullptr) {
+            $$->selection.conditions.swap(*$6);
+            delete $6;
+        }
+        if ($7 != nullptr) {
+            $$->selection.orders.swap(*$7);
+            delete $7;
+        }
     }
     ;
 
@@ -915,9 +939,9 @@ parse_expr_list:
       $$ = new std::vector<ParseExpr*>;
       $$->emplace_back($1);
     }
-    | COMMA parse_expr
+    | parse_expr_list COMMA parse_expr
     {
-      $$->emplace_back($2);
+      $$->emplace_back($3);
     }
     
 

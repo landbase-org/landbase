@@ -111,7 +111,8 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
       table_oper = unique_ptr<LogicalOperator>(join_oper);
     }
   }
-  root_oper = std::move(table_oper);
+  if (table_oper)
+    root_oper = std::move(table_oper);
 
   // 创建表达式算子 目前没有走stmt创建算子，而是直接创建算子
   unique_ptr<LogicalOperator>      expr_oper(nullptr);

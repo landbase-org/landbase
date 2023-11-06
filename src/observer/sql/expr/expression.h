@@ -160,6 +160,15 @@ public:
       const std::vector<Table *> &tables, Expression *&res_expr
   );
 
+  /**
+   * @brief 老版本兼容
+   *
+   */
+  static RC create(
+      const std::vector<RelAttrSqlNode> &nodes, const std::unordered_map<std::string, Table *> &table_map,
+      const std::vector<Table *> &tables, std::vector<Expression *> &res_expr, Db *db
+  );
+
 private:
   Field field_;
 };

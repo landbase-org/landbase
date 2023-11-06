@@ -203,11 +203,30 @@ static RC get_expressions(
     const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables, Db *db
 )
 {
-  // 如果只是普通的查询列表数据
   RC rc = RC::SUCCESS;
-  if (!sql_node.attributes.empty()) {
-    return FieldExpr::create(sql_node, table_map, tables, res_expressions, db);
+  std::vector<ParseExpr*> selectors = sql_node.expressions;
+  //处理字段
+  std::vector<RelAttrSqlNode>     explicit_attrs;
+  for (auto const &expr:selectors){
+    if (expr->expr_type() == ParseExprType::FIELD){
+      auto field_expr = dynamic_cast<ParseFieldExpr*>(expr);
+      RelAttrSqlNode temp{field_expr->table_name(),field_expr->table_alias(),field_expr->field_name(),field_expr->field_alias()};
+      explicit_attrs.emplace_back(temp);
+    }
   }
+  if (!explicit_attrs.empty()){
+    rc = FieldExpr::create(explicit_attrs, table_map, tables, res_expressions, db);
+    if (rc != RC::SUCCESS){
+      sql_debug("Err at attrs->exprs");
+      return rc;
+    }
+  }
+
+  // // 如果只是普通的查询列表数据
+  // // 特殊处理所有的attrbutes
+  // if (!sql_node.attributes.empty()) {
+  //   return FieldExpr::create(sql_node, table_map, tables, res_expressions, db);
+  // }
 
   // aggregation的情况
   for (auto &expr_node : sql_node.aggregations) {
@@ -228,11 +247,12 @@ static RC get_expressions(
         res_expressions.emplace_back(res_expr);
     }
     if (expr->expr_type() == ParseExprType::FIELD) {
-      Expression    *res_expr = nullptr;
-      auto           pf       = dynamic_cast<ParseFieldExpr *>(res_expr);
-      RelAttrSqlNode temp{pf->table_name(), pf->table_alias(), pf->field_name(), pf->field_alias()};
-      if (RC::SUCCESS == FieldExpr::create(temp, table_map, tables, res_expr))
-        res_expressions.emplace_back(res_expr);
+      // 此处跳过已经在前面处理过了
+      // Expression    *res_expr = nullptr;
+      // auto           pf       = dynamic_cast<ParseFieldExpr *>(res_expr);
+      // RelAttrSqlNode temp{pf->table_name(), pf->table_alias(), pf->field_name(), pf->field_alias()};
+      // if (RC::SUCCESS == FieldExpr::create(temp, table_map, tables, res_expr))
+      //   res_expressions.emplace_back(res_expr);
     }
   }
   return rc;
