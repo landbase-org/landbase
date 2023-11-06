@@ -49,7 +49,7 @@ RC handle_sub_query_alias(ParseSubQueryExpr *expr, std::vector<AttrSqlNode> &par
 
   // 检查非法情况：select * as alias from table_name_1 t1;
   for (auto &field : fields) {
-    if (field.attribute_name == "*" && field.field_alias != "") {
+    if (!field.is_aggre() && field.attribute_name == "*" && field.field_alias != "") {
       sql_debug("invalid argument. field alias cannot be used with *");
       return RC::INVALID_ARGUMENT;
     }
@@ -154,7 +154,7 @@ RC handle_alias(SelectSqlNode &select_sql)
 
   // 检查非法情况：select * as alias from table_name_1 t1;
   for (auto &field : fields) {
-    if (field.attribute_name == "*" && field.field_alias != "") {
+    if (!field.is_aggre() && field.attribute_name == "*" && field.field_alias != "") {
       sql_debug("invalid argument. field alias cannot be used with *");
       return RC::INVALID_ARGUMENT;
     }
