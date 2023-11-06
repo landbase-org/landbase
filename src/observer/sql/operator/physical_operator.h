@@ -50,7 +50,8 @@ enum class PhysicalOperatorType
   UPDATE,  // 更新
   INSERT,
   ORDER_BY,  // 排序
-  AGGREGATION
+  AGGREGATION,
+  ARITHMETIC,
 };
 
 /**

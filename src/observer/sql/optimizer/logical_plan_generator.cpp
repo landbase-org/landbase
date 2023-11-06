@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/expr/sub_query_expr.h"
 #include "sql/operator/aggre_logical_operator.h"
+#include "sql/operator/arithmetic_logical_operator.h"
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
 #include "sql/operator/explain_logical_operator.h"
@@ -146,6 +147,40 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   if (orderby_oper) {
     orderby_oper->add_child(std::move(root_oper));
     root_oper = std::move(orderby_oper);
+  }
+
+  // 创建算术运算算子
+  auto exprs          = select_stmt->expressions();
+  bool has_arith_expr = false;
+  for (auto &expr : exprs) {
+    if (expr->type() == ExprType::ARITHMETIC) {
+      has_arith_expr = true;
+      break;
+    }
+  }
+  if (has_arith_expr) {
+    std::vector<unique_ptr<Expression>> tmp_exprs;
+    for (auto expr : exprs) {
+      Expression *tmp;
+      switch (expr->type()) {
+        case ExprType::FIELD: {
+          tmp = new FieldExpr(static_cast<FieldExpr *>(expr)->field());
+        } break;
+        case ExprType::VALUE: {
+          tmp = new ValueExpr(static_cast<ValueExpr *>(expr)->get_value());
+        } break;
+        case ExprType::ARITHMETIC: {
+          tmp = new ArithmeticExpr(static_cast<ArithmeticExpr &>(*expr));
+        } break;
+        case ExprType::AGGREGATION: {
+          tmp = new AggreExpression(static_cast<AggreExpression &>(*expr));
+        } break;
+      }
+      tmp_exprs.emplace_back(tmp);
+    }
+    unique_ptr<ArithmeticLogicalOperator> arith_oper(new ArithmeticLogicalOperator(std::move(tmp_exprs)));
+    arith_oper->add_child(std::move(root_oper));
+    root_oper = std::move(arith_oper);
   }
 
   // 生成project算子

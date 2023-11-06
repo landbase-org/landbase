@@ -25,6 +25,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/operator/aggre_logical_operator.h"
 #include "sql/operator/aggre_physical_operator.h"
+#include "sql/operator/arithmetic_logical_operator.h"
+#include "sql/operator/arithmetic_physical_operator.h"
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/calc_physical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
@@ -102,6 +104,10 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
 
     case LogicalOperatorType::AGGREGATION: {
       return create_plan(static_cast<AggreLogicalOperator &>(logical_operator), oper);
+    } break;
+
+    case LogicalOperatorType::ARITHMETIC: {
+      return create_plan(static_cast<ArithmeticLogicalOperator &>(logical_operator), oper);
     } break;
 
     default: {
@@ -451,6 +457,35 @@ RC PhysicalPlanGenerator::create_plan(AggreLogicalOperator &aggre_oper, std::uni
   }
 
   oper = std::move(aggre_phy_oper);
+
+  LOG_TRACE("create a aggregation function physical operator");
+  return rc;
+}
+
+RC PhysicalPlanGenerator::create_plan(ArithmeticLogicalOperator &arith_oper, std::unique_ptr<PhysicalOperator> &oper)
+{
+  RC                                   rc          = RC::SUCCESS;
+  vector<unique_ptr<LogicalOperator>> &child_opers = arith_oper.children();
+  assert(child_opers.size() <= 1);
+
+  unique_ptr<ArithmeticPhysicalOperator> arith_phy_oper(
+      new ArithmeticPhysicalOperator(std::move(arith_oper.expressions()))
+  );
+  unique_ptr<PhysicalOperator> child_phy_oper;
+
+  if (!child_opers.empty()) {
+    LogicalOperator *child_oper = child_opers.front().get();
+    rc                          = create(*child_oper, child_phy_oper);
+    if (rc != RC::SUCCESS) {
+      sql_debug("failed to create order physical operator's child physical operator. rc=%s", strrc(rc));
+      return rc;
+    }
+    if (child_phy_oper) {
+      arith_phy_oper->add_child(std::move(child_phy_oper));
+    }
+  }
+
+  oper = std::move(arith_phy_oper);
 
   LOG_TRACE("create a aggregation function physical operator");
   return rc;

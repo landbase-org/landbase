@@ -344,6 +344,7 @@ public:
   ValueListTuple()          = default;
   virtual ~ValueListTuple() = default;
 
+  void add_cell(const Value &cell) { cells_.push_back(cell); }
   void set_cells(const std::vector<Value> &cells) { cells_ = cells; }
 
   virtual int cell_num() const override { return static_cast<int>(cells_.size()); }

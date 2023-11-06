@@ -375,6 +375,48 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
 
 ////////////////////////////////////////////////////////////////////////////////
 
+ArithmeticExpr::ArithmeticExpr(ArithmeticExpr &expr)
+{
+  arithmetic_type_      = expr.arithmetic_type_;
+  Expression *left_tmp  = nullptr;
+  Expression *right_tmp = nullptr;
+  if (expr.left_ != nullptr) {
+    switch (expr.left_->type()) {
+      case ExprType::FIELD: {
+        auto left_tmp = new FieldExpr(static_cast<FieldExpr &>(*expr.left_).field());
+      } break;
+      case ExprType::VALUE: {
+        auto left_tmp = new ValueExpr(static_cast<ValueExpr &>(*expr.left_).get_value());
+      } break;
+      case ExprType::ARITHMETIC: {
+        auto left_tmp = new ArithmeticExpr(static_cast<ArithmeticExpr &>(*expr.left_));
+      } break;
+      case ExprType::AGGREGATION: {
+        auto left_tmp = new AggreExpression(static_cast<AggreExpression &>(*expr.left_));
+      } break;
+    }
+  }
+  this->left_ = std::unique_ptr<Expression>(left_tmp);
+
+  if (expr.right_ != nullptr) {
+    switch (expr.right_->type()) {
+      case ExprType::FIELD: {
+        auto right_tmp = new FieldExpr(static_cast<FieldExpr &>(*expr.right_).field());
+      } break;
+      case ExprType::VALUE: {
+        auto right_tmp = new ValueExpr(static_cast<ValueExpr &>(*expr.right_).get_value());
+      } break;
+      case ExprType::ARITHMETIC: {
+        auto right_tmp = new ArithmeticExpr(static_cast<ArithmeticExpr &>(*expr.right_));
+      } break;
+      case ExprType::AGGREGATION: {
+        auto right_tmp = new AggreExpression(static_cast<AggreExpression &>(*expr.right_));
+      } break;
+    }
+  }
+  this->right_ = std::unique_ptr<Expression>(right_tmp);
+}
+
 ArithmeticExpr::ArithmeticExpr(ArithmeticExpr::Type type, Expression *left, Expression *right)
     : arithmetic_type_(type),
       left_(left),
@@ -475,11 +517,14 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
     sql_debug("failed to get value of left expression. rc=%s", strrc(rc));
     return rc;
   }
-  rc = right_->get_value(tuple, right_value);
-  if (rc != RC::SUCCESS) {
-    sql_debug("[ArithmeticExpr] failed to get value of right expression. rc=%s", strrc(rc));
-    return rc;
+  if (right_ != nullptr) {
+    rc = right_->get_value(tuple, right_value);
+    if (rc != RC::SUCCESS) {
+      sql_debug("[ArithmeticExpr] failed to get value of right expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }
+
   return calc_value(left_value, right_value, value);
 }
 
@@ -524,11 +569,26 @@ RC ArithmeticExpr::create(
   }
 
   auto right_expr = node.right();
-  rc              = Expression::create(right_expr, table_map, tables, right, db);
-  if (rc != RC::SUCCESS) {
-    sql_debug("[Arith Expr] right expr create failed. rc=%s", strrc(rc));
-    return rc;
+  // -1
+  if (right_expr != nullptr) {
+    rc = Expression::create(right_expr, table_map, tables, right, db);
+    if (rc != RC::SUCCESS) {
+      sql_debug("[Arith Expr] right expr create failed. rc=%s", strrc(rc));
+      return rc;
+    }
   }
+
+  // 开糊
+  ArithmeticExpr::Type type;
+  switch (node.arithmetic_type()) {
+    case ParseArithmeticExpr::Type::ADD: type = ArithmeticExpr::Type::ADD; break;
+    case ParseArithmeticExpr::Type::SUB: type = ArithmeticExpr::Type::SUB; break;
+    case ParseArithmeticExpr::Type::MUL: type = ArithmeticExpr::Type::MUL; break;
+    case ParseArithmeticExpr::Type::DIV: type = ArithmeticExpr::Type::DIV; break;
+    case ParseArithmeticExpr::Type::NEGATIVE: type = ArithmeticExpr::Type::NEGATIVE; break;
+  }
+
+  res_expr = new ArithmeticExpr(type, std::unique_ptr<Expression>(left), std::unique_ptr<Expression>(right));
   return rc;
 }
 

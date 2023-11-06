@@ -865,11 +865,7 @@ where:
     }
     ;
 condition_list:
-    /* empty */
-    {
-      $$ = nullptr;
-    }
-    | condition {
+    condition {
       $$ = new std::vector<ConditionSqlNode>;
       $$->emplace_back(*$1);
       delete $1;
