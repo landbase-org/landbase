@@ -194,6 +194,21 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     root_oper = std::move(groupby_oper);
   }
 
+  // 6生成having算子
+  unique_ptr<LogicalOperator> having_oper;
+  if (having_stmt != nullptr) {
+
+    rc = create_plan(select_stmt->having_stmt(), having_oper);
+    if (rc != RC::SUCCESS) {
+      sql_debug("failed to create predicate logical plan. rc=%s", strrc(rc));
+      return rc;
+    }
+    if (having_oper) {  // 将(root_oper)table_oper插入作为having_oper的子结点然后再更新root_oper
+      having_oper->add_child(std::move(root_oper));
+      root_oper = std::move(having_oper);
+    }
+  }
+
   /******************
    * 创建ORDER算子  *
    ******************/
@@ -242,6 +257,11 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       } break;
       case ExprType::SUBQUERY: {
         left = std::unique_ptr<Expression>(filter_unit_left);
+      } break;
+      case ExprType::AGGREGATION: {
+        auto tmp_expr = static_cast<const AggreExpression *>(filter_unit_left);
+        left =
+            unique_ptr<Expression>(new AggreExpression(tmp_expr->get_aggre_type(), new FieldExpr(tmp_expr->field())));
       } break;
       default: {
         sql_debug("unimplement expr: %d", filter_unit_left->type());

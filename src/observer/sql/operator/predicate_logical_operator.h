@@ -29,3 +29,5 @@ public:
 
   LogicalOperatorType type() const override { return LogicalOperatorType::PREDICATE; }
 };
+
+using HavingLogicalOperator = PredicateLogicalOperator;
