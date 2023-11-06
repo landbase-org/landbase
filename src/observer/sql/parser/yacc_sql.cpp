@@ -2365,7 +2365,7 @@ yyreduce:
     {
       (yyval.sql_node) = new ParsedSqlNode(SCF_SELECT);
       if ((yyvsp[0].parse_expr_list) != nullptr) {
-        (yyval.sql_node)->selection.exprs.swap(*(yyvsp[0].parse_expr_list));
+        (yyval.sql_node)->selection.expressions.swap(*(yyvsp[0].parse_expr_list));
         delete (yyvsp[0].parse_expr_list);
       }
     }

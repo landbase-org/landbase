@@ -101,6 +101,10 @@ public:
   {}
   ParseExprType expr_type() override { return ParseExprType::FUNCTION; }
   void          set_res_name(std::string name) { res_name_ = name; }
+  ParseExpr    *get_left() const { return left_; }
+  ParseExpr    *get_right() const { return right_; }
+  FuncType      get_func_type() const { return f_type; }
+  std::string   get_res_name() const { return res_name_; }
 
 private:
   FuncType    f_type;

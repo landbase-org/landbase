@@ -44,7 +44,7 @@ Tuple *ExprPhysicalOperator::current_tuple()
     // TODOX: 在此处是否需要把所有的field表达式的值拿到
     Tuple *child_tuple = children_.front()->current_tuple();
     tuple_             = new ExpressionTuple(exprs_);
-    // tuple_->set_tuple(child_tuple);
+    tuple_->set_tuple(child_tuple);
     return tuple_;
   }
 }

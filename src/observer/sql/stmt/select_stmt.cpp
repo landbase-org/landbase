@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 #include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "sql/parser/parse_defs.h"
+#include "sql/parser/parse_expr_defs.h"
 #include "sql/stmt/filter_stmt.h"
 #include "sql/stmt/order_by_stmt.h"
 #include "storage/db/db.h"
@@ -209,7 +210,6 @@ static RC get_expressions(
   }
 
   // aggregation的情况
-
   for (auto &expr_node : sql_node.aggregations) {
     Expression *tmp_expression;
     rc = AggreExpression::create(expr_node, table_map, tables, tmp_expression, db);
@@ -218,6 +218,22 @@ static RC get_expressions(
       return rc;
     }
     res_expressions.push_back(tmp_expression);
+  }
+
+  // 函数表达式处理,此处查询的列可能被放在这里
+  for (auto const expr : sql_node.expressions) {
+    if (expr->expr_type() == ParseExprType::FUNCTION) {
+      Expression *res_expr = nullptr;
+      if (RC::SUCCESS == FuncExpr::create(expr, table_map, tables, res_expr, db))
+        res_expressions.emplace_back(res_expr);
+    }
+    if (expr->expr_type() == ParseExprType::FIELD) {
+      Expression    *res_expr = nullptr;
+      auto           pf       = dynamic_cast<ParseFieldExpr *>(res_expr);
+      RelAttrSqlNode temp{pf->table_name(), pf->table_alias(), pf->field_name(), pf->field_alias()};
+      if (RC::SUCCESS == FieldExpr::create(temp, table_map, tables, res_expr))
+        res_expressions.emplace_back(res_expr);
+    }
   }
   return rc;
 }

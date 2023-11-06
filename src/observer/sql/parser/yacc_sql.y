@@ -639,7 +639,7 @@ select_stmt:        /*  select 语句的语法解析树*/
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
-        $$->selection.exprs.swap(*$2);
+        $$->selection.expressions.swap(*$2);
         delete $2;
       }
     }

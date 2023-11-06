@@ -1,5 +1,6 @@
 #include "sql/expr/do_expr.h"
 #include "common/rc.h"
+#include "sql/expr/expression.h"
 #include "storage/trx/trx.h"
 
 RC do_expr(Trx *trx, Expression *expression, Tuple *tuple)
@@ -36,6 +37,9 @@ RC do_expr(Trx *trx, Expression *expression, Tuple *tuple)
         sql_debug("[do_expr] failed to do subquery expr");
       }
     } break;
+    case ExprType::FUNCTION: {
+      auto expr = do_func_expr(trx, static_cast<FuncExpr *>(expression), tuple);
+    }
     default: {
       sql_debug("[do_expr] uninplemented ExprType");
     } break;
@@ -177,4 +181,8 @@ RC do_subquery_expr(Trx *trx, SubQueryExpr *subquery_expr, Tuple *tuple)
     }
   }
   return rc;
+}
+
+RC do_func_expr(Trx *trx, FuncExpr *subquery_expr, Tuple *tuple) {
+  return RC::UNIMPLENMENT;
 }
