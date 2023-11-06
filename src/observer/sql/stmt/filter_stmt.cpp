@@ -147,15 +147,19 @@ RC FilterStmt::create_filter_unit(
       left_expr = new FieldExpr(Field(table, field));
     } break;
     case ParseExprType::AGGREGATION: {
-      Table           *table      = nullptr;
+      std::vector<Table *> table;
+      for (auto &[s, t] : *tables) {
+        table.push_back(t);
+      }
       const FieldMeta *field      = nullptr;
       auto             aggre_expr = static_cast<const ParseAggreExpr *>(condition.left);
-      rc                          = get_table_and_field(db, default_table, tables, aggre_expr, table, field);
+      auto             aggre_node =
+          AggreSqlNode{RelAttrSqlNode{aggre_expr->table_name(), aggre_expr->field_name()}, aggre_expr->aggre_type()};
+      rc = AggreExpression::create(aggre_node, *tables, {table}, left_expr);
       if (rc != RC::SUCCESS) {
         sql_debug("cannot find attr");
         return rc;
       }
-      left_expr = new AggreExpression(aggre_expr->aggre_type(), new FieldExpr(Field(table, field)));
     } break;
     case ParseExprType::VALUE: {
       auto value_expr = static_cast<const ParseValueExpr *>(condition.left);
