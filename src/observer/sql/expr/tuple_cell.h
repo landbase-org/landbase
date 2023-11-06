@@ -40,6 +40,6 @@ public:
 private:
   std::string table_name_;
   std::string field_name_;
-  AggreType   aggre_type_;
+  AggreType   aggre_type_{AGGRE_NONE};
   std::string alias_;
 };

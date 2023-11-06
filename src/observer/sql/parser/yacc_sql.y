@@ -120,6 +120,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         LK
         IN_OP
         EXISTS_OP
+        GROUP
+        HAVING
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -129,10 +131,9 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   enum CompOp                       comp;
   enum AggreType                    aggre_type;
   enum OrderType                    order_type;
-  AggreSqlNode *                    aggre_node;
-  std::vector<AggreSqlNode> *       aggre_node_list;
-  std::vector<AggreSqlNode> *       aggre_node_list_opt;  // opt表示可以选择，可以有也可以没有
   RelAttrSqlNode *                  rel_attr;
+  RelAttrSqlNode *                  rel_attr_aggre_node;
+  std::vector<RelAttrSqlNode> *    rel_attr_aggre_list;
   std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
@@ -140,6 +141,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   ParseExpr *                       parse_expr;
   JoinSqlNode *                     join_node;
   OrderSqlNode *                    order_node;
+  GroupByHavingSqlNode *            groupby_having_node;
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
@@ -174,18 +176,20 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <comp>                exists_op
 %type <aggre_type>          aggre_type
 %type <order_type>          order_type
-%type <aggre_node>          aggre_node
-%type <aggre_node_list>     aggre_node_list
-%type <aggre_node_list>     aggre_node_list_opt
+%type <rel_attr>            aggre_node
 %type <rel_attr>            rel_attr        // (table column)
 %type <rel_attr_list>       rel_attr_list
-%type <rel_attr_list>       rel_attr_list_opt
+%type <rel_attr_aggre_node> rel_attr_aggre_node
+%type <rel_attr_aggre_list> rel_attr_aggre_list
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <nullable>            nullable // 用于标识字段是否可以为 null
 %type <value_list>          value_list
 %type <value_list_list>     value_list_list
 %type <update_list>         update_list
+%type <groupby_having_node> groupby_having_node
+%type <groupby_having_node> groupby_having_node_opt
+
 %type <condition_list>      where
 %type <condition_list>      condition_list
 %type <rel_node>            rel_node
@@ -224,6 +228,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <sql_node>            command_wrapper
 %type <string>              rel_name  // 表名
 %type <string>              attr_name // 列名
+
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
 
@@ -558,101 +563,41 @@ update_list:
     ;
 
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT rel_attr_list_opt aggre_node_list_opt FROM rel_list select_join_list where select_order_list
+    SELECT rel_attr_aggre_list FROM rel_list select_join_list where select_order_list groupby_having_node_opt
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
         $$->selection.attributes.swap(*$2);
         delete $2;
       }
-      if ($3 != nullptr) {
-        $$->selection.aggregations.swap(*$3);
-        delete $3;
+      if ($4 != nullptr) {
+        $$->selection.relations.swap(*$4);
+        delete $4;
       }
       if ($5 != nullptr) {
-        $$->selection.relations.swap(*$5);
+        $$->selection.joinctions.swap(*$5);
         delete $5;
       }
       if ($6 != nullptr) {
-        $$->selection.joinctions.swap(*$6);
+        $$->selection.conditions.swap(*$6);
         delete $6;
       }
       if ($7 != nullptr) {
-        $$->selection.conditions.swap(*$7);
+        $$->selection.orders.swap(*$7);
         delete $7;
       }
-      if ($8 != nullptr) {
-        $$->selection.orders.swap(*$8);
-        delete $8;
+      if ($8 != nullptr) { // GROUPBY
+        $$->selection.groupbys.swap((*$8).rel_attrs);
+        if ((*$8).havings.size()) {
+          $$->selection.havings.swap((*$8).havings);
+        }
+        delete $8; 
       }
     }
     ;
 
-
-aggre_node_list_opt:
-      aggre_node_list
-    {
-      $$ = $1;
-    }
-    | /* empty */
-    {
-      $$ = nullptr;
-    }
-    ;
-
-aggre_node_list:
-      aggre_node
-    {
-      $$ = new std::vector<AggreSqlNode>{*$1}; 
-      delete $1; 
-    }
-    | aggre_node_list COMMA aggre_node
-    {
-      $$->emplace_back(*$3); 
-      delete $3; 
-    }
-    ;
-
-aggre_node:
-      aggre_type LBRACE rel_attr RBRACE
-    {
-      $$ = new AggreSqlNode;
-      $$->aggre_type = $1;
-      if ($3 != nullptr) {
-        $$->attribute_name = *$3; 
-        delete $3; 
-      }
-    }
-    | aggre_type LBRACE rel_attr RBRACE AS rel_name
-    {
-      $$ = new AggreSqlNode;
-      $$->aggre_type = $1;
-      if ($3 != nullptr) {
-        $$->attribute_name = *$3; 
-        delete $3; 
-      }
-      if($6 != nullptr){
-        $$->alias = $6;
-        free($6);
-      }
-    }
-    | aggre_type LBRACE rel_attr RBRACE rel_name
-    {
-      $$ = new AggreSqlNode;
-      $$->aggre_type = $1;
-      if ($3 != nullptr) {
-        $$->attribute_name = *$3; 
-        delete $3; 
-      }
-      if($5 != nullptr){
-        $$->alias = $5;
-        free($5);
-      }
-    }
-    ;
-
-rel_attr_list_opt:
-      rel_attr_list
+groupby_having_node_opt:
+      groupby_having_node
     {
       $$ = $1; 
     }
@@ -661,6 +606,74 @@ rel_attr_list_opt:
       $$ = nullptr; 
     }
     ;
+
+groupby_having_node:
+     GROUP BY rel_attr_list
+    {
+      $$ = new GroupByHavingSqlNode{*$3}; 
+      delete $3; 
+    }
+    | GROUP BY rel_attr_list HAVING condition_list
+    {
+      $$ = new GroupByHavingSqlNode{*$3, *$5}; 
+      delete $3; 
+      delete $5; 
+    }
+    ;
+
+rel_attr_aggre_list:
+      rel_attr_aggre_node
+    {
+      $$ = new std::vector<RelAttrSqlNode>{*$1}; 
+      delete $1; 
+    }
+    | rel_attr_aggre_list COMMA rel_attr_aggre_node
+    {
+      $$->emplace_back(*$3); 
+      delete $3; 
+    }
+    ;
+
+rel_attr_aggre_node:
+      aggre_node
+    {
+      $$ = new RelAttrSqlNode(*$1);
+      delete $1; 
+    }
+    | rel_attr
+    {
+      $$ = new RelAttrSqlNode(*$1); 
+      delete $1; 
+    }
+    ;
+
+
+aggre_node:
+      aggre_type LBRACE rel_attr RBRACE
+    {
+      $$ = $3;
+      $$->aggre_type = $1;
+    }
+    | aggre_type LBRACE rel_attr RBRACE AS rel_name
+    {
+      $$ = $3;
+      $$->aggre_type = $1;
+      if($6 != nullptr){
+        $$->field_alias = $6;
+        free($6);
+      }
+    }
+    | aggre_type LBRACE rel_attr RBRACE rel_name
+    {
+      $$ = $3;
+      $$->aggre_type = $1;
+      if($5 != nullptr){
+        $$->field_alias = $5;
+        free($5);
+      }
+    }
+    ;
+
 
 rel_attr_list:
       rel_attr
@@ -865,6 +878,14 @@ parse_expr:
       $$ = new ParseValueListExpr(*$2);
       delete $2;
     }
+    | aggre_type LBRACE rel_attr RBRACE
+    {
+      std::string &table_name = $3->relation_name;
+      std::string &field_name = $3->attribute_name;
+      $$ = new ParseAggreExpr(table_name, field_name, $1); 
+      delete $3;
+    }
+    ;
 
 where:
     /* empty */

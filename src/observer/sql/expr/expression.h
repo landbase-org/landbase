@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <string.h>
@@ -26,6 +27,7 @@ See the Mulan PSL v2 for more details. */
 #include "event/sql_debug.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
+#include "sql/stmt/groupby_stml.h"
 #include "storage/db/db.h"
 #include "storage/field/field.h"
 #include "storage/field/field_meta.h"
@@ -101,7 +103,8 @@ public:
   /**
    * @brief 表达式的名字，比如是字段名称，或者用户在执行SQL语句时输入的内容
    */
-  virtual std::string name() const { return name_; }  // 这里是输出结果显示的table_name
+  virtual std::string name() const { return name_; }
+  virtual std::string name(bool with_table_name) const { return name_; }
   virtual void        set_name(std::string name) { name_ = name; }
 
 private:
@@ -138,9 +141,19 @@ public:
 
   const AggreType aggre_type() const { return field_.aggre_type(); }
 
-  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC          get_value(const Tuple &tuple, Value &value) const override;
+  std::string name(bool with_table_name) const override
+  {
+    if (with_table_name) {
+      return std::string(table_name()) + '.' + std::string(field_name());
+    }
+    return field_name();
+  }
 
   bool is_null(char *data) const;
+
+  static RC get_field_express(Expression *expr, std::vector<std::unique_ptr<FieldExpr>> &field_exprs);
+  bool      in_group_by(const std::vector<std::unique_ptr<GroupByUnit>> *field_exprs);
 
   /**
    * 用于初始化field_meta的时候， 例如rel.attr, rel.*, *, attr的情况
@@ -453,12 +466,12 @@ class AggreExpression : public Expression
 public:
   AggreExpression() = default;
   AggreExpression(AggreExpression &expr);
-  AggreExpression(const std::string &alias, AggreType type, const FieldExpr *field, bool full_table_name = false)
+  AggreExpression(const std::string &alias, AggreType type, const FieldExpr *field)
       : alias_(alias),
         type_(type),
-        full_table_name_(full_table_name),
         field_(field)
   {}
+  AggreExpression(AggreType type, const FieldExpr *field) : type_(type), field_(field) {}
   virtual ~AggreExpression();
 
 public:
@@ -476,32 +489,16 @@ public:
   const auto &field_alias() const { return field_->field_alias(); }
   AggreType   get_aggre_type() const { return type_; }
   std::string get_aggre_type_str() const { return aggreType2str(type_); };
-  void        set_full_table_name(bool flag) { full_table_name_ = flag; }
-  bool        is_full_table_name() { return full_table_name_; }
 
 public:
-  AttrType value_type() const override
-  {
-    switch (type_) {
-      case AGGRE_MAX: return field_->value_type();
-      case AGGRE_MIN: return field_->value_type();
-      case AGGRE_SUM: return field_->value_type();
-      case AGGRE_AVG: return FLOATS;
-      case AGGRE_COUNT: return INTS;
-      case AGGRE_COUNT_ALL: return INTS;
-      default: {
-        sql_debug("invalid aggre type. aggre_type=%d", type_);
-      } break;
-    }
-    return UNDEFINED;
-  };
+  AttrType value_type() const override;
   ExprType type() const override { return ExprType::AGGREGATION; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
   /**
    * @brief 返回列表的名字
    * @example MAX(id), COUNT(*) 等字段
    */
-  std::string name() const override;
+  std::string name(bool with_table_name) const override;
   const auto &alias() const { return alias_; }
 
 public:
@@ -513,7 +510,6 @@ public:
 
 private:
   AggreType        type_{AggreType::AGGRE_NONE};
-  bool             full_table_name_{false};  // 是否需要显示完整的表名， 用于子查询
   const FieldExpr *field_ = nullptr;
   const ValueExpr *value_ = nullptr;  // 用来存储COUNT（attr）的值
   std::string      alias_;

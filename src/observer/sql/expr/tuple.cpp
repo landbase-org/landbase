@@ -24,7 +24,7 @@ RC AggregationTuple::find_cell(const TupleCellSpec &spec, Value &cell) const
     // return RC::TUPLE_NOT_EXIST;
   }
 
-  // 当前只可能在aggre中找到
+  // 返回聚合之后的结果
   if (AggreType::AGGRE_NONE != spec.aggre_type()) {
     for (size_t i = 0; i < aggre_exprs_.size(); i++) {
       const auto &expr = aggre_exprs_[i];
@@ -35,11 +35,11 @@ RC AggregationTuple::find_cell(const TupleCellSpec &spec, Value &cell) const
       }
     }
   }
-  return RC::NOTFOUND;
 
+  // 返回GROUP BY的字段
   for (size_t i = 0; i < field_exprs_.size(); i++) {
     auto &expr = field_exprs_[i];
-    if (spec == expr.field()) {
+    if (spec == expr->field()) {
       cell = field_results_[i];
       LOG_INFO("Field is found from field_exprs");
       return RC::SUCCESS;
@@ -49,43 +49,44 @@ RC AggregationTuple::find_cell(const TupleCellSpec &spec, Value &cell) const
   return RC::NOTFOUND;
 }
 
-void AggregationTuple::init(std::vector<std::unique_ptr<AggreExpression>> aggre_exprs)
+void AggregationTuple::reinit()
 {
   count_ = 0;
-  size_  = aggre_exprs.size();
-  counts_.resize(size_);
-  all_null_.resize(size_);
-  aggre_results_.resize(size_);
-  field_results_.resize(size_);
-  field_exprs_.resize(size_);
-  aggre_exprs_ = std::move(aggre_exprs);
+  counts_.clear();
+  counts_.resize(aggre_size_);
+
+  all_null_.clear();
+  all_null_.resize(aggre_size_);
+
+  aggre_results_.clear();
+  aggre_results_.resize(aggre_size_);
+
+  field_results_.clear();
+  field_results_.resize(field_size_);
+
+  field_exprs_.clear();
+  field_exprs_.resize(field_size_);
   // 设置result的默认值
-  for (size_t i = 0; i < size_; ++i) {
+  for (size_t i = 0; i < aggre_size_; ++i) {
     if (aggre_exprs_[i]->get_aggre_type() == AGGRE_COUNT_ALL || aggre_exprs_[i]->get_aggre_type() == AGGRE_COUNT) {
       aggre_results_[i].set_int(0);
     }
   }
 }
 
-void AggregationTuple::reinit()
+void AggregationTuple::init(
+    std::vector<std::unique_ptr<AggreExpression>> &&aggre_exprs, std::vector<std::unique_ptr<FieldExpr>> &&field_exprs
+)
 {
   count_ = 0;
-  counts_.clear();
-  counts_.resize(size_);
-
-  all_null_.clear();
-  all_null_.resize(size_);
-
-  aggre_results_.clear();
-  aggre_results_.resize(size_);
-
-  field_results_.clear();
-  field_results_.resize(size_);
-
-  field_exprs_.clear();
-  field_exprs_.resize(size_);
+  counts_.resize(aggre_exprs.size());
+  all_null_.resize(aggre_exprs.size());
+  aggre_results_.resize(aggre_exprs.size());
+  field_results_.resize(field_exprs.size());
+  aggre_exprs_ = std::move(aggre_exprs);
+  field_exprs_ = std::move(field_exprs);
   // 设置result的默认值
-  for (size_t i = 0; i < size_; ++i) {
+  for (size_t i = 0; i < aggre_exprs.size(); ++i) {
     if (aggre_exprs_[i]->get_aggre_type() == AGGRE_COUNT_ALL || aggre_exprs_[i]->get_aggre_type() == AGGRE_COUNT) {
       aggre_results_[i].set_int(0);
     }
@@ -95,11 +96,23 @@ void AggregationTuple::reinit()
 void AggregationTuple::do_aggregation_begin()
 {
   // 初始化count_和all_null_
-  count_ = 0;
-  for (size_t i = 0; i < size_; i++) {
+  count_      = 0;
+  aggre_size_ = aggre_exprs_.size();
+  field_size_ = field_exprs_.size();
+  for (size_t i = 0; i < all_null_.size(); i++) {
     all_null_[i] = true;
     counts_[i]   = 0;
   }
+  // 设置result的默认值
+  for (size_t i = 0; i < aggre_exprs_.size(); ++i) {
+    if (aggre_exprs_[i]->get_aggre_type() == AGGRE_COUNT_ALL || aggre_exprs_[i]->get_aggre_type() == AGGRE_COUNT) {
+      aggre_results_[i].set_int(0);
+    } else {
+      aggre_results_[i].set_null();
+    }
+  }
+
+  update_field_values();
 }
 
 void AggregationTuple::do_aggregation()
@@ -107,7 +120,7 @@ void AggregationTuple::do_aggregation()
   count_++;
 
   Value cur_value;
-  for (size_t i = 0; i < size_; i++) {
+  for (size_t i = 0; i < aggre_exprs_.size(); i++) {
     const auto &expr = aggre_exprs_[i];
     expr->get_value(*tuple_, cur_value);
     AggreType aggre_type = expr->get_aggre_type();
@@ -152,7 +165,7 @@ void AggregationTuple::do_aggregation()
 }
 void AggregationTuple::do_aggregation_end()
 {
-  for (size_t i = 0; i < size_; i++) {
+  for (size_t i = 0; i < aggre_results_.size(); i++) {
     const auto &expr       = aggre_exprs_[i];
     Value      &res        = aggre_results_[i];  // 最后处理结果
     AggreType   aggre_type = expr->get_aggre_type();
@@ -181,5 +194,17 @@ void AggregationTuple::do_aggregation_end()
       } break;
       default: break;  // 其他类型不需要做处理
     }
+  }
+}
+
+void AggregationTuple::update_field_values()
+{
+  if (tuple_ == nullptr) {
+    return;
+  }
+  for (size_t i = 0; i < field_exprs_.size(); ++i) {
+    Value value;
+    field_exprs_[i]->get_value(*tuple_, value);
+    field_results_[i] = value;
   }
 }

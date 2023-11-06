@@ -314,24 +314,28 @@ public:
   const auto &get_field_exprs() const { return field_exprs_; }
 
 public:
-  void init(std::vector<std::unique_ptr<AggreExpression>> aggre_exprs);  // 默认构造的必须调用这个init
+  void init(
+      std::vector<std::unique_ptr<AggreExpression>> &&aggre_exprs, std::vector<std::unique_ptr<FieldExpr>> &&field_exprs
+  );  // 默认构造的必须调用这个init
   void reinit();
   void do_aggregation_begin();
   void do_aggregation();
   void do_aggregation_end();
+  void update_field_values();
 
 private:
   int                 count_{0};  // COUNT(*)的时候使用， 返回所有的数据，包括NULL
-  int                 size_{0};   // aggre_exprs的长度
+  int                 aggre_size_{0};
+  int                 field_size_{0};
   std::vector<bool>   all_null_;  // true表示当前列中所有数据都是null
   std::vector<size_t> counts_;    // 不为null的个数
   std::vector<Value>  aggre_results_;
   std::vector<Value>  field_results_;
 
 private:
-  std::vector<FieldExpr>                        field_exprs_;
   Tuple                                        *tuple_ = nullptr;  // 从子算子中获取的tuple
   std::vector<std::unique_ptr<AggreExpression>> aggre_exprs_;      // 查询的所有tuple
+  std::vector<std::unique_ptr<FieldExpr>>       field_exprs_;
 };
 
 /**

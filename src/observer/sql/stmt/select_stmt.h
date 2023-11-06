@@ -20,6 +20,8 @@ See the Mulan PSL v2 for more details. */
 #include "common/rc.h"
 #include "order_by_stmt.h"
 #include "sql/parser/parse_defs.h"
+#include "sql/stmt/filter_stmt.h"
+#include "sql/stmt/groupby_stml.h"
 #include "sql/stmt/stmt.h"
 
 class FieldMeta;
@@ -48,10 +50,16 @@ public:
   const std::vector<Expression *> &expressions() const { return expressions_; }
   FilterStmt                      *filter_stmt() const { return filter_stmt_; }
   OrderByStmt                     *order_by_stmt() const { return order_stmt_; }
+  OrderByStmt                     *order_by_stmt_before_group() const { return orderby_stmt_before_group_; }
+  GroupByStmt                     *groupby_stmt() const { return groupby_stmt_; }
+  HavingStmt                      *having_stmt() const { return having_stmt_; }
 
 private:
   std::vector<Expression *> expressions_;
   std::vector<Table *>      tables_;
-  FilterStmt               *filter_stmt_ = nullptr;
-  OrderByStmt              *order_stmt_  = nullptr;
+  FilterStmt               *filter_stmt_               = nullptr;
+  OrderByStmt              *order_stmt_                = nullptr;
+  OrderByStmt              *orderby_stmt_before_group_ = nullptr;
+  GroupByStmt              *groupby_stmt_              = nullptr;
+  HavingStmt               *having_stmt_               = nullptr;
 };

@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/expr/sub_query_expr.h"
 #include "sql/parser/parse_defs.h"
+#include "sql/parser/parse_expr_defs.h"
 #include "sql/parser/value.h"
 #include "sql/stmt/select_stmt.h"
 #include "storage/db/db.h"
@@ -90,6 +91,36 @@ RC get_table_and_field(
   return RC::SUCCESS;
 }
 
+RC get_table_and_field(
+    Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables, const ParseAggreExpr *field_expr,
+    Table *&table, const FieldMeta *&field
+)
+{
+  if (common::is_blank(field_expr->table_name().c_str())) {
+    table = default_table;
+  } else if (nullptr != tables) {
+    auto iter = tables->find(field_expr->table_name().c_str());
+    if (iter != tables->end()) {
+      table = iter->second;
+    }
+  } else {
+    table = db->find_table(field_expr->table_name().c_str());
+  }
+  if (nullptr == table) {
+    sql_debug("No such table: attr.relation_name: %s", field_expr->table_name().c_str());
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  field = table->table_meta().field(field_expr->field_name().c_str());
+  if (nullptr == field) {
+    sql_debug("no such field in table: table %s, field %s", table->name(), field_expr->field_name().c_str());
+    table = nullptr;
+    return RC::SCHEMA_FIELD_NOT_EXIST;
+  }
+
+  return RC::SUCCESS;
+}
+
 RC FilterStmt::create_filter_unit(
     Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables, const ConditionSqlNode &condition,
     FilterUnit *&filter_unit
@@ -118,6 +149,21 @@ RC FilterStmt::create_filter_unit(
         return rc;
       }
       left_expr = new FieldExpr(Field(table, field));
+    } break;
+    case ParseExprType::AGGREGATION: {
+      std::vector<Table *> table;
+      for (auto &[s, t] : *tables) {
+        table.push_back(t);
+      }
+      const FieldMeta *field      = nullptr;
+      auto             aggre_expr = static_cast<const ParseAggreExpr *>(condition.left);
+      auto             aggre_node = AggreSqlNode{
+          RelAttrSqlNode{aggre_expr->table_name(), "", aggre_expr->field_name(), ""}, aggre_expr->aggre_type()};
+      rc = AggreExpression::create(aggre_node, *tables, {table}, left_expr);
+      if (rc != RC::SUCCESS) {
+        sql_debug("cannot find attr");
+        return rc;
+      }
     } break;
     case ParseExprType::VALUE: {
       auto value_expr = static_cast<const ParseValueExpr *>(condition.left);

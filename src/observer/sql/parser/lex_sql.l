@@ -136,6 +136,9 @@ IS                                      RETURN_TOKEN(IS_);
 NOT                                     RETURN_TOKEN(NOT);
 LIKE                                    RETURN_TOKEN(LK);
 
+GROUP                                   RETURN_TOKEN(GROUP);
+HAVING                                  RETURN_TOKEN(HAVING);
+
 NULL                                    RETURN_TOKEN(NULL_T);
 NULLABLE                                RETURN_TOKEN(NULL_T);
 IN                                      RETURN_TOKEN(IN_OP);

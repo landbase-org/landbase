@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/stmt/filter_stmt.h"
+#include "sql/stmt/groupby_stml.h"
 #include "sql/stmt/order_by_stmt.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
@@ -31,7 +32,7 @@ RC handle_sub_query_alias(ParseSubQueryExpr *expr, std::vector<AttrSqlNode> &par
   auto &sub_query   = expr->sub_query();
   auto  table_names = sub_query->relations;
   auto &fields      = sub_query->attributes;
-  auto &aggres      = sub_query->aggregations;
+  // auto &aggres      = sub_query->aggregations;
 
   // select * from csq_1 t, csq_2 t;
   auto iter = std::unique(table_names.begin(), table_names.end(), [](const AttrSqlNode &a, const AttrSqlNode &b) {
@@ -61,12 +62,6 @@ RC handle_sub_query_alias(ParseSubQueryExpr *expr, std::vector<AttrSqlNode> &par
         if (field.relation_name == node.table_alias) {
           field.relation_name = node.relation_name;
           field.table_alias   = node.table_alias;
-        }
-      }
-      for (auto &aggre : aggres) {
-        if (aggre.attribute_name.table_alias == node.table_alias) {
-          aggre.attribute_name.relation_name = node.relation_name;
-          aggre.attribute_name.table_alias   = node.table_alias;
         }
       }
     }
@@ -104,6 +99,9 @@ RC handle_where_alias(std::vector<ConditionSqlNode> &conditions, std::vector<Att
           return rc;
         }
       } break;
+      case ParseExprType::VALUE:
+      case ParseExprType::VALUE_LIST:
+      case ParseExprType::AGGREGATION: break;
     }
     switch (cond.right->expr_type()) {
       case ParseExprType::FIELD: {
@@ -128,6 +126,9 @@ RC handle_where_alias(std::vector<ConditionSqlNode> &conditions, std::vector<Att
           return rc;
         }
       } break;
+      case ParseExprType::VALUE:
+      case ParseExprType::VALUE_LIST:
+      case ParseExprType::AGGREGATION: break;
     }
   }
   return rc;
@@ -137,7 +138,6 @@ RC handle_alias(SelectSqlNode &select_sql)
 {
   auto  table_names = select_sql.relations;
   auto &fields      = select_sql.attributes;
-  auto &aggres      = select_sql.aggregations;
 
   // select * from csq_1 t, csq_2 t;
   auto iter = std::unique(table_names.begin(), table_names.end(), [](const AttrSqlNode &a, const AttrSqlNode &b) {
@@ -169,12 +169,6 @@ RC handle_alias(SelectSqlNode &select_sql)
           field.table_alias   = node.table_alias;
         }
       }
-      for (auto &aggre : aggres) {
-        if (aggre.attribute_name.table_alias == node.table_alias) {
-          aggre.attribute_name.relation_name = node.relation_name;
-          aggre.attribute_name.table_alias   = node.table_alias;
-        }
-      }
     }
   }
   // 只处理where中的子查询
@@ -194,7 +188,9 @@ SelectStmt::~SelectStmt()
 }
 
 /**
- * @description: 解析要查询到字段, 转换到Field中去
+ * @description: 解析要查询到字段, 如果Express中全是FieldExpr那么就是普通的查询
+ * @description:                如果Express中全是AggreExpr那么就是普通的聚合查询
+ * @description:                否则就是聚合查询
  * @return {RC} 查询的状况
  */
 static RC get_expressions(
@@ -202,19 +198,37 @@ static RC get_expressions(
     const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables, Db *db
 )
 {
-  // 如果只是普通的查询列表数据
   RC rc = RC::SUCCESS;
-  if (!sql_node.attributes.empty()) {
+  // 没有聚合函数， 直接返回普通的类型
+  int aggre_size = 0;
+  for (auto node : sql_node.attributes) {
+    if (node.is_aggre()) {
+      aggre_size++;
+    }
+  }
+  // 为group但是却没有group by attr
+  if (aggre_size != 0 && aggre_size != sql_node.attributes.size() && sql_node.groupbys.size() == 0) {
+    return RC::FAILURE;
+  }
+  if (aggre_size == 0) {
     return FieldExpr::create(sql_node, table_map, tables, res_expressions, db);
   }
 
-  // aggregation的情况
-
-  for (auto &expr_node : sql_node.aggregations) {
+  /**************************
+   *    聚合函数， GROUP BY   *
+   **************************/
+  // 解析聚合函数
+  for (const auto &expr_node : sql_node.attributes) {
     Expression *tmp_expression;
-    rc = AggreExpression::create(expr_node, table_map, tables, tmp_expression, db);
+    if (expr_node.is_aggre()) {
+      rc =
+          AggreExpression::create(AggreSqlNode{expr_node, expr_node.aggre_type}, table_map, tables, tmp_expression, db);
+    } else {
+      rc = FieldExpr::create(expr_node, table_map, tables, tmp_expression);
+    }
+
     if (rc != RC::SUCCESS) {
-      sql_debug("create expression err");
+      sql_debug("create aggregation expression err");
       return rc;
     }
     res_expressions.push_back(tmp_expression);
@@ -233,7 +247,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   // parse the tables;
   std::vector<Table *>                     tables;
   std::unordered_map<std::string, Table *> table_map;
-  std::vector<OrderSqlNode>                orderbys = select_sql.orders;
+  const std::vector<OrderSqlNode>         &orderbys = select_sql.orders;
+  const std::vector<GroupBySqlNode>       &groupbys = select_sql.groupbys;
+  std::vector<OrderSqlNode>                groupbys_order;  // 转化为OrderSqlNode节点的
+  std::for_each(groupbys.begin(), groupbys.end(), [&groupbys_order](const GroupBySqlNode &node) {
+    groupbys_order.push_back({static_cast<RelAttrSqlNode>(node)});
+  });
+
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const char *table_name = select_sql.relations[i].relation_name.c_str();
     if (nullptr == table_name) {
@@ -346,13 +366,44 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     return rc;
   }
 
+  // 创建GROUP BY, 因为需要分组， 所以在他之前加一个order算子， 这样获取结果的时候就是连续的
+  OrderByStmt *orderby_stmt_before_group = nullptr;
+  GroupByStmt *groupby_stmt              = nullptr;
+  if (!groupbys.empty()) {
+    rc = OrderByStmt::create(
+        db,
+        default_table,
+        &table_map,
+        groupbys_order.data(),
+        static_cast<int>(groupbys_order.size()),
+        orderby_stmt_before_group
+    );
+    rc = GroupByStmt::create(db, table_map, tables, groupbys, groupby_stmt);
+    if (RC::SUCCESS == rc) {
+      LOG_INFO("create group by success");
+      LOG_INFO("create group by success");
+    }
+  }
+
+  // 创建Having
+  HavingStmt *having_stmt = nullptr;
+  if (!select_sql.havings.empty()) {
+    rc = HavingStmt::create(
+        db, default_table, &table_map, select_sql.havings.data(), select_sql.havings.size(), having_stmt
+    );
+    LOG_INFO("create having success");
+  }
+
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
   // TODO add expression copy
   select_stmt->tables_.swap(tables);
   select_stmt->expressions_.swap(expressions);
-  select_stmt->filter_stmt_ = filter_stmt;
-  select_stmt->order_stmt_  = orderby_stmt;
-  stmt                      = select_stmt;
+  select_stmt->filter_stmt_               = filter_stmt;
+  select_stmt->order_stmt_                = orderby_stmt;
+  select_stmt->orderby_stmt_before_group_ = orderby_stmt_before_group;
+  select_stmt->groupby_stmt_              = groupby_stmt;
+  select_stmt->having_stmt_               = having_stmt;
+  stmt                                    = select_stmt;
   return RC::SUCCESS;
 }

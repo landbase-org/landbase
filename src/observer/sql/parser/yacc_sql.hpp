@@ -118,11 +118,13 @@ extern int yydebug;
     LK = 319,                      /* LK  */
     IN_OP = 320,                   /* IN_OP  */
     EXISTS_OP = 321,               /* EXISTS_OP  */
-    NUMBER = 322,                  /* NUMBER  */
-    FLOAT = 323,                   /* FLOAT  */
-    ID = 324,                      /* ID  */
-    SSS = 325,                     /* SSS  */
-    UMINUS = 326                   /* UMINUS  */
+    GROUP = 322,                   /* GROUP  */
+    HAVING = 323,                  /* HAVING  */
+    NUMBER = 324,                  /* NUMBER  */
+    FLOAT = 325,                   /* FLOAT  */
+    ID = 326,                      /* ID  */
+    SSS = 327,                     /* SSS  */
+    UMINUS = 328                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -131,7 +133,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 125 "yacc_sql.y"
+#line 127 "yacc_sql.y"
 
   ParsedSqlNode *                   sql_node;
   ConditionSqlNode *                condition;
@@ -139,10 +141,9 @@ union YYSTYPE
   enum CompOp                       comp;
   enum AggreType                    aggre_type;
   enum OrderType                    order_type;
-  AggreSqlNode *                    aggre_node;
-  std::vector<AggreSqlNode> *       aggre_node_list;
-  std::vector<AggreSqlNode> *       aggre_node_list_opt;  // opt表示可以选择，可以有也可以没有
   RelAttrSqlNode *                  rel_attr;
+  RelAttrSqlNode *                  rel_attr_aggre_node;
+  std::vector<RelAttrSqlNode> *    rel_attr_aggre_list;
   std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
@@ -150,6 +151,7 @@ union YYSTYPE
   ParseExpr *                       parse_expr;
   JoinSqlNode *                     join_node;
   OrderSqlNode *                    order_node;
+  GroupByHavingSqlNode *            groupby_having_node;
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
@@ -166,7 +168,7 @@ union YYSTYPE
   float                             floats;
   bool                              nullable;
 
-#line 170 "yacc_sql.hpp"
+#line 172 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

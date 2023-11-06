@@ -23,12 +23,19 @@ See the Mulan PSL v2 for more details. */
 #include <vector>
 
 #include "common/log/log.h"
+#include "sql/parser/aggregation.h"
 #include "sql/parser/comp_op.h"
 #include "sql/parser/parse_expr_defs.h"
 #include "sql/parser/value.h"
 
 class Expression;
-
+class RelAttrSqlNode;
+class ConditionSqlNode;
+struct AggreSqlNode;
+struct RelAttrAggreSqlNode;
+struct SelectSqlNode;
+using GroupBySqlNode = RelAttrSqlNode;
+using HavingSqlNode  = ConditionSqlNode;
 /**
  * @defgroup SQLParser SQL Parser
  */
@@ -44,33 +51,6 @@ enum OrderType
 };
 
 /**
- * @description: 聚合类型
- */
-enum AggreType
-{
-  AGGRE_NONE,
-  AGGRE_MAX,
-  AGGRE_MIN,
-  AGGRE_COUNT,
-  AGGRE_COUNT_ALL,
-  AGGRE_AVG,
-  AGGRE_SUM
-};
-static std::string aggreType2str(AggreType aggre)
-{
-  static std::unordered_map<AggreType, std::string> m{
-      {AGGRE_NONE, "NONE"},
-      {AGGRE_MAX, "MAX"},
-      {AGGRE_MIN, "MIN"},
-      {AGGRE_COUNT, "COUNT"},
-      {AGGRE_COUNT_ALL, "COUNT"},
-      {AGGRE_AVG, "AVG"},
-      {AGGRE_SUM, "SUM"},
-  };
-  return m.at(aggre);
-}
-
-/**
  * @brief 描述一个属性
  * @ingroup SQLParser
  * @details 属性，或者说字段(column, field)
@@ -79,10 +59,13 @@ static std::string aggreType2str(AggreType aggre)
  */
 struct RelAttrSqlNode
 {
-  std::string relation_name;   ///< relation name (may be NULL) 表名
-  std::string table_alias;     ///< table alias (may be NULL)  表别名
-  std::string attribute_name;  ///< attribute name              属性名
-  std::string field_alias;     ///< field alias (may be NULL)   属性别名
+  const bool is_aggre() const { return aggre_type != AGGRE_NONE; }
+
+  std::string relation_name;           ///< relation name (may be NULL) 表名
+  std::string table_alias;             ///< table alias (may be NULL)   表别名
+  std::string attribute_name;          ///< attribute name              属性名
+  std::string field_alias;             ///< field alias (may be NULL)   属性别名
+  AggreType   aggre_type{AGGRE_NONE};  ///< aggre_type                  聚合类型
 };
 
 struct AttrSqlNode
@@ -99,6 +82,38 @@ struct AggreSqlNode
   RelAttrSqlNode attribute_name;          ///< 查询的字段
   AggreType      aggre_type{AGGRE_NONE};  ///< 聚合类型
   std::string    alias;                   ///< 别名
+};
+
+/**
+ * @brief 描述一个属性
+ * @ingroup SQLParser
+ * @details 属性，或者说字段(column, field, aggre_type)
+ * 因为在group查询中的可能有 id, AVG(num), ... 等， 需要特判
+ * Rel -> Relation
+ * Attr -> Attribute
+ * Aggre_type -> Aggregation type
+ */
+struct RelAttrAggreSqlNode
+{
+public:
+  RelAttrAggreSqlNode(RelAttrSqlNode rel_attr)
+      : relation_name(rel_attr.relation_name),
+        attribute_name(rel_attr.attribute_name)
+  {}
+  RelAttrAggreSqlNode(AggreSqlNode aggre)
+      : relation_name(aggre.attribute_name.relation_name),
+        attribute_name(aggre.attribute_name.attribute_name),
+        aggre_type(aggre.aggre_type)
+  {}
+
+  operator RelAttrSqlNode() const { return RelAttrSqlNode{relation_name, attribute_name}; }
+  operator AggreSqlNode() const { return AggreSqlNode{RelAttrSqlNode(*this), aggre_type}; }
+
+public:
+  const bool  is_aggre() const { return aggre_type != AGGRE_NONE; }
+  std::string relation_name;           ///< relation name (may be NULL) 表名
+  std::string attribute_name;          ///< attribute name              属性名
+  AggreType   aggre_type{AGGRE_NONE};  ///< aggregation type, 为AGGRE_NOEN 表示不为聚合
 };
 
 // TODO: 内存泄漏
@@ -135,6 +150,15 @@ struct OrderSqlNode
 };
 
 /**
+ * 因为当前groupby和having是一起出现的， 所以写在一个结构体中
+ */
+struct GroupByHavingSqlNode
+{
+  std::vector<GroupBySqlNode> rel_attrs;  ///> goupby的field
+  std::vector<HavingSqlNode>  havings;    ///> 过滤的条件
+};
+
+/**
  * @brief 描述一个select语句
  * @ingroup SQLParser
  * @details 一个正常的select语句描述起来比这个要复杂很多，这里做了简化。
@@ -146,12 +170,13 @@ struct OrderSqlNode
  */
 struct SelectSqlNode
 {
-  std::vector<RelAttrSqlNode>   attributes;    ///< 字段
-  std::vector<AggreSqlNode>     aggregations;  ///< aggregations
-  std::vector<AttrSqlNode>      relations;     ///< 查询的表
-  std::vector<ConditionSqlNode> conditions;    ///< 查询条件，使用AND串联起来多个条件
-  std::vector<JoinSqlNode>      joinctions;    ///< Join-list
-  std::vector<OrderSqlNode>     orders;        ///< Order-requirements
+  std::vector<RelAttrSqlNode>   attributes;
+  std::vector<AttrSqlNode>      relations;   ///< 查询的表
+  std::vector<ConditionSqlNode> conditions;  ///< 查询条件，使用AND串联起来多个条件
+  std::vector<JoinSqlNode>      joinctions;  ///< Join-list
+  std::vector<OrderSqlNode>     orders;      ///< Order-requirements
+  std::vector<GroupBySqlNode>   groupbys;    ///< goupby的元素
+  std::vector<HavingSqlNode>    havings;     ///< having过滤的条件
 };
 
 class ParseSubQueryExpr : public ParseExpr
