@@ -9,6 +9,13 @@ enum class ParseExprType
   VALUE,
   VALUE_LIST,
   SUBQUERY,
+  FUNCTION,
+};
+enum FuncType
+{
+  LENGTH_,
+  ROUND_,
+  DATE_FORMAT_
 };
 
 class ParseExpr
@@ -82,4 +89,22 @@ private:
   std::string table_alias_;
   std::string field_name_;
   std::string field_alias_;
+};
+
+class ParseFunctionExpr : public ParseExpr
+{
+public:
+  ParseFunctionExpr(FuncType tp, ParseExpr *left = nullptr, ParseExpr *right = nullptr)
+      : f_type(tp),
+        left_(left),
+        right_(right)
+  {}
+  ParseExprType expr_type() override { return ParseExprType::FUNCTION; }
+  void          set_res_name(std::string name) { res_name_ = name; }
+
+private:
+  FuncType    f_type;
+  std::string res_name_;
+  ParseExpr  *left_  = nullptr;
+  ParseExpr  *right_ = nullptr;
 };

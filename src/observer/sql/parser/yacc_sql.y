@@ -120,7 +120,9 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         LK
         IN_OP
         EXISTS_OP
-
+        LENGTH
+        ROUND
+        DATE_FORMAT
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
   ParsedSqlNode *                   sql_node;
@@ -129,6 +131,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   enum CompOp                       comp;
   enum AggreType                    aggre_type;
   enum OrderType                    order_type;
+  enum FuncType                     func_type;
   AggreSqlNode *                    aggre_node;
   std::vector<AggreSqlNode> *       aggre_node_list;
   std::vector<AggreSqlNode> *       aggre_node_list_opt;  // opt表示可以选择，可以有也可以没有
@@ -138,8 +141,10 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
   ParseExpr *                       parse_expr;
+  std::vector<ParseExpr*> *         parse_expr_list;
   JoinSqlNode *                     join_node;
   OrderSqlNode *                    order_node;
+  ParseFunctionExpr *               func_expr;
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * value_list_list; 
@@ -174,6 +179,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <comp>                exists_op
 %type <aggre_type>          aggre_type
 %type <order_type>          order_type
+%type <func_type>           func_type
 %type <aggre_node>          aggre_node
 %type <aggre_node_list>     aggre_node_list
 %type <aggre_node_list>     aggre_node_list_opt
@@ -193,7 +199,9 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <id_list>             id_list
 %type <expression>          expression
 %type <expression_list>     expression_list
-%type <parse_expr>          parse_expr;
+%type <func_expr>           func_expr
+%type <parse_expr>          parse_expr
+%type <parse_expr_list>     parse_expr_list
 %type <join_node>           join_node
 %type <join_list>           join_list
 %type <order_node>          order_node
@@ -557,6 +565,47 @@ update_list:
     }
     ;
 
+func_expr:
+      func_type LBRACE value RBRACE ID
+    {
+      ParseValueExpr* lf = new ParseValueExpr(*$3);
+      $$ = new ParseFunctionExpr($1,lf);
+      $$->set_res_name($5);
+      delete $3;
+      delete $5;
+    }
+    | func_type LBRACE value COMMA value RBRACE ID
+    {
+      ParseValueExpr* lf = new ParseValueExpr(*$3);
+      ParseValueExpr* rt = new ParseValueExpr(*$5);
+      $$ = new ParseFunctionExpr($1,lf,rt);
+      $$->set_res_name($7);
+      delete $7;
+      delete $5;
+      delete $3;
+    }
+    | func_type LBRACE rel_attr RBRACE
+    {
+      std::string &table_name = $3->relation_name;
+      std::string &field_name = $3->attribute_name;
+      ParseFieldExpr* lf = new ParseFieldExpr(table_name,field_name);
+      $$ = new ParseFunctionExpr($1,lf);
+      $$->set_res_name(token_name(sql_string,&@$));
+      delete $3;
+    }
+    | func_type LBRACE rel_attr COMMA value RBRACE 
+    {
+      std::string &table_name = $3->relation_name;
+      std::string &field_name = $3->attribute_name;
+      ParseFieldExpr* temp = new ParseFieldExpr(table_name,field_name);
+      ParseValueExpr* rt = new ParseValueExpr(*$5);
+      $$ = new ParseFunctionExpr($1,temp,rt);
+      $$->set_res_name(token_name(sql_string,&@$));
+      delete $5;
+      delete $3;
+    }
+    ;
+
 select_stmt:        /*  select 语句的语法解析树*/
     SELECT rel_attr_list_opt aggre_node_list_opt FROM rel_list select_join_list where select_order_list
     {
@@ -584,6 +633,14 @@ select_stmt:        /*  select 语句的语法解析树*/
       if ($8 != nullptr) {
         $$->selection.orders.swap(*$8);
         delete $8;
+      }
+    }
+    | SELECT parse_expr_list
+    {
+      $$ = new ParsedSqlNode(SCF_SELECT);
+      if ($2 != nullptr) {
+        $$->selection.exprs.swap(*$2);
+        delete $2;
       }
     }
     ;
@@ -802,6 +859,11 @@ order_type:
     | DESC { $$ = ORDER_DESC; }
     ;
 
+func_type:
+      LENGTH {$$ = LENGTH_;}
+    | ROUND {$$ = ROUND_;}
+    | DATE_FORMAT {$$ = DATE_FORMAT_;}
+
 rel_node:
     rel_name
     {
@@ -843,6 +905,22 @@ rel_list:
     }
     ;
 
+parse_expr_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | parse_expr
+    {
+      $$ = new std::vector<ParseExpr*>;
+      $$->emplace_back($1);
+    }
+    | COMMA parse_expr
+    {
+      $$->emplace_back($2);
+    }
+    
+
 parse_expr: 
     value
     {
@@ -864,6 +942,10 @@ parse_expr:
     {
       $$ = new ParseValueListExpr(*$2);
       delete $2;
+    }
+    | func_expr
+    {
+      $$ = $1;
     }
 
 where:

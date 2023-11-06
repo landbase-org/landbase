@@ -126,6 +126,10 @@ ORDER                                   RETURN_TOKEN(ORDER);
 BY                                      RETURN_TOKEN(BY);
 ASC                                     RETURN_TOKEN(ASC);
 
+LENGTH                                  RETURN_TOKEN(LENGTH);
+DATE_FORMAT                             RETURN_TOKEN(DATE_FORMAT);
+ROUND                                   RETURN_TOKEN(ROUND);
+
 SUM                                     RETURN_TOKEN(SUM);
 COUNT                                   RETURN_TOKEN(COUNT);
 AVG                                     RETURN_TOKEN(AVG);

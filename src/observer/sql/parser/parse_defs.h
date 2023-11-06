@@ -146,6 +146,7 @@ struct OrderSqlNode
  */
 struct SelectSqlNode
 {
+  std::vector<ParseExpr *>      expressions;         ///< 函数表达式
   std::vector<RelAttrSqlNode>   attributes;    ///< 字段
   std::vector<AggreSqlNode>     aggregations;  ///< aggregations
   std::vector<AttrSqlNode>      relations;     ///< 查询的表
