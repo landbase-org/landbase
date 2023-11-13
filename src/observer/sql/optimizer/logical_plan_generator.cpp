@@ -14,12 +14,14 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/optimizer/logical_plan_generator.h"
 
+#include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/sub_query_expr.h"
 #include "sql/operator/aggre_logical_operator.h"
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
 #include "sql/operator/explain_logical_operator.h"
+#include "sql/operator/expr_logical_operator.h"
 #include "sql/operator/insert_logical_operator.h"
 #include "sql/operator/join_logical_operator.h"
 #include "sql/operator/logical_operator.h"
@@ -28,8 +30,6 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/update_logical_operator.h"
-#include "sql/operator/expr_logical_operator.h"
-#include "event/sql_debug.h"
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/delete_stmt.h"
 #include "sql/stmt/explain_stmt.h"
@@ -196,6 +196,9 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       case ExprType::SUBQUERY: {
         left = std::unique_ptr<Expression>(filter_unit_left);
       } break;
+      case ExprType::FUNCTION: {
+        left = std::unique_ptr<Expression>(filter_unit_left);
+      } break;
       default: {
         sql_debug("unimplement expr: %d", filter_unit_left->type());
       } break;
@@ -218,6 +221,9 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       case ExprType::SUBQUERY: {
         right = unique_ptr<Expression>(filter_unit_right);
       } break;
+      case ExprType::FUNCTION: {
+        left = std::unique_ptr<Expression>(filter_unit_right);
+      } break;
       default: {
         sql_debug("unimplement expr: %d", filter_unit_left->type());
       } break;
@@ -231,6 +237,9 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       case LESS_THAN:
       case GREAT_EQUAL:
       case GREAT_THAN:
+      {
+        expr = new ComparisonExpr(filter_unit->comp(), std::move(left),std::move(right));
+      } break;
       case LIKE:
       case NOT_LIKE:
       case IS:

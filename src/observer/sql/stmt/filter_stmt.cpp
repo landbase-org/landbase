@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/expr/sub_query_expr.h"
 #include "sql/parser/parse_defs.h"
+#include "sql/parser/parse_expr_defs.h"
 #include "sql/parser/value.h"
 #include "sql/stmt/select_stmt.h"
 #include "storage/db/db.h"
@@ -138,6 +139,13 @@ RC FilterStmt::create_filter_unit(
       auto select_stmt = static_cast<SelectStmt *>(stmt);
       left_expr        = new SubQueryExpr(select_stmt);
     } break;
+    case ParseExprType::FUNCTION: {
+      std::vector<Table *> temp{default_table};
+      rc = FuncExpr::create(condition.left, *tables, temp, left_expr, db);
+      if (rc != RC::SUCCESS) {
+        sql_debug("Err at Condition'child expr");
+      }
+    } break;
     default: {
     } break;
   }
@@ -179,6 +187,13 @@ RC FilterStmt::create_filter_unit(
       }
       auto select_stmt = static_cast<SelectStmt *>(stmt);
       right_expr       = new SubQueryExpr(select_stmt);
+    } break;
+    case ParseExprType::FUNCTION: {
+      std::vector<Table *> temp{default_table};
+      rc = FuncExpr::create(condition.left, *tables, temp, right_expr, db);
+      if (rc != RC::SUCCESS) {
+        sql_debug("Err at Condition'child expr");
+      }
     } break;
     default: {
     } break;

@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/select_stmt.h"
+#include "common/log/log.h"
 #include "event/sql_debug.h"
 #include "sql/expr/expression.h"
 #include "sql/parser/parse_defs.h"
@@ -203,20 +204,21 @@ static RC get_expressions(
     const std::unordered_map<std::string, Table *> &table_map, const std::vector<Table *> &tables, Db *db
 )
 {
-  RC rc = RC::SUCCESS;
-  std::vector<ParseExpr*> selectors = sql_node.expressions;
-  //处理字段
-  std::vector<RelAttrSqlNode>     explicit_attrs;
-  for (auto const &expr:selectors){
-    if (expr->expr_type() == ParseExprType::FIELD){
-      auto field_expr = dynamic_cast<ParseFieldExpr*>(expr);
-      RelAttrSqlNode temp{field_expr->table_name(),field_expr->table_alias(),field_expr->field_name(),field_expr->field_alias()};
+  RC                       rc        = RC::SUCCESS;
+  std::vector<ParseExpr *> selectors = sql_node.expressions;
+  // 处理显式查询字段
+  std::vector<RelAttrSqlNode> explicit_attrs;
+  for (auto const &expr : selectors) {
+    if (expr->expr_type() == ParseExprType::FIELD) {
+      auto           field_expr = dynamic_cast<ParseFieldExpr *>(expr);
+      RelAttrSqlNode temp{
+          field_expr->table_name(), field_expr->table_alias(), field_expr->field_name(), field_expr->field_alias()};
       explicit_attrs.emplace_back(temp);
     }
   }
-  if (!explicit_attrs.empty()){
+  if (!explicit_attrs.empty()) {
     rc = FieldExpr::create(explicit_attrs, table_map, tables, res_expressions, db);
-    if (rc != RC::SUCCESS){
+    if (rc != RC::SUCCESS) {
       sql_debug("Err at attrs->exprs");
       return rc;
     }
@@ -239,7 +241,7 @@ static RC get_expressions(
     res_expressions.push_back(tmp_expression);
   }
 
-  // 函数表达式处理,此处查询的列可能被放在这里
+  // 显式的函数表达式处理,此处查询的列可能被放在这里
   for (auto const expr : sql_node.expressions) {
     if (expr->expr_type() == ParseExprType::FUNCTION) {
       Expression *res_expr = nullptr;
@@ -248,11 +250,60 @@ static RC get_expressions(
     }
     if (expr->expr_type() == ParseExprType::FIELD) {
       // 此处跳过已经在前面处理过了
-      // Expression    *res_expr = nullptr;
-      // auto           pf       = dynamic_cast<ParseFieldExpr *>(res_expr);
-      // RelAttrSqlNode temp{pf->table_name(), pf->table_alias(), pf->field_name(), pf->field_alias()};
-      // if (RC::SUCCESS == FieldExpr::create(temp, table_map, tables, res_expr))
-      //   res_expressions.emplace_back(res_expr);
+    }
+  }
+
+  // 处理条件语句中隐式的列需求 -> 因为Expr现在是TableScan的父节点
+  // 要想办法及能够找到这个表达式又不把他们加入project的projections
+  for (auto &condition : sql_node.conditions) {
+    ParseExpr *left  = condition.left;
+    ParseExpr *right = condition.right;
+    // 首先处理左边
+    if (left->expr_type() == ParseExprType::FUNCTION) {
+      ParseExpr *left_child = dynamic_cast<ParseFunctionExpr *>(left)->get_left();
+      if (left_child->expr_type() == ParseExprType::FIELD) {
+        // 默认只有一层不允许嵌套
+        Expression    *res_expr = nullptr;
+        auto           pf       = dynamic_cast<ParseFieldExpr *>(left_child);
+        RelAttrSqlNode temp{pf->table_name(), pf->table_alias(), pf->field_name(), pf->field_alias()};
+        if (RC::SUCCESS == FieldExpr::create(temp, table_map, tables, res_expr)) {
+          res_expr->set_name(pf->field_name());
+          res_expressions.emplace_back(res_expr);
+        }
+      }
+    } else if (left->expr_type() == ParseExprType::FIELD) {
+      Expression    *res_expr = nullptr;
+      auto           pf       = dynamic_cast<ParseFieldExpr *>(res_expr);
+      RelAttrSqlNode temp{pf->table_name(), pf->table_alias(), pf->field_name(), pf->field_alias()};
+      if (RC::SUCCESS == FieldExpr::create(temp, table_map, tables, res_expr)) {
+        res_expr->set_name(pf->field_name());
+        res_expressions.emplace_back(res_expr);
+      }
+    } else {
+      sql_debug("Wrong at making implicit field get");
+      return RC::INTERNAL;
+    }
+
+    // 处理右侧
+    // Handle right side
+    if (right->expr_type() == ParseExprType::FUNCTION) {
+      // Only process the left operand for function expressions
+      ParseExpr *right_child = dynamic_cast<ParseFunctionExpr *>(right)->get_right();
+      if (right_child->expr_type() == ParseExprType::FIELD) {
+        Expression    *res_expr = nullptr;
+        auto           pf       = dynamic_cast<ParseFieldExpr *>(right_child);
+        RelAttrSqlNode temp{pf->table_name(), pf->table_alias(), pf->field_name(), pf->field_alias()};
+        if (RC::SUCCESS == FieldExpr::create(temp, table_map, tables, res_expr)) {
+          res_expressions.emplace_back(res_expr);
+        }
+      }
+    } else if (right->expr_type() == ParseExprType::FIELD) {
+      Expression    *res_expr = nullptr;
+      auto           pf       = dynamic_cast<ParseFieldExpr *>(right);
+      RelAttrSqlNode temp{pf->table_name(), pf->table_alias(), pf->field_name(), pf->field_alias()};
+      if (RC::SUCCESS == FieldExpr::create(temp, table_map, tables, res_expr)) {
+        res_expressions.emplace_back(res_expr);
+      }
     }
   }
   return rc;

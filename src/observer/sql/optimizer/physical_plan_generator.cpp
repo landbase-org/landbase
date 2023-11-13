@@ -270,6 +270,7 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
 
   ProjectPhysicalOperator *project_operator = new ProjectPhysicalOperator;
   auto                    &project_exprs    = project_oper.expres();
+  // 做点什么让一些筛选用的表达式不要加入Projection
   for (const auto &expr : project_exprs) {
     project_operator->add_projection(expr);
   }
